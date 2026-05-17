@@ -1,0 +1,6 @@
+{
+  "name": "Soldev HR",
+  "short_name": "Soldev",
+  "start_url": "/",
+  "display": "standalone"
+}

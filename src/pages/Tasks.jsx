@@ -1,0 +1,233 @@
+import { useState, useEffect } from "react";
+import { Plus, CheckCircle, Clock, AlertTriangle, Search, Filter, X, Save, User } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { useRole } from "../lib/useRole";
+import { canDo } from "../lib/crudPermissions";
+
+const PRIORITY_COLORS = {
+  "عالية": "bg-red-100 text-red-700",
+  "متوسطة": "bg-amber-100 text-amber-700",
+  "منخفضة": "bg-green-100 text-green-700",
+};
+const STATUS_COLORS = {
+  "قيد العمل": "bg-blue-100 text-blue-700",
+  "مكتملة": "bg-green-100 text-green-700",
+  "متأخرة": "bg-red-100 text-red-600",
+  "ملغاة": "bg-gray-100 text-gray-500",
+};
+
+function TaskForm({ task, employees, onSave, onClose }) {
+  const [form, setForm] = useState({
+    title: "", description: "", assigned_to: "", assigned_to_id: "",
+    department: "", priority: "متوسطة", status: "قيد العمل",
+    due_date: "", notes: "", ...(task || {})
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleEmpSelect = (id) => {
+    const emp = employees.find(e => e.id === id);
+    if (emp) { set("assigned_to_id", id); set("assigned_to", emp.full_name_ar); set("department", emp.department || ""); }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    if (task?.id) await base44.entities.Task.update(task.id, form);
+    else await base44.entities.Task.create(form);
+    onSave();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h3 className="font-bold text-foreground">{task ? "تعديل المهمة" : "مهمة جديدة"}</h3>
+          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">عنوان المهمة *</label>
+            <input value={form.title} onChange={e => set("title", e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">مسند إلى</label>
+            <select value={form.assigned_to_id} onChange={e => handleEmpSelect(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none">
+              <option value="">اختر موظف...</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.full_name_ar} — {e.department}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">الأولوية</label>
+              <select value={form.priority} onChange={e => set("priority", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none">
+                <option>عالية</option><option>متوسطة</option><option>منخفضة</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">الحالة</label>
+              <select value={form.status} onChange={e => set("status", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none">
+                <option>قيد العمل</option><option>مكتملة</option><option>متأخرة</option><option>ملغاة</option>
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">تاريخ الاستحقاق</label>
+            <input type="date" value={form.due_date} onChange={e => set("due_date", e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground">الوصف</label>
+            <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={3}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none resize-none" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted text-foreground">إلغاء</button>
+          <button onClick={handleSave} disabled={saving || !form.title}
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
+            <Save className="w-4 h-4" />{saving ? "جاري الحفظ..." : "حفظ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Tasks() {
+  const { user } = useRole();
+  const canCreate = canDo(user, "tasks", "create");
+  const canEdit   = canDo(user, "tasks", "edit");
+  const canDelete = canDo(user, "tasks", "delete");
+  const [tasks, setTasks] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editTask, setEditTask] = useState(null);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [search, setSearch] = useState("");
+
+  const load = async () => {
+    const [ts, emps] = await Promise.all([
+      base44.entities.Task.list("-created_date"),
+      base44.entities.Employee.filter({ status: "نشط" }),
+    ]);
+    setTasks(ts); setEmployees(emps); setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const deleteTask = async (id) => {
+    if (confirm("حذف هذه المهمة؟")) { await base44.entities.Task.delete(id); load(); }
+  };
+
+  const toggleComplete = async (task) => {
+    const newStatus = task.status === "مكتملة" ? "قيد العمل" : "مكتملة";
+    await base44.entities.Task.update(task.id, { status: newStatus, completion_date: newStatus === "مكتملة" ? new Date().toISOString().slice(0, 10) : "" });
+    load();
+  };
+
+  const filtered = tasks
+    .filter(t => !filterStatus || t.status === filterStatus)
+    .filter(t => !search || t.title?.includes(search) || t.assigned_to?.includes(search));
+
+  const counts = {
+    all: tasks.length,
+    "قيد العمل": tasks.filter(t => t.status === "قيد العمل").length,
+    "مكتملة": tasks.filter(t => t.status === "مكتملة").length,
+    "متأخرة": tasks.filter(t => t.status === "متأخرة").length,
+  };
+
+  const isOverdue = (task) => task.due_date && new Date(task.due_date) < new Date() && task.status !== "مكتملة";
+
+  return (
+    <div className="p-6 space-y-5 max-w-5xl mx-auto" dir="rtl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">المهام الداخلية</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">إسناد المهام وتتبعها بين الفريق</p>
+        </div>
+        {canCreate && (
+          <button onClick={() => { setEditTask(null); setShowForm(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
+            <Plus className="w-4 h-4" />إنشاء مهمة جديدة
+          </button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث باسم المهمة..."
+            className="w-full pr-9 pl-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none" />
+        </div>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          className="px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none">
+          <option value="">تصفية حسب...</option>
+          <option value="قيد العمل">قيد العمل</option>
+          <option value="مكتملة">مكتملة</option>
+          <option value="متأخرة">متأخرة</option>
+        </select>
+      </div>
+
+      {/* Status Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {[["", "الكل", counts.all], ["قيد العمل", "قيد العمل", counts["قيد العمل"]], ["مكتملة", "مكتملة", counts["مكتملة"]], ["متأخرة", "متأخرة", counts["متأخرة"]]].map(([val, label, count]) => (
+          <button key={val} onClick={() => setFilterStatus(val)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterStatus === val ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}>
+            {label} ({count})
+          </button>
+        ))}
+      </div>
+
+      {/* Task List */}
+      <div className="space-y-2">
+        {loading ? <p className="text-center py-10 text-muted-foreground">جاري التحميل...</p>
+          : filtered.length === 0 ? (
+            <div className="text-center py-16 bg-card rounded-xl border border-border">
+              <CheckCircle className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-30" />
+              <p className="text-sm text-muted-foreground">لا توجد مهام</p>
+            </div>
+          ) : filtered.map(task => (
+            <div key={task.id} className={`bg-card rounded-xl border p-4 flex items-start gap-3 ${isOverdue(task) ? "border-red-200 bg-red-50/30" : "border-border"}`}>
+              <button onClick={() => toggleComplete(task)} className="mt-0.5 flex-shrink-0">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${task.status === "مكتملة" ? "bg-green-500 border-green-500" : "border-muted-foreground"}`}>
+                  {task.status === "مكتملة" && <CheckCircle className="w-3 h-3 text-white" />}
+                </div>
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className={`font-semibold text-sm ${task.status === "مكتملة" ? "line-through text-muted-foreground" : "text-foreground"}`}>{task.title}</h3>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[task.status]}`}>{task.status}</span>
+                  {isOverdue(task) && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">متأخرة!</span>}
+                </div>
+                {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
+                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                  {task.assigned_to && <span className="flex items-center gap-1"><User className="w-3 h-3" />لموظف: {task.assigned_to}</span>}
+                  {task.due_date && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(task.due_date).toLocaleDateString("ar-SA")}</span>}
+                  {task.department && <span>{task.department}</span>}
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {canEdit && (
+                  <button onClick={() => { setEditTask(task); setShowForm(true); }}
+                    className="text-xs px-3 py-1.5 border border-border rounded-lg hover:bg-muted text-foreground">تعديل</button>
+                )}
+                {canDelete && (
+                  <button onClick={() => deleteTask(task.id)}
+                    className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50">حذف</button>
+                )}
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {showForm && <TaskForm task={editTask} employees={employees} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
+    </div>
+  );
+}

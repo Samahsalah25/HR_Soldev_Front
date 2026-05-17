@@ -1,0 +1,90 @@
+{
+  "name": "StorageCustomer",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string",
+      "title": "\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644"
+    },
+    "email": {
+      "type": "string",
+      "title": "\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a"
+    },
+    "phone": {
+      "type": "string",
+      "title": "\u0631\u0642\u0645 \u0627\u0644\u062c\u0648\u0627\u0644"
+    },
+    "password_hash": {
+      "type": "string",
+      "title": "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631"
+    },
+    "id_number": {
+      "type": "string",
+      "title": "\u0631\u0642\u0645 \u0627\u0644\u0647\u0648\u064a\u0629 / \u0627\u0644\u0625\u0642\u0627\u0645\u0629"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "title": "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0645\u064a\u0644\u0627\u062f"
+    },
+    "customer_type": {
+      "type": "string",
+      "title": "\u0646\u0648\u0639 \u0627\u0644\u0639\u0645\u064a\u0644",
+      "enum": [
+        "\u0641\u0631\u062f",
+        "\u0634\u0631\u0643\u0629"
+      ],
+      "default": "\u0641\u0631\u062f"
+    },
+    "storage_type": {
+      "type": "string",
+      "title": "\u0646\u0648\u0639 \u0627\u0644\u0645\u062e\u0632\u0648\u0646"
+    },
+    "contract_months": {
+      "type": "number",
+      "title": "\u0645\u062f\u0629 \u0627\u0644\u0639\u0642\u062f (\u0623\u0634\u0647\u0631)",
+      "default": 1
+    },
+    "company_name": {
+      "type": "string",
+      "title": "\u0627\u0633\u0645 \u0627\u0644\u0634\u0631\u0643\u0629"
+    },
+    "company_rep": {
+      "type": "string",
+      "title": "\u0627\u0633\u0645 \u0627\u0644\u0645\u0641\u0648\u0636"
+    },
+    "commercial_reg": {
+      "type": "string",
+      "title": "\u0631\u0642\u0645 \u0627\u0644\u0633\u062c\u0644 \u0627\u0644\u062a\u062c\u0627\u0631\u064a"
+    },
+    "tax_number": {
+      "type": "string",
+      "title": "\u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0636\u0631\u064a\u0628\u064a"
+    },
+    "id_image_url": {
+      "type": "string",
+      "title": "\u0635\u0648\u0631\u0629 \u0627\u0644\u0647\u0648\u064a\u0629"
+    },
+    "commercial_reg_url": {
+      "type": "string",
+      "title": "\u0645\u0644\u0641 \u0627\u0644\u0633\u062c\u0644 \u0627\u0644\u062a\u062c\u0627\u0631\u064a"
+    },
+    "is_active": {
+      "type": "boolean",
+      "title": "\u0646\u0634\u0637",
+      "default": true
+    }
+  },
+  "required": [
+    "full_name",
+    "email",
+    "phone",
+    "password_hash"
+  ],
+  "rls": {
+    "read": true,
+    "create": true,
+    "update": false,
+    "delete": false
+  }
+}

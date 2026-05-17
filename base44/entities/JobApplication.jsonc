@@ -1,0 +1,121 @@
+{
+  "name": "JobApplication",
+  "type": "object",
+  "properties": {
+    "recruitment_id": {
+      "type": "string",
+      "title": "\u0645\u0639\u0631\u0641 \u0637\u0644\u0628 \u0627\u0644\u062a\u0648\u0638\u064a\u0641"
+    },
+    "job_title": {
+      "type": "string",
+      "title": "\u0627\u0644\u0645\u0633\u0645\u0649 \u0627\u0644\u0648\u0638\u064a\u0641\u064a"
+    },
+    "applicant_name": {
+      "type": "string",
+      "title": "\u0627\u0633\u0645 \u0627\u0644\u0645\u062a\u0642\u062f\u0645"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "title": "\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a"
+    },
+    "phone": {
+      "type": "string",
+      "title": "\u0631\u0642\u0645 \u0627\u0644\u062c\u0648\u0627\u0644"
+    },
+    "nationality": {
+      "type": "string",
+      "title": "\u0627\u0644\u062c\u0646\u0633\u064a\u0629"
+    },
+    "experience_years": {
+      "type": "number",
+      "title": "\u0633\u0646\u0648\u0627\u062a \u0627\u0644\u062e\u0628\u0631\u0629",
+      "default": 0
+    },
+    "current_salary": {
+      "type": "number",
+      "title": "\u0627\u0644\u0631\u0627\u062a\u0628 \u0627\u0644\u062d\u0627\u0644\u064a",
+      "default": 0
+    },
+    "expected_salary": {
+      "type": "number",
+      "title": "\u0627\u0644\u0631\u0627\u062a\u0628 \u0627\u0644\u0645\u062a\u0648\u0642\u0639",
+      "default": 0
+    },
+    "cv_url": {
+      "type": "string",
+      "title": "\u0631\u0627\u0628\u0637 \u0627\u0644\u0633\u064a\u0631\u0629 \u0627\u0644\u0630\u0627\u062a\u064a\u0629"
+    },
+    "cover_letter": {
+      "type": "string",
+      "title": "\u062e\u0637\u0627\u0628 \u0627\u0644\u062a\u0642\u062f\u064a\u0645"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "\u062c\u062f\u064a\u062f",
+        "\u0641\u0631\u0632 \u0623\u0648\u0644\u064a",
+        "\u0645\u0642\u0627\u0628\u0644\u0629 HR",
+        "\u0645\u0642\u0627\u0628\u0644\u0629 \u0641\u0646\u064a\u0629",
+        "\u0639\u0631\u0636 \u0648\u0638\u064a\u0641\u064a",
+        "\u0645\u0642\u0628\u0648\u0644",
+        "\u0645\u0631\u0641\u0648\u0636",
+        "\u0627\u0646\u0633\u062d\u0627\u0628"
+      ],
+      "title": "\u0645\u0631\u062d\u0644\u0629 \u0627\u0644\u0637\u0644\u0628",
+      "default": "\u062c\u062f\u064a\u062f"
+    },
+    "interviews": {
+      "type": "array",
+      "title": "\u0627\u0644\u0645\u0642\u0627\u0628\u0644\u0627\u062a",
+      "items": {
+        "type": "object",
+        "properties": {
+          "interview_type": {
+            "type": "string"
+          },
+          "interview_date": {
+            "type": "string"
+          },
+          "interviewer_name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "final_result": {
+      "type": "string",
+      "title": "\u0627\u0644\u0646\u062a\u064a\u062c\u0629 \u0627\u0644\u0646\u0647\u0627\u0626\u064a\u0629",
+      "enum": [
+        "\u0642\u064a\u062f \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629",
+        "\u0646\u0627\u062c\u062d",
+        "\u0631\u0627\u0633\u0628",
+        "\u0641\u064a \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631"
+      ]
+    },
+    "rejection_reason": {
+      "type": "string",
+      "title": "\u0633\u0628\u0628 \u0627\u0644\u0631\u0641\u0636"
+    },
+    "hr_notes": {
+      "type": "string",
+      "title": "\u0645\u0644\u0627\u062d\u0638\u0627\u062a HR \u0627\u0644\u062f\u0627\u062e\u0644\u064a\u0629"
+    }
+  },
+  "required": [
+    "recruitment_id",
+    "job_title",
+    "applicant_name",
+    "email",
+    "phone"
+  ]
+}

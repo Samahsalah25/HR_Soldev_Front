@@ -53,7 +53,22 @@ import AssetManagement from './pages/AssetManagement';
 import LoanManagement from './pages/LoanManagement';
 import Termination from './pages/Termination';
 import Login from "./pages/Login";
+import ProtectedRoute from "./routes/ProtectedRoute.jsx";
+import { logoutUser } from "@/api/authApi";
+import { useNavigate } from "react-router-dom";
 function TerminatedEmployeeScreen() {
+  const navigate = useNavigate();
+
+const handleLogout = async () => {
+  try {
+    await logoutUser(); // 
+  } catch (err) {
+    console.log("logout error:", err);
+  }
+
+  localStorage.removeItem("user"); 
+  navigate("/"); // أو "/"
+};
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background" dir="rtl">
       <div className="max-w-md w-full mx-4 text-center space-y-6">
@@ -73,7 +88,7 @@ function TerminatedEmployeeScreen() {
           </p>
         </div>
         <button
-          onClick={() => base44.auth.logout()}
+          onClick={() =>handleLogout()}
           className="px-6 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
           تسجيل الخروج
@@ -144,7 +159,9 @@ const AuthenticatedApp = () => {
       <Route path="/login-employee" element={<EmployeeEntry />} />
       <Route path="/login" element={<Login />} />
       <Route path="/login-empolyee" element={<EmployeeEntry />} />
+      <Route element={<ProtectedRoute />}>
       <Route element={<Layout />}>
+      
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/home-dashboard" element={<RoleDashboard />} />
         <Route path="/employees" element={<Employees />} />
@@ -181,7 +198,7 @@ const AuthenticatedApp = () => {
         <Route path="/assets" element={<AssetManagement />} />
         <Route path="/loan-management" element={<LoanManagement />} />
         <Route path="/termination" element={<Termination />} />
-      </Route>
+      </Route></Route>
       <Route path="/careers" element={<PublicJobApplication />} />
       <Route path="/storage-booking" element={<StorageBookingFlow />} />
       <Route path="/my-storage" element={<CustomerPortal />} />

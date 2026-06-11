@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { Plus, Save, Trash2, Settings } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import {
+  getSalaryAdvanceTypes,
+  createSalaryAdvanceType,
+  updateSalaryAdvanceType,
+  deleteSalaryAdvanceType,
+} from "@/api/salaryAdvanceTypesApi";
 
 const defaultType = {
   name: "", name_en: "", description: "",
@@ -18,29 +24,50 @@ export default function LoanTypeManager({ onClose }) {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
-    const data = await base44.entities.LoanType.list();
-    setTypes(data);
-  };
-
+ const load = async () => {
+  const response = await getSalaryAdvanceTypes();
+  setTypes(response.data || []);
+};
   useEffect(() => { load(); }, []);
 
-  const handleSave = async () => {
-    setSaving(true);
-    if (editing.id) {
-      await base44.entities.LoanType.update(editing.id, editing);
-    } else {
-      await base44.entities.LoanType.create(editing);
-    }
-    setEditing(null);
-    load();
-    setSaving(false);
+ const handleSave = async () => {
+  setSaving(true);
+
+  const payload = {
+    name: editing.name_en || editing.name,
+    name_ar: editing.name,
+    description: editing.description,
+    maximum_amount: editing.max_amount,
+    maximum_installments: editing.max_installments,
+    salary_percentage: editing.salary_ratio,
+    minimum_service_period: editing.min_service_months,
+    direct_manager_approval: editing.requires_manager_approval,
+    hr_approval: editing.requires_hr_approval,
+    finance_approval: editing.requires_finance_approval,
+    finance_approval_limit: editing.finance_approval_threshold,
   };
 
-  const handleDelete = async (id) => {
-    await base44.entities.LoanType.update(id, { is_active: false });
+  try {
+    if (editing.id) {
+      await updateSalaryAdvanceType(editing.id, payload);
+    } else {
+      await createSalaryAdvanceType(payload);
+    }
+
+    setEditing(null);
     load();
-  };
+  } finally {
+    setSaving(false);
+  }
+};
+
+const handleDelete = async (id) => {
+  if (!confirm("حذف نوع السلفة؟")) return;
+
+  await deleteSalaryAdvanceType(id);
+
+  load();
+};
 
   const set = (k, v) => setEditing(f => ({ ...f, [k]: v }));
 
@@ -70,20 +97,53 @@ export default function LoanTypeManager({ onClose }) {
                         <p className="font-semibold text-foreground">{t.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">حد أقصى: {t.max_amount?.toLocaleString("ar-SA")} ر.س</span>
-                          <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">حتى {t.max_installments} قسط</span>
+                          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">حد أقصى: {t.maximum_amount?.toLocaleString("ar-SA")} ر.س</span>
+                          <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">حتى {t.maximum_installments} قسط</span>
                           <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded">{t.salary_ratio}× الراتب</span>
-                          <span className="text-xs bg-slate-50 text-slate-700 px-2 py-0.5 rounded">خدمة ≥ {t.min_service_months} شهر</span>
+                          <span className="text-xs bg-slate-50 text-slate-700 px-2 py-0.5 rounded">خدمة ≥ {t.minimum_service_period} شهر</span>
                         </div>
                         <div className="flex gap-2 mt-2">
-                          {t.requires_manager_approval && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">✓ مدير</span>}
-                          {t.requires_hr_approval && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">✓ HR</span>}
-                          {t.requires_finance_approval && <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">✓ مالية (&gt;{t.finance_approval_threshold?.toLocaleString("ar-SA")})</span>}
+                          {t.direct_manager_approval && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">✓ مدير</span>}
+                          {t.hr_approval && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">✓ HR</span>}
+                          {t.finance_approval && <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">✓ مالية (&gt;{t.finance_approval_threshold?.toLocaleString("ar-SA")})</span>}
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => setEditing({ ...t })} className="text-xs px-3 py-1.5 border border-border rounded-lg hover:bg-muted text-foreground">تعديل</button>
-                        {t.is_active && <button onClick={() => handleDelete(t.id)} className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>}
+                        <button onClick={() =>
+  setEditing({
+    id: t.id,
+
+    name: t.name_ar,
+    name_en: t.name,
+
+    description: t.description,
+
+    max_amount: t.maximum_amount,
+    max_installments: t.maximum_installments,
+
+    salary_ratio: t.salary_ratio,
+
+    min_service_months: t.minimum_service_period,
+
+    requires_manager_approval:
+      t.direct_manager_approval,
+
+    requires_hr_approval:
+      t.hr_approval,
+
+    requires_finance_approval:
+      t.finance_approval,
+
+    finance_approval_threshold:
+      t.finance_approval_limit,
+  })
+} className="text-xs px-3 py-1.5 border border-border rounded-lg hover:bg-muted text-foreground">تعديل</button>
+                        <button
+  onClick={() => handleDelete(t.id)}
+  className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+>
+  <Trash2 className="w-3.5 h-3.5" />
+</button>
                       </div>
                     </div>
                   </div>

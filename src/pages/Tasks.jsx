@@ -3,7 +3,40 @@ import { Plus, CheckCircle, Clock, AlertTriangle, Search, Filter, X, Save, User 
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
+import {
+  getTasks,
+  createTask,
+  updateTask,
+  deleteTask as deleteTaskApi,
+} from "@/api/tasksApi";
+import {
+getEmployees,
+} from "@/api/departmentsApi";
+const PRIORITY_MAP = {
+  "عالية": "high",
+  "متوسطة": "medium",
+  "منخفضة": "low",
+};
 
+const PRIORITY_MAP_REVERSE = {
+  high: "عالية",
+  medium: "متوسطة",
+  low: "منخفضة",
+};
+
+const STATUS_MAP = {
+  "قيد العمل": "in_progress",
+  "مكتملة": "complete",
+  "متأخرة": "late",
+  "ملغاة": "cancelled",
+};
+
+const STATUS_MAP_REVERSE = {
+  in_progress: "قيد العمل",
+  complete: "مكتملة",
+  late: "متأخرة",
+  cancelled: "ملغاة",
+};
 const PRIORITY_COLORS = {
   "عالية": "bg-red-100 text-red-700",
   "متوسطة": "bg-amber-100 text-amber-700",
@@ -25,15 +58,34 @@ function TaskForm({ task, employees, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleEmpSelect = (id) => {
-    const emp = employees.find(e => e.id === id);
-    if (emp) { set("assigned_to_id", id); set("assigned_to", emp.full_name_ar); set("department", emp.department || ""); }
-  };
+const handleEmpSelect = (id) => {
+  const emp = employees.find(e => e.id === id);
+
+  if (emp) {
+    set("assigned_to_id", id);
+    set("assigned_to", emp.full_name_ar);
+    set("department", emp.department || "");
+  }
+};
 
   const handleSave = async () => {
     setSaving(true);
-    if (task?.id) await base44.entities.Task.update(task.id, form);
-    else await base44.entities.Task.create(form);
+ const payload = {
+  title: form.title,
+  employee_id: form.assigned_to_id || null,
+  priority: PRIORITY_MAP[form.priority],
+  state: STATUS_MAP[form.status],
+  deadline: form.due_date
+    ? `${form.due_date} 18:00:00`
+    : null,
+  description: form.description,
+};
+
+if (task?.id) {
+  await updateTask(task.id, payload);
+} else {
+  await createTask(payload);
+}
     onSave();
   };
 
@@ -52,7 +104,7 @@ function TaskForm({ task, employees, onSave, onClose }) {
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">مسند إلى</label>
-            <select value={form.assigned_to_id} onChange={e => handleEmpSelect(e.target.value)}
+            <select value={form.assigned_to_id} onChange={e => handleEmpSelect(Number(e.target.value))}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none">
               <option value="">اختر موظف...</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.full_name_ar} — {e.department}</option>)}
@@ -110,24 +162,104 @@ export default function Tasks() {
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
 
-  const load = async () => {
-    const [ts, emps] = await Promise.all([
-      base44.entities.Task.list("-created_date"),
-      base44.entities.Employee.filter({ status: "نشط" }),
-    ]);
-    setTasks(ts); setEmployees(emps); setLoading(false);
-  };
+const load = async () => {
+  try {
+    setLoading(true);
+
+    const [tasksRes, employeesRes] =
+      await Promise.all([
+        getTasks(),
+        getEmployees(),
+      ]);
+
+    // TASKS
+    const normalized =
+      tasksRes?.data?.map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        assigned_to: t.employee_name,
+        assigned_to_id: t.employee_id,
+
+        priority:
+          PRIORITY_MAP_REVERSE[
+            t.priority
+          ] || "متوسطة",
+
+        status:
+          STATUS_MAP_REVERSE[
+            t.state
+          ] || "قيد العمل",
+
+        due_date: t.deadline
+          ? t.deadline.split(" ")[0]
+          : "",
+
+        active: t.active,
+      })) || [];
+
+    // EMPLOYEES
+    const normalizedEmployees =
+      employeesRes?.data?.map(
+        (emp) => ({
+          id: emp.id,
+
+          full_name_ar:
+            emp.full_name_ar ||
+            emp.name ||
+            emp.full_name,
+
+          department:
+            emp.department_name ||
+            emp.department ||
+            "",
+        })
+      ) || [];
+
+    setTasks(normalized);
+
+    setEmployees(
+      normalizedEmployees
+    );
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { load(); }, []);
 
   const deleteTask = async (id) => {
-    if (confirm("حذف هذه المهمة؟")) { await base44.entities.Task.delete(id); load(); }
+    if (confirm("حذف هذه المهمة؟")) { await await deleteTaskApi(id); load(); }
   };
 
   const toggleComplete = async (task) => {
-    const newStatus = task.status === "مكتملة" ? "قيد العمل" : "مكتملة";
-    await base44.entities.Task.update(task.id, { status: newStatus, completion_date: newStatus === "مكتملة" ? new Date().toISOString().slice(0, 10) : "" });
-    load();
+   const newStatus =
+  task.status === "مكتملة"
+    ? "قيد العمل"
+    : "مكتملة";
+
+await updateTask(task.id, {
+  title: task.title,
+  employee_id:
+    task.assigned_to_id,
+
+  priority:
+    PRIORITY_MAP[task.priority],
+
+  state:
+    STATUS_MAP[newStatus],
+
+  deadline: task.due_date
+    ? `${task.due_date} 18:00:00`
+    : null,
+
+  description:
+    task.description,
+});
+
+load();
   };
 
   const filtered = tasks

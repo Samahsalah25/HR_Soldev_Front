@@ -9,6 +9,20 @@ import LoanApplicationModal from "@/components/loans/LoanApplicationModal";
 import LoanDetailModal from "@/components/loans/LoanDetailModal";
 import LoanWorkflowBadge from "@/components/loans/LoanWorkflowBadge";
 import MonthlyInstallmentsView from "@/components/loans/MonthlyInstallmentsView";
+import { updateSalaryAdvance ,getAllInstallments } from "@/api/salaryAdvancesApi";
+
+import {
+  getActiveSalaryAdvances ,
+  getSalaryAdvances,  getSalaryAdvanceById,
+  getSalaryAdvanceInstallments,
+} from "@/api/salaryAdvancesApi";
+import {
+  getSalaryAdvanceTypes,
+} from "@/api/salaryAdvanceTypesApi";
+
+import {
+  getEmployees,
+} from "@/api/departmentsApi";
 
 // ─── Employee View ───────────────────────────────────────────────────
 function EmployeeView({ employee, loans, applications }) {
@@ -315,35 +329,213 @@ function FullView({ applications, loans, employees, user, role, onAction, onDisb
     red: "bg-red-100 text-red-600 hover:bg-red-200"
   };
 
-  const getActions = (app) => {
-    const actions = [];
-    const isHR = role === "admin" || role === "hr";
-    const isManager = ["admin", "hr", "dept_manager", "general_manager", "ceo"].includes(role);
-    const isFinance = role === "admin" || role === "accountant";
-    switch (app.status) {
-      case "قيد المراجعة":
-        if (isHR) actions.push({ label: "أحِل للمدير", color: "purple", fn: () => onAction(app, "انتظار موافقة المدير", null) });
-        if (isHR) actions.push({ label: "موافقة HR مباشرة", color: "blue", fn: () => onAction(app, "انتظار موافقة المالية", "hr_approved_by") });
-        break;
-      case "انتظار موافقة المدير":
-        if (isManager) actions.push({ label: "✓ موافقة المدير", color: "purple", fn: () => onAction(app, "انتظار موافقة HR", "manager_approved_by") });
-        break;
-      case "انتظار موافقة HR":
-        if (isHR) actions.push({ label: "✓ موافقة HR", color: "blue", fn: () => onAction(app, "انتظار موافقة المالية", "hr_approved_by") });
-        break;
-      case "انتظار موافقة المالية":
-        if (isFinance) actions.push({ label: "✓ موافقة المالية", color: "orange", fn: () => onAction(app, "معتمدة", "finance_approved_by") });
-        break;
-      case "معتمدة":
-        if (isFinance || isAdmin) actions.push({ label: "💸 صرف", color: "green", fn: () => onDisbUrse(app) });
-        break;
-    }
-    if (!["مرفوضة", "ملغاة", "مصروفة"].includes(app.status) && (isHR || isAdmin)) {
-      actions.push({ label: "رفض", color: "red", fn: () => onReject(app) });
-    }
-    return actions;
-  };
+// const getActions = (app) => {
+//   const actions = [];
 
+//   const type = app.loan_type || {};
+//   const isHR = role === "admin" || role === "hr";
+//   const isManager = ["admin", "hr", "dept_manager", "general_manager", "ceo"].includes(role);
+//   const isFinance = role === "admin" || role === "accountant";
+
+//   // 1) قيد المراجعة
+//   if (app.status === "قيد المراجعة") {
+
+//     // 👇 مدير لو النوع يسمح
+//     if (type.direct_manager_approval) {
+//       actions.push({
+//         label: "موافقة المدير",
+//         color: "purple",
+//         fn: () => onAction(app, "انتظار موافقة HR", "manager_approved_by")
+//       });
+//     }
+
+//     // 👇 HR لو النوع يسمح
+//     if (type.hr_approval) {
+//       actions.push({
+//         label: "موافقة HR",
+//         color: "blue",
+//         fn: () => onAction(app, "انتظار موافقة المالية", "hr_approved_by")
+//       });
+//     }
+//   }
+
+//   // 2) انتظار المدير
+//   if (app.status === "انتظار موافقة المدير") {
+//     if (type.direct_manager_approval && isManager) {
+//       actions.push({
+//         label: "✓ موافقة المدير",
+//         color: "purple",
+//         fn: () => onAction(app, "انتظار موافقة HR", "manager_approved_by")
+//       });
+//     }
+//   }
+
+//   // 3) انتظار HR
+//   if (app.status === "انتظار موافقة HR") {
+//     if (type.hr_approval && isHR) {
+//       actions.push({
+//         label: "✓ موافقة HR",
+//         color: "blue",
+//         fn: () => onAction(app, "انتظار موافقة المالية", "hr_approved_by")
+//       });
+//     }
+//   }
+
+//   // 4) المالية
+//   if (app.status === "انتظار موافقة المالية") {
+//     if (type.finance_approval && isFinance) {
+//       actions.push({
+//         label: "✓ موافقة المالية",
+//         color: "orange",
+//         fn: () => onAction(app, "معتمدة", "finance_approved_by")
+//       });
+//     }
+//   }
+
+//   // 5) الصرف
+//   if (app.status === "معتمدة") {
+//     if (isFinance || role === "admin") {
+//       actions.push({
+//         label: "💸 صرف",
+//         color: "green",
+//         fn: () => onDisbUrse(app)
+//       });
+//     }
+//   }
+
+//   // 6) رفض (يبقى عام)
+//   if (!["مرفوضة", "ملغاة", "مصروفة"].includes(app.status)) {
+//     if (isHR || role === "admin") {
+//       actions.push({
+//         label: "رفض",
+//         color: "red",
+//         fn: () => onReject(app)
+//       });
+//     }
+//   }
+
+//   return actions;
+// };
+
+const getActions = (app) => {
+  const actions = [];
+
+  const type = app.loan_type || {};
+
+  const isHR = role === "admin" || role === "hr";
+  const isManager = ["admin", "hr", "dept_manager", "general_manager", "ceo"].includes(role);
+  const isFinance = role === "admin" || role === "accountant";
+
+  // =========================
+  // 1) Draft → Submit
+  // =========================
+  if (app.apiState === "draft") {
+
+    actions.push({
+      label: "إحالة للمدير",
+      color: "purple",
+      fn: async () => {
+        await updateSalaryAdvance(app.id, "submit_to_manager");
+        load();
+      }
+    });
+
+    actions.push({
+      label: "إرسال مباشر HR",
+      color: "blue",
+      fn: async () => {
+        await updateSalaryAdvance(app.id, "direct_hr");
+        load();
+      }
+    });
+  }
+
+  // =========================
+  // 2) Manager approval
+  // =========================
+  if (app.apiState === "waiting_manager") {
+
+    if (type.direct_manager_approval && isManager) {
+
+      actions.push({
+        label: "✓ موافقة المدير",
+        color: "purple",
+        fn: async () => {
+          await updateSalaryAdvance(app.id, "manager_approve");
+          load();
+        }
+      });
+    }
+  }
+
+  // =========================
+  // 3) HR approval
+  // =========================
+  if (app.apiState === "waiting_hr") {
+
+    if (type.hr_approval && isHR) {
+
+      actions.push({
+        label: "✓ موافقة HR",
+        color: "blue",
+        fn: async () => {
+          await updateSalaryAdvance(app.id, "hr_approve");
+          load();
+        }
+      });
+    }
+  }
+
+  // =========================
+  // 4) Finance approval
+  // =========================
+  if (app.apiState === "waiting_financial") {
+
+    if (type.finance_approval && isFinance) {
+
+      actions.push({
+        label: "✓ موافقة المالية",
+        color: "orange",
+        fn: async () => {
+          await updateSalaryAdvance(app.id, "financial_approve");
+          load();
+        }
+      });
+    }
+  }
+
+  // =========================
+  // 5) Pay
+  // =========================
+  if (app.apiState === "approved") {
+
+    if (isFinance || role === "admin") {
+
+      actions.push({
+        label: "💸 صرف",
+        color: "green",
+        fn: async () => {
+          await updateSalaryAdvance(app.id, "pay");
+          load();
+        }
+      });
+    }
+  }
+
+  // =========================
+  // 6) Reject (في كل الحالات غير النهائية)
+  // =========================
+  if (!["rejected", "certified"].includes(app.apiState)) {
+
+    actions.push({
+      label: "رفض",
+      color: "red",
+      fn: () => onReject(app) // modal فقط
+    });
+  }
+
+  return actions;
+};
   return (
     <div className="space-y-4">
       <div className="flex gap-1 border-b border-border">
@@ -389,6 +581,7 @@ function FullView({ applications, loans, employees, user, role, onAction, onDisb
               {filteredApps.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد طلبات</td></tr>
               ) : filteredApps.map(app => {
+                  console.log("APP DEBUG:", app.status, app.apiState, app);
                 const actions = getActions(app);
                 return (
                   <tr key={app.id} className="border-b border-border last:border-0 hover:bg-muted/20">
@@ -419,7 +612,7 @@ function FullView({ applications, loans, employees, user, role, onAction, onDisb
       )}
 
       {activeTab === "installments" && (
-        <MonthlyInstallmentsView loans={loans} />
+        <MonthlyInstallmentsView loans={loans}  />
       )}
 
       {activeTab === "active" && (
@@ -488,31 +681,134 @@ export default function LoanManagement() {
   const [selectedLoanRepayments, setSelectedLoanRepayments] = useState([]);
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+const [installments, setInstallments] = useState([]);
 
-  const load = async () => {
-    const [apps, lns, emps] = await Promise.all([
-      base44.entities.LoanApplication.list("-created_date"),
-      base44.entities.Loan.list("-created_date"),
-      base44.entities.Employee.filter({ status: "نشط" }),
-    ]);
-    setApplications(apps);
-    setLoans(lns);
-    setEmployees(emps);
-    // Find current user's employee record
+const mapStatus = (state) => {
+  switch (state) {
+    case "draft":
+      return "قيد المراجعة";
+
+    case "waiting_manager":
+      return "انتظار موافقة المدير";
+
+    case "waiting_hr":
+      return "انتظار موافقة HR";
+
+    case "waiting_financial":
+      return "انتظار موافقة المالية";
+
+    case "approved":
+      return "معتمدة";
+
+    case "certified":
+      return "مصروفة";
+
+    case "rejected":
+      return "مرفوضة";
+
+    default:
+      return state;
+  }
+};
+
+const load = async () => {
+  try {
+    setLoading(true);
+
+    const [advancesRes, empsRes, typesRes, activeRes, installmentsRes] =
+      await Promise.all([
+        getSalaryAdvances(),
+        getEmployees(),
+        getSalaryAdvanceTypes(),
+        getActiveSalaryAdvances(),
+        getAllInstallments(),
+      ]);
+
+    const types = typesRes.data || [];
+
+    const applications = (advancesRes.data || []).map(item => {
+      const type = types.find(t => t.id === item.advance_type_id);
+
+      return {
+        ...item,
+        loan_type: type || null,
+        status: mapStatus(item.state),
+        apiState: item.state,
+        installments: item.installments_count,
+        monthly_deduction: item.installment_amount,
+        loan_type_name: item.advance_type_name,
+        created_date: item.start_date,
+        employee_name: item.employee_name,
+      };
+    });
+
+    setApplications(applications);
+
+    const loans = (activeRes.data || []).map(l => ({
+      id: l.id,
+      employee_name: l.employee_name,
+      amount: l.advance_amount,
+      paid_amount: l.paid_amount,
+      remaining_amount: l.amount_left,
+      status: "نشطة",
+      monthly_deduction: l.installment_amount,
+      issue_date: l.date_of_advance,
+      apiState: l.state,
+    }));
+
+    setLoans(loans);
+
+    const installments = installmentsRes.data || [];
+
+   const loansMap = Object.fromEntries(
+  loans.map(l => [l.id, l])
+);
+
+const installmentsView = installments.map(ins => ({
+  ...ins,
+  employee_name: loansMap[ins.loan_id]?.employee_name || "",
+  loan_amount: loansMap[ins.loan_id]?.amount || 0,
+}));
+    setInstallments(installmentsView);
+
+    const employees = empsRes.data || [];
+    setEmployees(employees);
+
     if (user) {
-      const emp = emps.find(e => e.email?.toLowerCase() === user.email?.toLowerCase());
+      const emp = employees.find(
+        e => e.email?.toLowerCase() === user.email?.toLowerCase()
+      );
       setMyEmployee(emp || null);
     }
-    setLoading(false);
-  };
 
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => { if (user !== null) load(); }, [user]);
 
-  const openLoanDetail = async (loan) => {
-    const repayments = await base44.entities.LoanRepayment.filter({ loan_id: loan.id });
-    setSelectedLoanRepayments(repayments.sort((a, b) => a.installment_number - b.installment_number));
-    setSelectedLoan(loan);
-  };
+ const openLoanDetail = async (loan) => {
+  try {
+    // 1. جيبي التفاصيل الكاملة (GET ONE)
+    const detailsRes = await getSalaryAdvanceById(loan.id);
+    const details = detailsRes.data;
+
+    // 2. جيبي جدول السداد
+    const installmentsRes = await getSalaryAdvanceInstallments(loan.id);
+    const installments = installmentsRes.data || [];
+
+    // 3. رتّبي الأقساط
+    const sorted = installments.sort(
+      (a, b) => a.installment_number - b.installment_number
+    );
+
+    setSelectedLoan(details);
+    setSelectedLoanRepayments(sorted);
+
+  } catch (error) {
+    console.error("Loan detail error:", error);
+  }
+};
 
   const advanceWorkflow = async (app, newStatus, approvalField) => {
     const update = { status: newStatus };
@@ -557,15 +853,24 @@ export default function LoanManagement() {
     load();
   };
 
-  const rejectApplication = async () => {
-    await base44.entities.LoanApplication.update(rejectModal.id, { status: "مرفوضة", rejection_reason: rejectReason });
-    await logLoanAction({
-      loan_application_id: rejectModal.id, employee_name: rejectModal.employee_name,
-      action: "رفض", performed_by: user?.full_name || user?.email,
-      performed_by_role: role, new_value: rejectReason,
-    });
-    setRejectModal(null); setRejectReason(""); load();
-  };
+ const rejectApplication = async () => {
+  if (!rejectModal?.id) return;
+
+  try {
+    await updateSalaryAdvance(
+      rejectModal.id,
+      "reject",
+      rejectReason
+    );
+
+    setRejectModal(null);
+    setRejectReason("");
+    load();
+
+  } catch (err) {
+    console.error("Reject error:", err);
+  }
+};
 
   const handleAction = (app, newStatus, approvalField) => {
     if (newStatus === "reject") { setRejectModal({ id: app.id, employee_name: app.employee_name }); return; }

@@ -3,15 +3,44 @@ import { TrendingDown, Plus, X, Save, Search } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
-
+import { getEmployees } from "@/api/departmentsApi";
+import {
+  getDeductions,
+  getUnderApprovalDeductions,
+  createDeduction,
+  updateDeduction,
+  deleteDeduction,
+} from "@/api/deductionsApi";
+// const STATUS_COLORS = {
+//   "قيد الاعتماد": "bg-amber-100 text-amber-700",
+//   "معتمد": "bg-blue-100 text-blue-700",
+//   "مطبَّق": "bg-green-100 text-green-700",
+//   "مرفوض": "bg-red-100 text-red-600",
+//   "مُلغى": "bg-gray-100 text-gray-500",
+// };
 const STATUS_COLORS = {
-  "قيد الاعتماد": "bg-amber-100 text-amber-700",
-  "معتمد": "bg-blue-100 text-blue-700",
-  "مطبَّق": "bg-green-100 text-green-700",
-  "مرفوض": "bg-red-100 text-red-600",
-  "مُلغى": "bg-gray-100 text-gray-500",
+  draft: "bg-gray-100 text-gray-600",
+  under_approval: "bg-amber-100 text-amber-700",
+  approved: "bg-blue-100 text-blue-700",
+  paid: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-600",
 };
-
+const STATE_LABELS = {
+  draft: "مسودة",
+  under_approval: "قيد الاعتماد",
+  approved: "معتمد",
+  rejected: "مرفوض",
+  paid: "مطبَّق",
+};
+const DEDUCTION_TYPE_LABELS = {
+  absence: "خصم غياب",
+  lateness: "خصم تأخير",
+  violation: "خصم مخالفة",
+  loan: "خصم قسط سلفة",
+  insurance: "خصم تأميني",
+  admin: "خصم إداري",
+  other: "أخرى",
+};
 function DeductionForm({ employees, violations, onSave, onClose }) {
   const [form, setForm] = useState({
     employee_id: "", employee_name: "", department: "",
@@ -21,10 +50,15 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleEmpSelect = (id) => {
-    const emp = employees.find(e => e.id === id);
-    if (emp) { set("employee_id", id); set("employee_name", emp.full_name_ar); set("department", emp.department || ""); }
-  };
+ const handleEmpSelect = (id) => {
+  const emp = employees.find(e => String(e.id) === String(id));
+
+  if (emp) {
+    set("employee_id", id);
+    set("employee_name", emp.full_name_ar || emp.name || "");
+    set("department", emp.department || emp.department_name || "");
+  }
+};
 
   const handleViolationSelect = (vid) => {
     const v = violations.find(x => x.id === vid);
@@ -35,11 +69,26 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
     }
   };
 
-  const handleSave = async () => {
+ const handleSave = async () => {
+  try {
     setSaving(true);
-    await base44.entities.Deduction.create({ ...form, status: "قيد الاعتماد", requires_approval: true });
+
+    await createDeduction({
+      employee: form.employee_id,
+      deduction_type: form.deduction_type,
+      date: form.month,
+      amount: form.amount,
+      reason: form.reason,
+      state: "قيد الاعتماد",
+    });
+
     onSave();
-  };
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setSaving(false);
+  }
+};
 
   const eligibleViolations = violations.filter(v => v.penalty === "خصم راتب" && v.status === "مؤكدة");
 
@@ -121,41 +170,100 @@ export default function Deductions() {
   const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState("");
 
-  const load = async () => {
-    const [ds, emps, vs] = await Promise.all([
-      base44.entities.Deduction.list("-created_date"),
-      base44.entities.Employee.list(),
-      base44.entities.Violation.list(),
+const load = async () => {
+  try {
+    setLoading(true);
+
+    const [ds, emps] = await Promise.all([
+      getDeductions(),
+      getEmployees(),
     ]);
-    setDeductions(ds); setEmployees(emps); setViolations(vs); setLoading(false);
-  };
+
+    // normalize deductions
+    const deductionsData = ds?.data ?? ds ?? [];
+const normalizedDeductions = deductionsData.map((d) => ({
+  id: d.id,
+  employee_name: d.employee_name,
+  department: d.department,
+  deduction_type: d.deduction_type,
+  month: d.month_of_deduction,
+  amount: d.amount,
+  reason: d.reason,
+
+  // مهم جداً
+  raw_state: d.state,
+
+  // عرض عربي فقط
+  status: STATE_LABELS[d.state] || d.state,
+}));
+
+    setDeductions(normalizedDeductions);
+
+    // normalize employees
+    const employeesData = emps?.data ?? emps ?? [];
+
+    const normalizedEmployees = employeesData.map((e) => ({
+      id: e.id,
+      full_name_ar: e.name,
+      department: e.department_name,
+      department_id: e.department_id,
+    }));
+
+    setEmployees(normalizedEmployees);
+
+  } catch (err) {
+    console.error("LOAD DEDUCTIONS ERROR:", err);
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => { load(); }, []);
 
-  const approve = async (id) => {
-    const u = await base44.auth.me();
-    await base44.entities.Deduction.update(id, { status: "معتمد", approved_by: u.full_name || u.email, approval_date: new Date().toISOString().slice(0, 10) });
-    load();
-  };
-  const reject = async (id) => {
-    await base44.entities.Deduction.update(id, { status: "مرفوض" });
-    load();
-  };
-  const apply = async (id) => {
-    await base44.entities.Deduction.update(id, { status: "مطبَّق" });
-    load();
-  };
+ const approve = async (id) => {
+  await updateDeduction(id, {
+    state: "approved",
+  });
+  load();
+};
+ const reject = async (id) => {
+  await updateDeduction(id, {
+    state: "rejected",
+  });
+  load();
+};
+ const apply = async (id) => {
+  await updateDeduction(id, {
+    state: "paid",
+  });
+  load();
+};
 
-  const pending = deductions.filter(d => d.status === "قيد الاعتماد");
-  const filtered = deductions
-    .filter(d => activeTab === "pending" ? d.status === "قيد الاعتماد" : true)
-    .filter(d => !filterMonth || d.month === filterMonth)
-    .filter(d => !search || d.employee_name?.includes(search) || d.deduction_type?.includes(search));
+ const pending = deductions.filter(
+  d => d.status === "قيد الاعتماد"
+);
 
-  const totals = {
-    pending: pending.length,
-    approved: deductions.filter(d => d.status === "معتمد").length,
-    applied: deductions.filter(d => d.status === "مطبَّق").reduce((s, d) => s + (d.amount || 0), 0),
-  };
+const filtered = deductions
+  .filter(d =>
+    activeTab === "pending"
+      ? d.status === "قيد الاعتماد"
+      : true
+  )
+  .filter(d => !filterMonth || d.month === filterMonth)
+  .filter(d =>
+    !search ||
+    d.employee_name?.includes(search) ||
+    d.deduction_type?.includes(search)
+  );
+
+const totals = {
+  pending: deductions.filter(d => d.status === "قيد الاعتماد").length,
+
+  approved: deductions.filter(d => d.status === "معتمد").length,
+
+  applied: deductions
+    .filter(d => d.status === "مطبَّق")
+    .reduce((s, d) => s + (Number(d.amount) || 0), 0),
+};
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -231,11 +339,11 @@ export default function Deductions() {
                     <p className="font-medium text-foreground">{d.employee_name}</p>
                     <p className="text-xs text-muted-foreground">{d.department}</p>
                   </td>
-                  <td className="px-4 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{d.deduction_type}</span></td>
+                  <td className="px-4 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{DEDUCTION_TYPE_LABELS[d.deduction_type] || d.deduction_type}</span></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{d.month}</td>
                   <td className="px-4 py-3 font-bold text-red-600">{d.amount?.toLocaleString("ar-SA")} ر.س</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground max-w-40 truncate">{d.reason}</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[d.status]}`}>{d.status}</span></td>
+                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[d.raw_state]}`}>{d.status}</span></td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       {d.status === "قيد الاعتماد" && canApprove && <>

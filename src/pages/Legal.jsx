@@ -3,14 +3,27 @@ import { Scale, FileText, Plus, X, Save, AlertTriangle, CheckCircle, Clock, Buil
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
-
+import {
+  getCases,
+  createCase,
+  deleteCase,
+  updateCase,
+} from "../API/casesApi";
 const CASE_STATUS_COLORS = {
-  "جديدة": "bg-blue-100 text-blue-700",
-  "قيد النظر": "bg-amber-100 text-amber-700",
-  "مؤجلة": "bg-gray-100 text-gray-600",
-  "مغلقة - لصالحنا": "bg-green-100 text-green-700",
-  "مغلقة - ضدنا": "bg-red-100 text-red-600",
-  "تسوية ودية": "bg-purple-100 text-purple-700",
+  new: "bg-blue-100 text-blue-700",
+  in_progress: "bg-amber-100 text-amber-700",
+  postponed: "bg-gray-100 text-gray-600",
+  won: "bg-green-100 text-green-700",
+  lost: "bg-red-100 text-red-600",
+  settled: "bg-purple-100 text-purple-700",
+};
+const CASE_STATUS_LABELS = {
+  new: "جديدة",
+  in_progress: "قيد النظر",
+  postponed: "مؤجلة",
+  won: "مغلقة لصالحنا",
+  lost: "مغلقة ضدنا",
+  settled: "تسوية ودية",
 };
 
 const CONTRACT_STATUS_COLORS = {
@@ -24,7 +37,7 @@ const CONTRACT_STATUS_COLORS = {
 function CaseForm({ employees, onSave, onClose }) {
   const [form, setForm] = useState({
     case_number: `QD-${Date.now().toString().slice(-5)}`, title: "",
-    case_type: "نزاع عمالي", party: "", court: "", filing_date: new Date().toISOString().slice(0, 10),
+   case_type: "employee_dispute", party: "", court: "", filing_date: new Date().toISOString().slice(0, 10),
     hearing_date: "", lawyer: "", estimated_value: 0, status: "جديدة",
     description: "", employee_id: "", employee_name: "", notes: ""
   });
@@ -34,11 +47,33 @@ function CaseForm({ employees, onSave, onClose }) {
     const emp = employees.find(e => e.id === id);
     if (emp) { set("employee_id", id); set("employee_name", emp.full_name_ar); }
   };
-  const handleSave = async () => {
+const handleSave = async () => {
+  try {
     setSaving(true);
-    await base44.entities.LegalCase.create(form);
+
+    const payload = {
+      case_number: form.case_number,
+      case_type: form.case_type,
+      case_title: form.title,
+      other_party: form.party,
+      court_agency: form.court,
+      submission_date: form.filing_date,
+      next_session_date: form.hearing_date,
+      lawyer: form.lawyer,
+      estimated_value: Number(form.estimated_value),
+      employee_id: form.employee_id || null,
+      case_description: form.description,
+    };
+
+    await createCase(payload);
+
     onSave();
-  };
+  } catch (error) {
+    console.error("Create Case Error:", error);
+  } finally {
+    setSaving(false);
+  }
+};
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
       <div className="bg-card rounded-2xl border border-border w-full max-w-xl shadow-2xl max-h-[90vh] flex flex-col">
@@ -52,10 +87,19 @@ function CaseForm({ employees, onSave, onClose }) {
               <input value={form.case_number} onChange={e => set("case_number", e.target.value)} dir="ltr"
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" /></div>
             <div className="space-y-1.5"><label className="text-sm font-medium">نوع القضية</label>
-              <select value={form.case_type} onChange={e => set("case_type", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                {["نزاع عمالي","قضية تجارية","عقد موظف","تعويض","إفصاح سري","أخرى"].map(t => <option key={t}>{t}</option>)}
-              </select></div>
+             <select
+  value={form.case_type}
+  onChange={e => set("case_type", e.target.value)}
+  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+>
+  <option value="employee_dispute">نزاع عمالي</option>
+  <option value="commercial_case">قضية تجارية</option>
+  <option value="employee_contract">عقد موظف</option>
+  <option value="compensation">تعويض</option>
+  <option value="confidential_disclosure">إفصاح سري</option>
+  <option value="other">أخرى</option>
+</select>
+              </div>
           </div>
           <div className="space-y-1.5"><label className="text-sm font-medium">عنوان القضية *</label>
             <input value={form.title} onChange={e => set("title", e.target.value)}
@@ -124,11 +168,31 @@ function ContractForm({ onSave, onClose }) {
     setFileUrl(file_url); setUploading(false);
   };
 
-  const handleSave = async () => {
+const handleSave = async () => {
+  try {
     setSaving(true);
-    await base44.entities.LegalContract.create({ ...form, file_url: fileUrl });
+
+    await createCase({
+      case_number: form.case_number,
+      case_type: form.case_type,
+      case_title: form.title,
+      other_party: form.party,
+      court_agency: form.court,
+      submission_date: form.filing_date,
+      next_session_date: form.hearing_date,
+      lawyer: form.lawyer,
+      estimated_value: form.estimated_value,
+      employee_id: form.employee_id || null,
+      case_description: form.description,
+    });
+
     onSave();
-  };
+  } catch (error) {
+    console.error(error);
+  } finally {
+    setSaving(false);
+  }
+};
 
   const daysToExpiry = form.end_date ? Math.ceil((new Date(form.end_date) - new Date()) / 86400000) : null;
 
@@ -220,23 +284,39 @@ export default function Legal() {
   const [search, setSearch] = useState("");
 
   const load = async () => {
-    const [cs, cts, emps] = await Promise.all([
-      base44.entities.LegalCase.list("-created_date"),
-      base44.entities.LegalContract.list("-created_date"),
-      base44.entities.Employee.list(),
-    ]);
+  const [casesResponse, cts, emps] = await Promise.all([
+  getCases(),
+  base44.entities.LegalContract.list("-created_date"),
+  base44.entities.Employee.list(),
+]);
+
+setCases(casesResponse.data || []);
+setContracts(cts);
+setEmployees(emps);
+setLoading(false);
     setCases(cs); setContracts(cts); setEmployees(emps); setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const deleteCase = async (id) => { if (confirm("حذف القضية؟")) { await base44.entities.LegalCase.delete(id); load(); } };
+const deleteCase = async (id) => {
+  if (confirm("حذف القضية؟")) {
+    await deleteCase(id);
+    load();
+  }
+};
   const deleteContract = async (id) => { if (confirm("حذف العقد؟")) { await base44.entities.LegalContract.delete(id); load(); } };
 
-  const filteredCases = cases.filter(c => !search || c.title?.includes(search) || c.party?.includes(search));
+const filteredCases = cases.filter(
+  c =>
+    !search ||
+    c.case_title?.includes(search) ||
+    c.other_party?.includes(search) ||
+    c.case_number?.includes(search)
+);
   const filteredContracts = contracts.filter(c => !search || c.title?.includes(search) || c.party_name?.includes(search));
 
-  const activeCases = cases.filter(c => !["مغلقة - لصالحنا","مغلقة - ضدنا","تسوية ودية"].includes(c.status));
+  const activeCases = cases.filter(c => !["مغلقة - لصالحنا","مغلقة - ضدنا","تسوية ودية"].includes(c.state));
   const expiringContracts = contracts.filter(c => {
     if (!c.end_date || c.status !== "نشط") return false;
     const days = Math.ceil((new Date(c.end_date) - new Date()) / 86400000);
@@ -323,14 +403,26 @@ export default function Legal() {
                 : filteredCases.map(c => (
                   <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{c.case_number}</td>
-                    <td className="px-3 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{c.case_type}</span></td>
-                    <td className="px-3 py-3 font-medium text-foreground max-w-40 truncate">{c.title}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{c.party || "—"}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{c.court || "—"}</td>
-                    <td className="px-3 py-3 text-xs">{c.hearing_date ? new Date(c.hearing_date).toLocaleDateString("ar-SA") : "—"}</td>
+                    <td className="px-3 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{c.case_type_arabic}</span></td>
+                    <td className="px-3 py-3 font-medium text-foreground max-w-40 truncate">{c.case_title}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs">{c.other_party || "—"}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs">{c.court_agency || "—"}</td>
+                    <td className="px-3 py-3 text-xs">
+  {c.next_session_date
+    ? new Date(c.next_session_date).toLocaleDateString("ar-SA")
+    : "—"}
+</td>
                     <td className="px-3 py-3 text-xs font-semibold text-purple-600">{c.estimated_value > 0 ? `${c.estimated_value?.toLocaleString("ar-SA")} ر.س` : "—"}</td>
                     <td className="px-3 py-3 text-xs text-muted-foreground">{c.lawyer || "—"}</td>
-                    <td className="px-3 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CASE_STATUS_COLORS[c.status]}`}>{c.status}</span></td>
+               <td className="px-3 py-3">
+  <span
+    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+      CASE_STATUS_COLORS[c.state]
+    }`}
+  >
+    {CASE_STATUS_LABELS[c.state] || c.state}
+  </span>
+</td>
                     {canDelete && <td className="px-3 py-3"><button onClick={() => deleteCase(c.id)} className="text-xs text-red-500 hover:underline">حذف</button></td>}
                   </tr>
                 ))}

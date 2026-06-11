@@ -3,10 +3,16 @@ import { ChevronRight, ChevronLeft, Calendar, CheckCircle, Clock, AlertTriangle 
 import { base44 } from "@/api/base44Client";
 import { formatCurrency } from "@/lib/hrUtils";
 import { formatMonth, logLoanAction } from "@/lib/loanUtils";
+import { getAllInstallments } from "@/api/salaryAdvancesApi";
+import {
+  payInstallment,
+  delayInstallment,
+
+} from "@/api/salaryAdvancesApi";
 
 const MONTHS_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
-export default function MonthlyInstallmentsView({ loans }) {
+export default function MonthlyInstallmentsView({ loans  }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-based
@@ -22,13 +28,33 @@ export default function MonthlyInstallmentsView({ loans }) {
     loadInstallments();
   }, [selectedMonthStr]);
 
-  const loadInstallments = async () => {
-    setLoading(true);
-    const reps = await base44.entities.LoanRepayment.filter({ due_month: selectedMonthStr });
-    setInstallments(reps.sort((a, b) => (a.employee_name || "").localeCompare(b.employee_name || "")));
-    setLoading(false);
-  };
+const loadInstallments = async () => {
+  setLoading(true);
 
+  const res = await getAllInstallments();
+
+  const reps = res?.data || [];
+
+  const filtered = reps
+    .filter(r => {
+      if (!r.due_date) return false;
+
+      const date = new Date(r.due_date);
+
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+
+      const currentMonth = `${year}-${month}`;
+
+      return currentMonth === selectedMonthStr;
+    })
+    .sort((a, b) =>
+      (a.employee_name || "").localeCompare(b.employee_name || "")
+    );
+
+  setInstallments(filtered);
+  setLoading(false);
+};
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear(y => y - 1); }
     else setMonth(m => m - 1);
@@ -38,75 +64,65 @@ export default function MonthlyInstallmentsView({ loans }) {
     else setMonth(m => m + 1);
   };
 
-  const markPaid = async (rep) => {
-    setSaving(rep.id);
-    const user = await base44.auth.me();
-    await base44.entities.LoanRepayment.update(rep.id, {
-      status: "مدفوع",
-      paid_at: new Date().toISOString().slice(0, 10),
-      paid_by: user.full_name || user.email,
-    });
-    // Update parent loan totals
-    const loan = loans.find(l => l.id === rep.loan_id);
-    if (loan) {
-      const allReps = await base44.entities.LoanRepayment.filter({ loan_id: rep.loan_id });
-      const paidSum = allReps.filter(r => r.status === "مدفوع" || r.id === rep.id).reduce((s, r) => s + r.amount, 0);
-      const newRemaining = loan.amount - paidSum;
-      await base44.entities.Loan.update(rep.loan_id, {
-        paid_amount: paidSum,
-        remaining_amount: Math.max(0, newRemaining),
-        status: newRemaining <= 0 ? "مسددة بالكامل" : "نشطة",
-      });
-    }
-    await logLoanAction({
-      loan_id: rep.loan_id,
-      employee_name: rep.employee_name,
-      action: "سداد قسط",
-      performed_by: user.full_name || user.email,
-      performed_by_role: user.role,
-      new_value: `قسط ${rep.installment_number} — ${rep.amount} ر.س — ${selectedMonthStr}`,
-    });
-    setSaving(null);
-    loadInstallments();
-  };
+ const markPaid = async (rep) => {
+  try {
+    if (!rep?.id) return;
 
-  const confirmDefer = async () => {
-    if (!deferMonth || !deferModal) return;
-    setSaving(deferModal.id);
+    // IMPORTANT: استخدم advance_id مش loan_id
+    const advanceId = rep.advance_id;
+
+    if (!advanceId) {
+      console.error("Missing advance_id:", rep);
+      return;
+    }
+
+    setSaving(rep.id);
+
+    await payInstallment(advanceId, rep.id);
+
+    await loadInstallments();
+  } catch (error) {
+    console.error("Pay error:", error);
+  } finally {
+    setSaving(null);
+  }
+};
+
+const confirmDefer = async () => {
+  if (!deferMonth || !deferModal) return;
+
+  setSaving(deferModal.id);
+
+  try {
     const user = await base44.auth.me();
-    await base44.entities.LoanRepayment.update(deferModal.id, {
-      status: "مؤجل",
-      notes: `مؤجل إلى ${deferMonth}`,
-    });
-    await base44.entities.LoanRepayment.create({
-      loan_id: deferModal.loan_id,
-      employee_id: deferModal.employee_id,
-      employee_name: deferModal.employee_name,
-      installment_number: deferModal.installment_number,
-      due_month: deferMonth,
-      amount: deferModal.amount,
-      status: "مجدول",
-      notes: `مُرحَّل من ${selectedMonthStr}`,
-    });
+
+    await delayInstallment(deferModal.id, deferMonth);
+
     await logLoanAction({
       loan_id: deferModal.loan_id,
       employee_name: deferModal.employee_name,
-      action: "تعديل جدول",
+      action: "تأجيل قسط",
       performed_by: user.full_name || user.email,
       performed_by_role: user.role,
-      new_value: `تأجيل قسط ${deferModal.installment_number} من ${selectedMonthStr} إلى ${deferMonth}`,
+      new_value: `من ${selectedMonthStr} إلى ${deferMonth}`,
     });
-    setSaving(null);
+
     setDeferModal(null);
     setDeferMonth("");
-    loadInstallments();
-  };
 
-  const pending = installments.filter(r => r.status === "مجدول");
-  const paid = installments.filter(r => r.status === "مدفوع");
-  const deferred = installments.filter(r => r.status === "مؤجل");
-  const totalPending = pending.reduce((s, r) => s + r.amount, 0);
-  const totalPaid = paid.reduce((s, r) => s + r.amount, 0);
+    await loadInstallments();
+  } finally {
+    setSaving(null);
+  }
+};
+
+ 
+const pending = installments.filter(r => r.state === "unpaid");
+const paid = installments.filter(r => r.state === "paid");
+const deferred = installments.filter(r => r.state === "postponed");
+
+const totalPending = pending.reduce((s, r) => s + Number(r.amount || 0), 0);
+const totalPaid = paid.reduce((s, r) => s + Number(r.amount || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -177,12 +193,12 @@ export default function MonthlyInstallmentsView({ loans }) {
                   </td>
                   <td className="px-4 py-3 font-bold text-foreground">{formatCurrency(rep.amount)}</td>
                   <td className="px-4 py-3">
-                    {rep.status === "مدفوع" ? (
+                    {rep.state === "paid" ? (
                       <span className="flex items-center gap-1 text-green-600 text-xs font-medium">
                         <CheckCircle className="w-3.5 h-3.5" />مدفوع
                         {rep.paid_at && <span className="text-muted-foreground">({new Date(rep.paid_at).toLocaleDateString("ar-SA")})</span>}
                       </span>
-                    ) : rep.status === "مؤجل" ? (
+                    ) : rep.state === "postponed" ? (
                       <span className="flex items-center gap-1 text-red-600 text-xs font-medium">
                         <AlertTriangle className="w-3.5 h-3.5" />مؤجل
                       </span>
@@ -193,14 +209,22 @@ export default function MonthlyInstallmentsView({ loans }) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {rep.status === "مجدول" && (
+                    {rep.state === "unpaid" && (
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => markPaid(rep)}
-                          disabled={saving === rep.id}
-                          className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium disabled:opacity-50">
-                          {saving === rep.id ? "..." : "✓ سداد"}
-                        </button>
+                      <button
+  onClick={() => {
+    console.log("rep clicked:", rep);
+    if (!rep?.id) {
+      console.error("Missing installment id", rep);
+      return;
+    }
+    markPaid(rep);
+  }}
+  disabled={saving === rep.id || !rep?.id}
+  className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium disabled:opacity-50"
+>
+  {saving === rep.id ? "..." : "✓ سداد"}
+</button>
                         <button
                           onClick={() => { setDeferModal(rep); setDeferMonth(""); }}
                           className="text-xs px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium">

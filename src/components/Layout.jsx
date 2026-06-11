@@ -12,6 +12,8 @@ import NotificationPanel from "./NotificationPanel";
 import { useLanguage } from "../lib/useLanguage";
 import { useRole } from "../lib/useRole";
 import { t } from "../lib/translations";
+import { useNavigate } from "react-router-dom";
+import { logoutUser } from "@/api/authApi";
 
 // Nav groups are filtered dynamically based on role — defined inside component
 const ALL_NAV_GROUPS = [
@@ -88,10 +90,21 @@ export default function Layout() {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const { lang, toggle, isAr } = useLanguage();
 
+
   const toggleGroup = (label) => setCollapsedGroups(g => ({ ...g, [label]: !g[label] }));
-  const handleLogout = () => {
-    base44.auth.logout();
-  };
+const navigate = useNavigate();
+
+const handleLogout = async () => {
+  try {
+    await logoutUser(); // call backend logout
+  } catch (err) {
+    console.log("logout error:", err);
+  }
+
+  localStorage.removeItem("user"); // امسحي السيشن المحلي
+  navigate("/"); // رجعي للوجين
+};
+  
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -163,7 +176,7 @@ export default function Layout() {
     </div>
   );
 
-  return (
+return (
     <div className="flex h-screen bg-background overflow-hidden" dir="rtl">
       {/* Desktop Sidebar */}
       <aside className={`hidden lg:flex flex-col bg-sidebar transition-all duration-300 flex-shrink-0 ${sidebarOpen ? "w-56" : "w-14"}`}>

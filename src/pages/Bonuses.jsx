@@ -3,6 +3,16 @@ import { Gift, Plus, X, Save, DollarSign } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
+import {
+  getAdditions,
+  getUnderApprovalAdditions,
+  createAddition,
+  updateAddition,
+  deleteAddition,
+} from "@/api/additionsApi";
+import {
+getEmployees,getDepartments
+} from "@/api/departmentsApi";
 
 const STATUS_COLORS = {
   "قيد الاعتماد": "bg-amber-100 text-amber-700",
@@ -20,23 +30,76 @@ function BonusForm({ employees, departments, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleEmpSelect = (id) => {
-    const emp = employees.find(e => e.id === id);
-    if (emp) { set("employee_id", id); set("employee_name", emp.full_name_ar); set("department", emp.department || ""); }
-  };
+const handleEmpSelect = (id) => {
+  const emp = employees.find(
+    (e) => e.id === Number(id)
+  );
 
-  const handleSave = async () => {
+  if (emp) {
+    set("employee_id", emp.id);
+
+    set(
+      "employee_name",
+      emp.full_name_ar
+    );
+
+    set(
+      "department",
+      emp.department_id || ""
+    );
+  }
+};
+ const handleSave = async () => {
+  try {
     setSaving(true);
-    if (form.scope === "قسم") {
-      const deptEmps = employees.filter(e => e.department === form.department);
-      await Promise.all(deptEmps.map(emp => base44.entities.Bonus.create({ ...form, employee_id: emp.id, employee_name: emp.full_name_ar, status: "قيد الاعتماد" })));
-    } else if (form.scope === "الشركة") {
-      await Promise.all(employees.map(emp => base44.entities.Bonus.create({ ...form, employee_id: emp.id, employee_name: emp.full_name_ar, status: "قيد الاعتماد" })));
-    } else {
-      await base44.entities.Bonus.create({ ...form, status: "قيد الاعتماد" });
-    }
+
+    const payload = {
+      add_to:
+        form.scope === "فردية"
+          ? "employee"
+          : form.scope === "قسم"
+          ? "department"
+          : "all",
+
+      employee:
+        form.scope === "فردية"
+          ? Number(form.employee_id)
+          : null,
+
+      department:
+        form.scope === "قسم"
+          ? Number(form.department)
+          : null,
+
+      addition_type:
+        form.bonus_type,
+
+      date: form.period,
+
+      amount: Number(form.amount),
+
+      reason: form.reason,
+
+      state: "under_approval",
+    };
+
+    console.log("PAYLOAD =>", payload);
+
+    await createAddition(payload);
+
     onSave();
-  };
+
+  } catch (err) {
+    console.error(
+      "CREATE BONUS ERROR",
+      err?.response?.data || err
+    );
+
+    alert("فشل إنشاء المكافأة");
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -73,7 +136,20 @@ function BonusForm({ employees, departments, onSave, onClose }) {
               <select value={form.department} onChange={e => { set("department", e.target.value); set("employee_id", ""); set("employee_name", ""); }}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
                 <option value="">اختر القسم...</option>
-                {departments.map(d => <option key={d.id} value={d.name}>{d.name} ({employees.filter(e => e.department === d.name).length} موظف)</option>)}
+             {departments.map((d) => (
+  <option
+    key={d.id}
+    value={d.id}
+  >
+    {d.name} (
+    {
+      employees.filter(
+        (e) =>
+          e.department_id === d.id
+      ).length
+    } موظف)
+  </option>
+))}
               </select>
             </div>
           )}
@@ -100,11 +176,20 @@ function BonusForm({ employees, departments, onSave, onClose }) {
             <label className="text-sm font-medium">المبلغ (ريال) *</label>
             <input type="number" min={0} value={form.amount} onChange={e => set("amount", +e.target.value)}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-            {form.scope !== "فردية" && form.amount > 0 && (
-              <p className="text-xs text-muted-foreground">
-                الإجمالي: {((form.scope === "قسم" ? employees.filter(e => e.department === form.department).length : employees.length) * form.amount)?.toLocaleString("ar-SA")} ر.س
-              </p>
-            )}
+         {form.scope !== "فردية" && form.amount > 0 && (
+  <p className="text-xs text-muted-foreground">
+    الإجمالي: {(
+      (
+        form.scope === "قسم"
+          ? employees.filter(
+              (e) =>
+                e.department_id === Number(form.department)
+            ).length
+          : employees.length
+      ) * form.amount
+    )?.toLocaleString("ar-SA")} ر.س
+  </p>
+)}
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">السبب *</label>
@@ -146,33 +231,177 @@ export default function Bonuses() {
   const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState("");
 
-  const load = async () => {
-    const [bs, emps, depts] = await Promise.all([
-      base44.entities.Bonus.list("-created_date"),
-      base44.entities.Employee.filter({ status: "نشط" }),
-      base44.entities.Department.list(),
+const load = async () => {
+  try {
+    setLoading(true);
+
+    const [
+      additionsRes,
+      employeesRes,
+      departmentsRes,
+    ] = await Promise.all([
+      getAdditions(),
+      getEmployees(),
+      getDepartments(),
     ]);
-    setBonuses(bs); setEmployees(emps); setDepartments(depts); setLoading(false);
-  };
+
+    // =========================
+    // BONUSES
+    // =========================
+    const bonusesData =
+      additionsRes?.data || [];
+
+    const normalizedBonuses =
+      bonusesData.map((b) => ({
+        id: b.id,
+
+        employee_id: b.employee_id,
+        employee_name: b.employee_name,
+
+        department_id: b.department_id,
+        department: b.department_name,
+
+        bonus_type:
+          b.addition_type_arabic ||
+          b.addition_type,
+
+        scope:
+          b.add_to === "employee"
+            ? "فردية"
+            : b.add_to === "department"
+            ? "قسم"
+            : "الشركة",
+
+        amount: b.amount,
+
+        reason: b.reason,
+
+        period: b.date,
+
+        status: b.state_arabic,
+
+        raw_state: b.state,
+
+        approved_by: b.approved_by_name,
+
+        approval_date: b.approve_date,
+      }));
+
+    setBonuses(normalizedBonuses);
+
+    // =========================
+    // EMPLOYEES
+    // =========================
+    const employeesData =
+      employeesRes?.data || [];
+
+    const normalizedEmployees =
+      employeesData.map((e) => ({
+        id: e.id,
+
+        full_name_ar:
+          e.name,
+
+        department:
+          e.department_name,
+
+        department_id:
+          e.department_id,
+
+        employee_number:
+          e.employee_number,
+
+        job_title:
+          e.job_title,
+      }));
+
+    setEmployees(
+      normalizedEmployees
+    );
+
+    // =========================
+    // DEPARTMENTS
+    // =========================
+    const departmentsData =
+      departmentsRes?.data || [];
+
+    const normalizedDepartments =
+      departmentsData.map((d) => ({
+        id: d.id,
+
+        name:
+          d.name_ar ||
+          d.name,
+
+        english_name:
+          d.name,
+
+        total_employee:
+          d.total_employee,
+      }));
+
+    setDepartments(
+      normalizedDepartments
+    );
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => { load(); }, []);
 
   const approve = async (id) => {
     const u = await base44.auth.me();
-    await base44.entities.Bonus.update(id, { status: "معتمدة", approved_by: u.full_name || u.email, approval_date: new Date().toISOString().slice(0, 10) });
+await updateAddition(id, {
+  state: "approved",
+});
     load();
   };
-  const reject = async (id) => { await base44.entities.Bonus.update(id, { status: "مرفوضة" }); load(); };
-  const pay = async (id) => { await base44.entities.Bonus.update(id, { status: "مدفوعة" }); load(); };
+  const reject = async (id) => { await await updateAddition(id, {
+  state: "rejected",
+});; load(); };
+  const pay = async (id) => { await updateAddition(id, {
+  state: "paid",
+}); load(); };
 
-  const pending = bonuses.filter(b => b.status === "قيد الاعتماد");
-  const displayed = (activeTab === "pending" ? pending : bonuses)
-    .filter(b => !filterMonth || b.period === filterMonth);
+ const pending = bonuses.filter(
+  b => b.raw_state === "under_approval"
+);
 
-  const totals = {
-    pending: pending.length,
-    approved: bonuses.filter(b => b.status === "معتمدة").length,
-    paid: bonuses.filter(b => b.status === "مدفوعة").reduce((s, b) => s + (b.amount || 0), 0),
-  };
+const displayed =
+  (activeTab === "pending"
+    ? pending
+    : bonuses
+  ).filter(
+    b =>
+      !filterMonth ||
+      b.period === filterMonth
+  );
+console.log(
+  bonuses.map(b => ({
+    id: b.id,
+    raw_state: b.raw_state,
+    amount: b.amount,
+  }))
+);
+const totals = {
+  pending: pending.length,
+
+  approved: bonuses.filter(
+    b => b.raw_state === "approved"
+  ).length,
+
+  paid: bonuses
+    .filter(
+      b => b.raw_state === "paid"
+    )
+    .reduce(
+      (s, b) => s + (b.amount || 0),
+      0
+    ),
+};
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">

@@ -4,6 +4,14 @@ import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 
+import {
+  getMeetings,
+  createMeeting,
+  updateMeeting,
+    deleteMeeting as apiDeleteMeeting,
+} from "@/api/meetingsApi";
+
+import { getEmployees } from "@/api/departmentsApi";
 function MeetingForm({ meeting, employees, onSave, onClose }) {
   const [form, setForm] = useState({
     title: "", type: "داخلي", date: new Date().toISOString().slice(0, 10),
@@ -11,14 +19,20 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
     organizer: "", assigned_employee_id: "", assigned_employee_name: "",
     external_company: "", agenda: "", status: "مجدول", attendees: [], ...(meeting || {})
   });
+  const [showAttendeesPopup, setShowAttendeesPopup] =
+  useState(false);
   const [saving, setSaving] = useState(false);
   const [attendeeInput, setAttendeeInput] = useState("");
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleEmpSelect = (id) => {
-    const emp = employees.find(e => e.id === id);
-    if (emp) { set("assigned_employee_id", id); set("assigned_employee_name", emp.full_name_ar); }
-  };
+  const emp = employees.find(e => e.id === Number(id));
+
+  if (emp) {
+    set("assigned_employee_id", emp.id);
+    set("assigned_employee_name", emp.name);
+  }
+};
 
   const addAttendee = () => {
     if (attendeeInput.trim()) { set("attendees", [...(form.attendees || []), attendeeInput.trim()]); setAttendeeInput(""); }
@@ -26,13 +40,43 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
 
   const removeAttendee = (i) => set("attendees", form.attendees.filter((_, idx) => idx !== i));
 
-  const handleSave = async () => {
-    setSaving(true);
-    if (meeting?.id) await base44.entities.Meeting.update(meeting.id, form);
-    else await base44.entities.Meeting.create(form);
-    onSave();
+ const handleSave = async () => {
+  setSaving(true);
+
+  const payload = {
+    name: form.title,
+    meeting_type: form.type === "داخلي" ? "internal" : "external",
+    state:
+      form.status === "مجدول"
+        ? "scheduled"
+        : form.status === "مكتمل"
+        ? "complete"
+        : "cancelled",
+
+    date: form.date,
+    time: form.time,
+    duration: form.duration_minutes,
+    location: form.location,
+
+    organizer_id: form.assigned_employee_id || null,
+
+    attendee_ids: (form.attendees || []).map((a) => a.id),
+
+    description: form.agenda,
   };
 
+  try {
+    if (meeting?.id) {
+      await updateMeeting(meeting.id, payload);
+    } else {
+      await createMeeting(payload);
+    }
+
+    onSave();
+  } finally {
+    setSaving(false);
+  }
+};
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
       <div className="bg-card rounded-2xl border border-border w-full max-w-xl shadow-2xl max-h-[90vh] flex flex-col">
@@ -93,13 +137,20 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
           )}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">تعيين موظف مسؤول</label>
-            <select value={form.assigned_employee_id} onChange={e => handleEmpSelect(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none">
-              <option value="">بدون تعيين</option>
-              {employees.map(e => <option key={e.id} value={e.id}>{e.full_name_ar}</option>)}
-            </select>
+            <select
+  value={form.assigned_employee_id}
+  onChange={e => handleEmpSelect(e.target.value)}
+  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none"
+>
+  <option value="">بدون تعيين</option>
+  {employees.map(e => (
+    <option key={e.id} value={e.id}>
+      {e.name || "بدون اسم"}
+    </option>
+  ))}
+</select>
           </div>
-          <div className="space-y-1.5">
+          {/* <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">الحضور</label>
             <div className="flex gap-2">
               <input value={attendeeInput} onChange={e => setAttendeeInput(e.target.value)}
@@ -115,7 +166,51 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
                 </span>
               ))}
             </div>
-          </div>
+          </div> */}
+    <div className="space-y-2">
+  <label className="text-sm font-medium text-foreground">
+    الحضور
+  </label>
+
+  <button
+    type="button"
+    onClick={() => setShowAttendeesPopup(true)}
+    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm text-right hover:bg-muted"
+  >
+    + إضافة حضور
+  </button>
+
+  <div className="flex flex-wrap gap-2 mt-3">
+    {(form.attendees || []).map((emp, index) => (
+      <div
+        key={emp.id}
+        className="flex items-center gap-2 px-2 py-1 bg-secondary/10 rounded-full"
+      >
+        <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+          {emp.name?.slice(0, 1)}
+        </div>
+
+        <span className="text-xs text-secondary">
+          {emp.name}
+        </span>
+
+        <button
+          type="button"
+          onClick={() =>
+            set(
+              "attendees",
+              form.attendees.filter(
+                (_, i) => i !== index
+              )
+            )
+          }
+        >
+          <X className="w-3 h-3 text-red-500" />
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">جدول الأعمال</label>
             <textarea value={form.agenda} onChange={e => set("agenda", e.target.value)} rows={3}
@@ -130,6 +225,95 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
           </button>
         </div>
       </div>
+      {showAttendeesPopup && (
+  <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+    <div className="bg-card w-full max-w-md rounded-2xl border border-border p-5">
+      
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-foreground">
+          اختيار الحضور
+        </h3>
+
+        <button
+          onClick={() =>
+            setShowAttendeesPopup(false)
+          }
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
+        {employees.map((emp) => {
+          const selected = (
+            form.attendees || []
+          ).some((a) => a.id === emp.id);
+
+          return (
+            <button
+              key={emp.id}
+              type="button"
+              onClick={() => {
+                if (selected) {
+                  set(
+                    "attendees",
+                    form.attendees.filter(
+                      (a) => a.id !== emp.id
+                    )
+                  );
+                } else {
+                  set("attendees", [
+                    ...(form.attendees || []),
+                    {
+                      id: emp.id,
+                      name: emp.full_name_ar,
+                    },
+                  ]);
+                }
+              }}
+              className={`p-3 rounded-xl border transition-all text-center ${
+                selected
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:bg-muted"
+              }`}
+            >
+              <div className="w-14 h-14 mx-auto rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold mb-2">
+                {emp.name
+                  ?.split(" ")
+                  .slice(0, 2)
+                  .map((n) => n[0])
+                  .join("")}
+              </div>
+
+              <p className="text-sm font-medium text-foreground">
+                {emp.name}
+              </p>
+
+              {emp.department_name && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {emp.department_name}
+                </p>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-end mt-5">
+        <button
+          type="button"
+          onClick={() =>
+            setShowAttendeesPopup(false)
+          }
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
+        >
+          تم
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+    
     </div>
   );
 }
@@ -186,19 +370,51 @@ export default function Meetings() {
   const [showForm, setShowForm] = useState(false);
   const [editMeeting, setEditMeeting] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+// 👇 فوق component
+const normalizeMeetings = (data) =>
+  data.map(m => ({
+    id: m.id,
+    title: m.name,
+    type: m.meeting_type === "external" ? "خارجي" : "داخلي",
+    status:
+      m.state === "scheduled"
+        ? "مجدول"
+        : m.state === "complete"
+        ? "مكتمل"
+        : "ملغى",
 
-  const load = async () => {
+    date: m.date,
+    time: m.time,
+    duration_minutes: m.duration,
+
+    location: m.location || "",
+
+    assigned_employee_name: m.organizer_name || "",
+    assigned_employee_id: m.organizer_id || "",
+
+    attendees: m.attendees || [],
+  }));
+
+const load = async () => {
+  try {
+    setLoading(true);
+
     const [ms, emps] = await Promise.all([
-      base44.entities.Meeting.list("-date"),
-      base44.entities.Employee.filter({ status: "نشط" }),
+      getMeetings(),
+      getEmployees(),
     ]);
-    setMeetings(ms); setEmployees(emps); setLoading(false);
-  };
+
+   setMeetings(normalizeMeetings(ms?.data || ms));
+    setEmployees(emps?.data || emps);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { load(); }, []);
 
   const deleteMeeting = async (id) => {
-    if (confirm("حذف هذا الاجتماع؟")) { await base44.entities.Meeting.delete(id); load(); }
+    if (confirm("حذف هذا الاجتماع؟")) {  await apiDeleteMeeting(id); load(); }
   };
 
   const today = new Date().toISOString().slice(0, 10);

@@ -4,7 +4,12 @@ import { base44 } from "@/api/base44Client";
 import { formatMonth, logLoanAction } from "@/lib/loanUtils";
 import { formatCurrency } from "@/lib/hrUtils";
 import LoanWorkflowBadge from "./LoanWorkflowBadge";
-
+import {
+  payInstallment,
+  delayInstallment,
+  earlyPayInstallment,
+  getSalaryAdvanceInstallments,
+} from "@/api/salaryAdvancesApi";
 export default function LoanDetailModal({ loan, repayments: initialRepayments, onClose, onUpdate }) {
   const [repayments, setRepayments] = useState(initialRepayments || []);
   const [auditLog, setAuditLog] = useState([]);
@@ -13,118 +18,157 @@ export default function LoanDetailModal({ loan, repayments: initialRepayments, o
   const [deferModal, setDeferModal] = useState(null); // repayment to defer
   const [deferMonth, setDeferMonth] = useState("");
 
-  useEffect(() => {
-    // جلب سجل العمليات بـ loan_id أو loan_application_id
-    Promise.all([
-      base44.entities.LoanAuditLog.filter({ loan_id: loan.id }),
-      loan.request_id ? base44.entities.LoanAuditLog.filter({ loan_application_id: loan.request_id }) : Promise.resolve([]),
-    ]).then(([byLoan, byApp]) => {
-      const combined = [...byLoan];
-      byApp.forEach(l => { if (!combined.find(x => x.id === l.id)) combined.push(l); });
-      setAuditLog(combined.sort((a, b) => new Date(b.created_date) - new Date(a.created_date)));
-    });
-    if (!initialRepayments) {
-      base44.entities.LoanRepayment.filter({ loan_id: loan.id }).then(r => setRepayments(r.sort((a, b) => a.installment_number - b.installment_number)));
-    }
-  }, [loan.id]);
+useEffect(() => {
+  Promise.all([
+    base44.entities.LoanAuditLog.filter({ loan_id: loan.id }),
+    loan.request_id
+      ? base44.entities.LoanAuditLog.filter({
+          loan_application_id: loan.request_id,
+        })
+      : Promise.resolve([]),
+  ]).then(([byLoan, byApp]) => {
+    const combined = [...byLoan];
 
-  const paidCount = repayments.filter(r => r.status === "مدفوع").length;
-  const remaining = repayments.filter(r => r.status !== "مدفوع").length;
-  const paidAmount = repayments.filter(r => r.status === "مدفوع").reduce((s, r) => s + r.amount, 0);
-  const remainingAmount = repayments.filter(r => r.status !== "مدفوع").reduce((s, r) => s + r.amount, 0);
+    byApp.forEach((l) => {
+      if (!combined.find((x) => x.id === l.id)) {
+        combined.push(l);
+      }
+    });
 
-  const markPaid = async (repayment) => {
-    setSaving(true);
-    const user = await base44.auth.me();
-    await base44.entities.LoanRepayment.update(repayment.id, {
-      status: "مدفوع",
-      paid_at: new Date().toISOString().slice(0, 10),
-      paid_by: user.full_name || user.email,
-    });
-    // تحديث سجل السلفة الرئيسي
-    const newPaid = paidAmount + repayment.amount;
-    const newRemaining = loan.amount - newPaid;
-    await base44.entities.Loan.update(loan.loan_id || loan.id, {
-      paid_amount: newPaid,
-      remaining_amount: newRemaining,
-      status: newRemaining <= 0 ? "مسددة بالكامل" : "نشطة",
-    });
-    await logLoanAction({
-      loan_id: loan.id,
-      employee_name: loan.employee_name,
-      action: "سداد قسط",
-      performed_by: user.full_name || user.email,
-      performed_by_role: user.role,
-      new_value: `قسط ${repayment.installment_number} — ${repayment.amount} ر.س`,
-    });
-    const updated = await base44.entities.LoanRepayment.filter({ loan_id: loan.id });
-    setRepayments(updated.sort((a, b) => a.installment_number - b.installment_number));
-    setSaving(false);
-    if (onUpdate) onUpdate();
-  };
+    setAuditLog(
+      combined.sort(
+        (a, b) =>
+          new Date(b.created_date) -
+          new Date(a.created_date)
+      )
+    );
+  });
 
-  const confirmDefer = async () => {
-    if (!deferMonth) return;
-    const repayment = deferModal;
-    setSaving(true);
-    const user = await base44.auth.me();
-    // mark current installment as deferred
-    await base44.entities.LoanRepayment.update(repayment.id, {
-      status: "مؤجل",
-      notes: `مؤجل إلى ${deferMonth}`,
+  if (!initialRepayments) {
+    getSalaryAdvanceInstallments(loan.id).then((res) => {
+      setRepayments(res.data || []);
     });
-    // create new installment for the deferred month
-    await base44.entities.LoanRepayment.create({
-      loan_id: loan.id,
-      employee_id: loan.employee_id,
-      employee_name: loan.employee_name,
-      installment_number: repayment.installment_number,
-      due_month: deferMonth,
-      amount: repayment.amount,
-      status: "مجدول",
-      notes: `مُرحَّل من قسط ${repayment.installment_number} الأصلي`,
-    });
-    await logLoanAction({
-      loan_id: loan.id,
-      employee_name: loan.employee_name,
-      action: "تعديل جدول",
-      performed_by: user.full_name || user.email,
-      performed_by_role: user.role,
-      new_value: `تأجيل قسط ${repayment.installment_number} إلى ${deferMonth}`,
-    });
-    const updated = await base44.entities.LoanRepayment.filter({ loan_id: loan.id });
-    setRepayments(updated.sort((a, b) => a.installment_number - b.installment_number || a.due_month?.localeCompare(b.due_month)));
-    setSaving(false);
+  }
+}, [loan.id]);
+ const activeRepayments = repayments.filter(
+  (r) => r.state !== "postponed"
+);
+
+const paidCount = activeRepayments.filter(
+  (r) => r.state === "paid"
+).length;
+
+const remaining = activeRepayments.filter(
+  (r) => r.state !== "paid"
+).length;
+
+const paidAmount = activeRepayments
+  .filter((r) => r.state === "paid")
+  .reduce((s, r) => s + Number(r.amount), 0);
+
+const remainingAmount = activeRepayments
+  .filter((r) => r.state !== "paid")
+  .reduce((s, r) => s + Number(r.amount), 0);
+  const loadInstallments = async () => {
+  const response =
+    await getSalaryAdvanceInstallments(loan.id);
+
+  setRepayments([...response.data]);
+};
+useEffect(() => {
+  loadInstallments();
+}, [loan.id]);
+
+const markPaid = async (repayment) => {
+  try {
+    setSaving(repayment.id);
+
+    await payInstallment(
+      repayment.loan_id,
+      repayment.id
+    );
+
+    await loadInstallments();
+  } catch (error) {
+    console.error("Pay error:", error);
+  } finally {
+    setSaving(null);
+  }
+};
+
+const confirmDefer = async () => {
+  if (!deferMonth || !deferModal) return;
+
+  try {
+    setSaving(deferModal.id);
+
+    await delayInstallment(
+      deferModal.loan_id,
+      deferModal.id,
+      `${deferMonth}-01`
+    );
+
+    await loadInstallments();
+
     setDeferModal(null);
     setDeferMonth("");
-    if (onUpdate) onUpdate();
-  };
+  } catch (error) {
+    console.error("Delay error:", error);
+  } finally {
+    setSaving(null);
+  }
+};
 
-  const earlySettle = async () => {
-    if (!window.confirm(`هل تريد السداد المبكر الكامل للمبلغ المتبقي (${remainingAmount.toLocaleString("ar-SA")} ر.س)؟`)) return;
+ const earlySettle = async () => {
+  if (
+    !window.confirm(
+      `هل تريد السداد المبكر الكامل للمبلغ المتبقي (${remainingAmount.toLocaleString(
+        "ar-SA"
+      )} ر.س)؟`
+    )
+  ) {
+    return;
+  }
+
+  try {
     setSaving(true);
-    const user = await base44.auth.me();
-    for (const r of repayments.filter(r => r.status !== "مدفوع")) {
-      await base44.entities.LoanRepayment.update(r.id, {
-        status: "مدفوع", paid_at: new Date().toISOString().slice(0, 10), paid_by: user.full_name || user.email,
-        notes: "سداد مبكر",
-      });
+
+    const unpaidInstallments =
+      repayments.filter(
+        (r) => r.state === "unpaid"
+      );
+
+    for (const installment of unpaidInstallments) {
+      await earlyPayInstallment(
+        loan.id,
+        installment.id,
+        installment.due_date
+      );
     }
-    await base44.entities.Loan.update(loan.loan_id || loan.id, {
-      paid_amount: loan.amount, remaining_amount: 0, status: "مسددة بالكامل",
-    });
-    await logLoanAction({
-      loan_id: loan.id, employee_name: loan.employee_name,
-      action: "سداد مبكر", performed_by: user.full_name || user.email,
-      new_value: `${remainingAmount} ر.س`,
-    });
+
+    await loadInstallments();
+
+    if (onUpdate) {
+      onUpdate();
+    }
+  } catch (error) {
+    console.error(
+      "Early settle error:",
+      error
+    );
+  } finally {
     setSaving(false);
-    if (onUpdate) onUpdate();
-    onClose();
-  };
+  }
+};
 
-  const statusColors = { "مجدول": "text-amber-600 bg-amber-50", "مدفوع": "text-green-600 bg-green-50", "مؤجل": "text-red-600 bg-red-50", "إجازة بدون راتب": "text-gray-500 bg-gray-50" };
-
+const statusColors = {
+  paid: "text-green-600 bg-green-50",
+  unpaid: "text-amber-600 bg-amber-50",
+  postponed: "text-blue-600 bg-blue-50",
+};
+const activeInstallments = repayments.filter(
+  (r) => r.state !== "postponed"
+);
   return (
     <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -140,28 +184,64 @@ export default function LoanDetailModal({ loan, repayments: initialRepayments, o
           <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-px bg-border border-b border-border">
-          {[
-            { label: "المبلغ الكلي", value: formatCurrency(loan.amount), color: "text-foreground" },
-            { label: "المسدَّد", value: formatCurrency(paidAmount), color: "text-green-600" },
-            { label: "المتبقي", value: formatCurrency(remainingAmount), color: "text-red-600" },
-            { label: `${paidCount} / ${repayments.length} قسط`, value: `${Math.round((paidCount / (repayments.length || 1)) * 100)}%`, color: "text-primary" },
-          ].map(s => (
-            <div key={s.label} className="bg-card px-4 py-3 text-center">
-              <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-            </div>
-          ))}
-        </div>
+    {/* Stats */}
+<div className="grid grid-cols-4 gap-px bg-border border-b border-border">
+  {[
+    {
+      label: "المبلغ الكلي",
+      value: formatCurrency(loan.amount),
+      color: "text-foreground",
+    },
+    {
+      label: "المسدَّد",
+      value: formatCurrency(paidAmount),
+      color: "text-green-600",
+    },
+    {
+      label: "المتبقي",
+      value: formatCurrency(remainingAmount),
+      color: "text-red-600",
+    },
+    {
+      label: `${paidCount} / ${activeInstallments.length} قسط`,
+      value: `${Math.round(
+        (paidCount / (activeInstallments.length || 1)) * 100
+      )}%`,
+      color: "text-primary",
+    },
+  ].map((s) => (
+    <div
+      key={s.label}
+      className="bg-card px-4 py-3 text-center"
+    >
+      <p
+        className={`text-lg font-bold ${s.color}`}
+      >
+        {s.value}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {s.label}
+      </p>
+    </div>
+  ))}
+</div>
 
-        {/* Progress Bar */}
-        <div className="px-6 py-3 border-b border-border">
-          <div className="w-full bg-muted rounded-full h-2.5">
-            <div className="bg-green-500 h-2.5 rounded-full transition-all"
-              style={{ width: `${Math.min(100, (paidCount / (repayments.length || 1)) * 100)}%` }} />
-          </div>
-        </div>
+{/* Progress Bar */}
+<div className="px-6 py-3 border-b border-border">
+  <div className="w-full bg-muted rounded-full h-2.5">
+    <div
+      className="bg-green-500 h-2.5 rounded-full transition-all"
+      style={{
+        width: `${Math.min(
+          100,
+          (paidCount /
+            (activeInstallments.length || 1)) *
+            100
+        )}%`,
+      }}
+    />
+  </div>
+</div>
 
         {/* Tabs */}
         <div className="flex gap-1 px-6 py-2 border-b border-border">
@@ -181,27 +261,54 @@ export default function LoanDetailModal({ loan, repayments: initialRepayments, o
               ) : repayments.map(r => (
                 <div key={r.id} className="flex items-center justify-between border border-border rounded-xl px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${r.status === "مدفوع" ? "bg-green-100 text-green-700" : r.status === "مؤجل" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${r.state === "paid" ? "bg-green-100 text-green-700" : r.status === "مؤجل" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
                       {r.installment_number}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{formatMonth(r.due_month)}</p>
+                      <p className="text-sm font-medium text-foreground"><p className="text-sm font-medium text-foreground">
+  {formatMonth(r.due_date)}
+</p></p>
                       {r.paid_at && <p className="text-xs text-muted-foreground">سُدِّد: {new Date(r.paid_at).toLocaleDateString("ar-SA")}</p>}
                       {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-foreground">{r.amount.toLocaleString("ar-SA")} ر.س</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[r.status]}`}>{r.status}</span>
-                    {r.status === "مجدول" && (
-                      <div className="flex gap-1">
-                        <button onClick={() => markPaid(r)} disabled={saving}
-                          className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">✓ سداد</button>
-                        <button onClick={() => { setDeferModal(r); setDeferMonth(""); }}
-                          className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">تأجيل</button>
-                      </div>
-                    )}
-                  </div>
+                 <div className="flex items-center gap-3">
+  <span className="font-bold text-foreground">
+    {Number(r.amount).toLocaleString("ar-SA")} ر.س
+  </span>
+
+ <span
+  className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[r.state]}`}
+>
+  {r.state === "paid"
+    ? "مدفوع"
+    : r.state === "postponed"
+    ? "تم تأجيله"
+    : "غير مدفوع"}
+</span>
+
+  {r.state === "unpaid" && (
+    <div className="flex gap-1">
+      <button
+        onClick={() => markPaid(r)}
+        disabled={saving}
+        className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+      >
+        ✓ سداد
+      </button>
+
+      <button
+        onClick={() => {
+          setDeferModal(r);
+          setDeferMonth("");
+        }}
+        className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
+      >
+        تأجيل
+      </button>
+    </div>
+  )}
+</div>
                 </div>
               ))}
             </div>
@@ -269,7 +376,7 @@ export default function LoanDetailModal({ loan, repayments: initialRepayments, o
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">شهر التأجيل الجديد *</label>
             <input type="month" value={deferMonth} onChange={e => setDeferMonth(e.target.value)}
-              min={deferModal.due_month}
+          min={deferModal.due_date}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-amber-400/30" />
             <p className="text-xs text-muted-foreground">سيتم إنشاء قسط جديد بنفس المبلغ في الشهر المحدد</p>
           </div>

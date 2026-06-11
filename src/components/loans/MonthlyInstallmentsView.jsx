@@ -96,7 +96,11 @@ const confirmDefer = async () => {
   try {
     const user = await base44.auth.me();
 
-    await delayInstallment(deferModal.id, deferMonth);
+  await delayInstallment(
+  deferModal.advance_id,
+  deferModal.id,
+  `${deferMonth}-01`
+);
 
     await logLoanAction({
       loan_id: deferModal.loan_id,

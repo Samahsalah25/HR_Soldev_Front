@@ -9,6 +9,7 @@ import {
   delayInstallment,
   earlyPayInstallment,
   getSalaryAdvanceInstallments,
+    getSalaryAdvanceHistory,
 } from "@/api/salaryAdvancesApi";
 export default function LoanDetailModal({ loan, repayments: initialRepayments, onClose, onUpdate }) {
   const [repayments, setRepayments] = useState(initialRepayments || []);
@@ -19,37 +20,24 @@ export default function LoanDetailModal({ loan, repayments: initialRepayments, o
   const [deferMonth, setDeferMonth] = useState("");
 
 useEffect(() => {
-  Promise.all([
-    base44.entities.LoanAuditLog.filter({ loan_id: loan.id }),
-    loan.request_id
-      ? base44.entities.LoanAuditLog.filter({
-          loan_application_id: loan.request_id,
-        })
-      : Promise.resolve([]),
-  ]).then(([byLoan, byApp]) => {
-    const combined = [...byLoan];
+  const loadHistory = async () => {
+    try {
+      const response = await getSalaryAdvanceHistory(
+        loan.id
+      );
+console.log("History Response", response);
+      setAuditLog(response.data || []);
+    } catch (error) {
+      console.error(
+        "History load error:",
+        error
+      );
+    }
+  };
 
-    byApp.forEach((l) => {
-      if (!combined.find((x) => x.id === l.id)) {
-        combined.push(l);
-      }
-    });
-
-    setAuditLog(
-      combined.sort(
-        (a, b) =>
-          new Date(b.created_date) -
-          new Date(a.created_date)
-      )
-    );
-  });
-
-  if (!initialRepayments) {
-    getSalaryAdvanceInstallments(loan.id).then((res) => {
-      setRepayments(res.data || []);
-    });
-  }
+  loadHistory();
 }, [loan.id]);
+
  const activeRepayments = repayments.filter(
   (r) => r.state !== "postponed"
 );
@@ -314,41 +302,71 @@ const activeInstallments = repayments.filter(
             </div>
           )}
 
-          {activeTab === "audit" && (
-            <div className="space-y-2">
-              {auditLog.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-8">لا توجد سجلات</p>
-              ) : auditLog.map(log => {
-                const actionColors = {
-                  "إنشاء": "bg-blue-500", "موافقة مدير": "bg-purple-500", "موافقة HR": "bg-teal-500",
-                  "موافقة مالية": "bg-orange-500", "صرف": "bg-green-500", "سداد قسط": "bg-green-400",
-                  "سداد مبكر": "bg-emerald-600", "تعديل جدول": "bg-amber-500", "رفض": "bg-red-500",
-                };
-                const dotColor = actionColors[log.action] || "bg-primary";
-                return (
-                  <div key={log.id} className="flex gap-3 border border-border rounded-xl px-4 py-3">
-                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${dotColor}`} />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between flex-wrap gap-1">
-                        <span className="text-sm font-semibold text-foreground">{log.action}</span>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {log.created_date && (
-                            <span>{new Date(log.created_date).toLocaleDateString("ar-SA")} — {new Date(log.created_date).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        بواسطة: <span className="font-medium text-foreground">{log.performed_by}</span>
-                        {log.performed_by_role && <span className="text-muted-foreground"> ({log.performed_by_role})</span>}
-                      </p>
-                      {log.new_value && <p className="text-xs text-foreground bg-muted/30 rounded px-2 py-1 mt-1">{log.new_value}</p>}
-                      {log.notes && <p className="text-xs text-muted-foreground italic mt-0.5">{log.notes}</p>}
-                    </div>
-                  </div>
-                );
-              })}
+       {activeTab === "audit" && (
+  <div className="space-y-2">
+    {auditLog.length === 0 ? (
+      <p className="text-center text-sm text-muted-foreground py-8">
+        لا توجد سجلات
+      </p>
+    ) : (
+      auditLog.map((log) => {
+        const actionColors = {
+          submit: "bg-blue-500",
+          manager_approve: "bg-purple-500",
+          hr_approve: "bg-teal-500",
+          finance_approve: "bg-orange-500",
+          pay: "bg-green-500",
+          installment_paid: "bg-green-400",
+          early_pay: "bg-emerald-600",
+          postpone: "bg-amber-500",
+          reject: "bg-red-500",
+        };
+
+        const dotColor =
+          actionColors[log.action_type] || "bg-primary";
+
+        return (
+          <div
+            key={log.id}
+            className="flex gap-3 border border-border rounded-xl px-4 py-3"
+          >
+            <div
+              className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${dotColor}`}
+            />
+
+            <div className="flex-1">
+              <div className="flex items-center justify-between flex-wrap gap-1">
+                <span className="text-sm font-semibold text-foreground">
+                  {log.action_title}
+                </span>
+
+                {log.date && (
+                  <span className="text-xs text-muted-foreground">
+                    {log.date}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-0.5">
+                بواسطة:
+                <span className="font-medium text-foreground">
+                  {" "}
+                  {log.user_name}
+                </span>
+              </p>
+
+              {log.details && (
+                <p className="text-xs text-foreground bg-muted/30 rounded px-2 py-1 mt-1">
+                  {log.details}
+                </p>
+              )}
             </div>
-          )}
+          </div>
+        );
+      })
+    )}
+  </div>
+)}
         </div>
 
         {remainingAmount > 0 && remaining > 1 && (

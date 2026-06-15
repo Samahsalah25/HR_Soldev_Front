@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://carl-variance-african-humanities.trycloudflare.com/api/v1",
+  baseURL: "https://residence-married-curriculum-disclaimers.trycloudflare.com/api/v1",
   
   withCredentials: true,
     xsrfCookieName: "session_id",

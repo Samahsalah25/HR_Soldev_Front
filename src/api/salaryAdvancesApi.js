@@ -159,3 +159,13 @@ export const getAllInstallments = async () => {
   const response = await api.get("/salary_advances/installments");
   return response.data;
 };
+// =============================
+// GET SALARY ADVANCE HISTORY
+// =============================
+export const getSalaryAdvanceHistory = async (id) => {
+  const response = await api.get(
+    `/salary_advances/${id}/history`
+  );
+
+  return response.data;
+};

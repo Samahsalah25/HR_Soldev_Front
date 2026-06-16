@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Eye, Edit, Trash2, AlertCircle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { getEmployeesList, deleteEmployee, normalizeEmployee } from "@/api/employeesApi";
 import { formatCurrency, calcServiceYears, getExpiryStatus } from "../lib/hrUtils";
 import EmployeeForm from "../components/EmployeeForm";
 import EmployeeDetail from "../components/EmployeeDetail";
@@ -18,8 +18,8 @@ const STATUS_COLORS = {
 
 export default function Employees() {
   const { user } = useRole();
-  const canAdd    = canDo(user, "employees", "create");
-  const canEdit   = canDo(user, "employees", "edit");
+  const canAdd = canDo(user, "employees", "create");
+  const canEdit = canDo(user, "employees", "edit");
   const canDelete = canDo(user, "employees", "delete");
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,9 +34,14 @@ export default function Employees() {
 
   const load = async () => {
     setLoading(true);
-    const data = await base44.entities.Employee.list();
-    setEmployees(data);
-    setLoading(false);
+    try {
+      const data = await getEmployeesList();
+      setEmployees(data.map(normalizeEmployee));
+    } catch (err) {
+      console.error("Load employees error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -56,8 +61,13 @@ export default function Employees() {
 
   const handleDelete = async (id) => {
     if (confirm("هل أنت متأكد من حذف هذا الموظف؟")) {
-      await base44.entities.Employee.delete(id);
-      load();
+      try {
+        await deleteEmployee(id);
+        load();
+      } catch (err) {
+        console.error("Delete employee error:", err);
+        alert(err?.response?.data?.message || "حدث خطأ أثناء الحذف");
+      }
     }
   };
 
@@ -172,10 +182,9 @@ export default function Employees() {
                       {emp.is_saudi ? (
                         <span className="text-xs text-muted-foreground">—</span>
                       ) : idStatus ? (
-                        <span className={`text-xs font-medium ${
-                          idStatus.color === "red" ? "text-red-600" :
+                        <span className={`text-xs font-medium ${idStatus.color === "red" ? "text-red-600" :
                           idStatus.color === "amber" ? "text-amber-600" : "text-green-600"
-                        }`}>
+                          }`}>
                           {idStatus.color === "red" && <AlertCircle className="w-3 h-3 inline ml-1" />}
                           {idStatus.label}
                         </span>

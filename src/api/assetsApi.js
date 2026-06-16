@@ -105,6 +105,35 @@ export async function getAssetById(id) {
     return res.data;
 }
 
+/**
+ * GET /custodies/:id/history  →  asset history/logs
+ * Falls back gracefully if endpoint doesn't exist
+ */
+export async function getAssetHistory(id) {
+    // Try common history endpoint paths
+    const paths = [
+        `/custodies/${id}/history`,
+        `/custodies/${id}/logs`,
+        `/custodies/${id}/tracking`,
+        `/custody_logs?custody_id=${id}`,
+    ];
+    for (const path of paths) {
+        try {
+            const res = await assetsApi.get(path);
+            const data = res.data;
+            const list = Array.isArray(data) ? data
+                : Array.isArray(data?.data) ? data.data
+                    : Array.isArray(data?.logs) ? data.logs
+                        : Array.isArray(data?.history) ? data.history
+                            : null;
+            if (list !== null) return list;
+        } catch {
+            // try next path
+        }
+    }
+    return null; // no history endpoint found
+}
+
 export async function createAsset(data) {
     const res = await assetsApi.post("/custodies", data);
     return res.data;

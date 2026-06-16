@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import {
   getAssets, getEmployees, getCustodyRequests, getCustodyReturns,
   acceptCustodyRequest, rejectCustodyRequest,
+  acceptCustodyReturn, rejectCustodyReturn,
   stateLabel, categoryTypeLabel, conditionLabel,
   requestStatusLabel, REQUEST_STATUS_COLORS,
 } from "@/api/assetsApi";
@@ -78,16 +79,25 @@ export default function AssetManagement() {
   // ── Request actions ─────────────────────────────────────────────────────────
   const handleAccept = async (req) => {
     try {
-      await acceptCustodyRequest(req.id);
+      // Use custody_returns endpoint if the request came from returns source
+      if (req._source === "returns") {
+        await acceptCustodyReturn(req.id);
+      } else {
+        await acceptCustodyRequest(req.id);
+      }
       load();
     } catch (err) {
       console.error("Accept error:", err);
     }
   };
 
-  const handleReject = async (reqId) => {
+  const handleReject = async (req) => {
     try {
-      await rejectCustodyRequest(reqId);
+      if (req._source === "returns") {
+        await rejectCustodyReturn(req.id);
+      } else {
+        await rejectCustodyRequest(req.id);
+      }
       load();
     } catch (err) {
       console.error("Reject error:", err);
@@ -123,7 +133,10 @@ export default function AssetManagement() {
   });
 
   // Tab الطلبات: كل الطلبات (custody_requests + custody_returns مدمجين)
-  const allRequestsAndReturns = [...requests, ...returns];
+  const allRequestsAndReturns = [
+    ...requests.map(r => ({ ...r, _source: "requests" })),
+    ...returns.map(r => ({ ...r, _source: "returns" })),
+  ];
   const myRequests = isAdminOrHR
     ? allRequestsAndReturns
     : allRequestsAndReturns.filter(r => String(r.employee_id) === String(currentEmployee?.id));
@@ -350,7 +363,17 @@ export default function AssetManagement() {
                     {/* الإجراءات */}
                     <td className="px-4 py-3">
                       <div className="flex gap-1 items-center">
-                        {isAdminOrHR && isPending && (
+                        {/* طلب إعادة → زرار تسجيل استلام */}
+                        {isAdminOrHR && req._source === "returns" && isPending && (
+                          <button
+                            onClick={() => setReceiveModal(req)}
+                            className="flex items-center gap-1 text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg font-medium hover:bg-orange-200 transition-colors whitespace-nowrap"
+                          >
+                            <RotateCcw className="w-3 h-3" /> تسجيل استلام
+                          </button>
+                        )}
+                        {/* طلب أصل عادي → قبول / رفض */}
+                        {isAdminOrHR && req._source !== "returns" && isPending && (
                           <>
                             <button
                               onClick={() => handleAccept(req)}
@@ -360,7 +383,7 @@ export default function AssetManagement() {
                               <CheckCircle className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleReject(req.id)}
+                              onClick={() => handleReject(req)}
                               className="p-1.5 hover:bg-red-50 text-red-600 rounded transition-colors"
                               title="رفض"
                             >
@@ -368,7 +391,8 @@ export default function AssetManagement() {
                             </button>
                           </>
                         )}
-                        {isAdminOrHR && isAccepted && (
+                        {/* طلب مقبول → تسجيل تسليم */}
+                        {isAdminOrHR && req._source !== "returns" && isAccepted && (
                           <button
                             onClick={() => setDeliverModal(req)}
                             className="text-xs px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors whitespace-nowrap"

@@ -189,6 +189,34 @@ export async function rejectCustodyRequest(id) {
 }
 
 /**
+ * POST /custody_returns/:id/accept  (for return requests)
+ */
+export async function acceptCustodyReturn(id) {
+    try {
+        const res = await assetsApi.post(`/custody_returns/${id}/accept`);
+        return res.data;
+    } catch {
+        // Fallback: some backends use the same custody_requests endpoint
+        const res = await assetsApi.post(`/custody_requests/${id}/accept`);
+        return res.data;
+    }
+}
+
+/**
+ * POST /custody_returns/:id/reject  (for return requests)
+ */
+export async function rejectCustodyReturn(id) {
+    try {
+        const res = await assetsApi.post(`/custody_returns/${id}/reject`);
+        return res.data;
+    } catch {
+        // Fallback: some backends use the same custody_requests endpoint
+        const res = await assetsApi.post(`/custody_requests/${id}/reject`);
+        return res.data;
+    }
+}
+
+/**
  * POST /custody_requests/:id/deliver
  * Body: { delivered_by, delivery_date, condition_at_delivery }
  */

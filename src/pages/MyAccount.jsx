@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Warehouse, FileText, Receipt, LogOut, Home, User, Phone, Mail, CreditCard, Eye } from "lucide-react";
+import { Warehouse, FileText, Receipt, LogOut, User, Phone, Mail, CreditCard, Eye } from "lucide-react";
 import { getCustomerSession, clearCustomerSession } from "../lib/customerAuth";
 import InvoiceView from "../components/storage/InvoiceView";
 import ContractView from "../components/storage/ContractView";

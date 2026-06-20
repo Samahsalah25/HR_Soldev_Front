@@ -3,15 +3,13 @@ import { Link, useLocation, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, Users, DollarSign, CalendarDays, Clock,
   Briefcase, FileText, LogOut, Bell, Menu, ChevronLeft,
-  Building2, Shield, Settings, TrendingDown, Globe, UserCircle,
+  Building2, Shield, Settings, Globe, UserCircle,
   CheckSquare, ClipboardList, Video, Calculator, Scale, AlertTriangle, ChevronDown,
   UserPlus, ArrowLeftRight, FolderOpen, Gift, MinusCircle, BarChart2, Warehouse, Receipt, Package, Calendar, CreditCard, UserX
 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import NotificationPanel from "./NotificationPanel";
 import { useLanguage } from "../lib/useLanguage";
 import { useRole } from "../lib/useRole";
-import { t } from "../lib/translations";
 import { useNavigate } from "react-router-dom";
 import { logoutUser } from "@/api/authApi";
 

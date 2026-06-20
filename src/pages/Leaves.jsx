@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, CalendarDays, Plane, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { Plus, Plane, CheckCircle, XCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";

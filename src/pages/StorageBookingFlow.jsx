@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle, Warehouse, User, FileText, PenLine, CreditCard, ChevronLeft, Search, X } from "lucide-react";
+import { CheckCircle, Warehouse, User, PenLine, CreditCard, ChevronLeft, Search, X } from "lucide-react";
 import { getCustomerSession } from "../lib/customerAuth";
 
 const STEPS = [

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle, XCircle, Clock, Users, AlertTriangle, CalendarDays, Briefcase, TrendingUp, Building2, ClipboardList } from "lucide-react";
+import { CheckCircle, XCircle, Users, AlertTriangle, CalendarDays, Building2, ClipboardList } from "lucide-react";
 
 const STATUS_COLORS = {
   "قيد المراجعة": "bg-amber-100 text-amber-700",

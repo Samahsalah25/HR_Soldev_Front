@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Plus, Save, Trash2, Settings } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import {
   getSalaryAdvanceTypes,
   createSalaryAdvanceType,

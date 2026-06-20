@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Save, RotateCcw } from "lucide-react";
+import { X, RotateCcw } from "lucide-react";
 import { receiveCustodyRequest } from "@/api/assetsApi";
 
 const CONDITION_OPTIONS = [

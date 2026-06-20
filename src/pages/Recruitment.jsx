@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UserPlus, Plus, X, Save, Search, CheckCircle, XCircle, Eye, ChevronRight, Calendar, Star, FileText, ExternalLink } from "lucide-react";
+import { UserPlus, Plus, X, Save, Search, CheckCircle, XCircle, Eye, ChevronRight, Calendar, Star, ExternalLink } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";

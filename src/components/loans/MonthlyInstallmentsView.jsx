@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { ChevronRight, ChevronLeft, Calendar, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatCurrency } from "@/lib/hrUtils";
-import { formatMonth, logLoanAction } from "@/lib/loanUtils";
+import { logLoanAction } from "@/lib/loanUtils";
 import { getAllInstallments } from "@/api/salaryAdvancesApi";
 import {
   payInstallment,

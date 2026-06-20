@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Receipt, Plus, X, Save, CheckCircle, Upload, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { Receipt, X, CheckCircle, Upload, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const STATUS_COLORS = {

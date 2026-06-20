@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Plus, BookOpen, Upload, Trash2, Edit, ExternalLink, Save, X, FileText } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import {
   getCompanyPolicies,
   createCompanyPolicy,

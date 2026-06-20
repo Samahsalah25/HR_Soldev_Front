@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
-import { Scale, FileText, Plus, X, Save, AlertTriangle, CheckCircle, Clock, Building, Upload, Search, Gavel } from "lucide-react";
+import { Scale, FileText, Plus, X, Save, AlertTriangle, Upload, Search, Gavel } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 import {
   getCases,
   createCase,
-  deleteCase,
-  updateCase,
 } from "../API/casesApi";
 const CASE_STATUS_COLORS = {
   new: "bg-blue-100 text-blue-700",

@@ -3,17 +3,59 @@ import { UserPlus, Plus, X, Save, Search, CheckCircle, XCircle, Eye, ChevronRigh
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
-
-const STAGES = ["جديد","فرز أولي","مقابلة HR","مقابلة فنية","عرض وظيفي","مقبول","مرفوض","انسحاب"];
+import {
+  getJobs,
+  createJob,
+  acceptJob,
+  rejectJob as rejectJobApi,
+} from "@/api/jobsApi";
+import { getApplicants, updateApplicant ,addApplicantMeeting ,updateMeeting,getMyMeetings ,allMyMeetingsForanApplicant} from "@/api/applicantsApi";
+import { getBranches } from "@/api/branchesApi";
+import { getDepartments } from "@/api/departmentsApi";
+import { getCurrentUser } from "@/api/authApi";
+const STAGES = [
+  { label: "جديد", value: "new" },
+  { label: "فرز أولي", value: "first_stage" },
+  { label: "مقابلة HR", value: "hr_meeting" },
+  { label: "مقابلة فنية", value: "technical_meeting" },
+  { label: "عرض وظيفي", value: "job_offering" },
+  { label: "مقبول", value: "accepted" },
+  { label: "مرفوض", value: "rejected" },
+  { label: "انسحاب", value: "dropout" },
+];
 const STAGE_COLORS = {
-  "جديد":"bg-blue-100 text-blue-700","فرز أولي":"bg-indigo-100 text-indigo-700",
-  "مقابلة HR":"bg-amber-100 text-amber-700","مقابلة فنية":"bg-orange-100 text-orange-700",
-  "عرض وظيفي":"bg-purple-100 text-purple-700","مقبول":"bg-green-100 text-green-700",
-  "مرفوض":"bg-red-100 text-red-600","انسحاب":"bg-gray-100 text-gray-600"
+  new: "bg-blue-100 text-blue-700",
+  first_stage: "bg-indigo-100 text-indigo-700",
+ hr_meeting: "bg-amber-100 text-amber-700",
+ technical_meeting: "bg-orange-100 text-orange-700",
+   job_offering: "bg-purple-100 text-purple-700",
+  accepted: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-600",
+  withdrawn: "bg-gray-100 text-gray-600",
 };
 const RESULT_COLORS = {
-  "ناجح":"bg-green-100 text-green-700","راسب":"bg-red-100 text-red-600",
-  "في الانتظار":"bg-amber-100 text-amber-700","قيد المراجعة":"bg-gray-100 text-gray-600"
+  accepted: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-600",
+  waiting: "bg-amber-100 text-amber-700",
+  pending: "bg-gray-100 text-gray-600",
+  under_review: "bg-gray-100 text-gray-600",
+};
+const STAGE_MAP = {
+  new: "جديد",
+  waiting: "قيد الاعتماد",
+  accepted: "مقبول",
+  rejected: "مرفوض",
+};
+const STAGE_LABELS = {
+  new: "جديد",
+  first_stage:"فرز أولي" ,
+  hr_meeting:"مقابلة HR" ,
+  under_review: "قيد المراجعة",
+  technical_meeting: "مقابلة فنية",
+  job_offering: "عرض وظيفي",
+  accepted: "مقبول",
+  rejected: "مرفوض",
+  dropout: "انسحاب",
 };
 
 function JobForm({ departments, branches, onSave, onClose }) {
@@ -28,13 +70,36 @@ function JobForm({ departments, branches, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
-  const handleSave = async () => {
-    setSaving(true);
-    const user = await base44.auth.me();
-    const linkId = `JOB-${Date.now().toString(36).toUpperCase()}`;
-    await base44.entities.Recruitment.create({...form, public_link_id: linkId, requested_by: user.full_name||user.email});
-    onSave();
-  };
+ const handleSave = async () => {
+  setSaving(true);
+
+  await createJob({
+    name: form.job_title,
+    department_id: form.department,
+branch_id: form.branch,
+    employment_type: form.employment_type,
+    target: form.vacancies_count,
+    min_salary: form.salary_range_min,
+    max_salary: form.salary_range_max,
+    submission_end_date: form.closing_date,
+    job_description: form.description,
+    required_skills: form.skills,
+    years_of_experience: form.req_experience_years,
+    gender:
+      form.req_gender === "ذكر"
+        ? "male"
+        : form.req_gender === "أنثى"
+        ? "female"
+        : "any",
+    qualification: form.req_qualification,
+    languages: form.req_languages,
+    age_range: form.req_age_range,
+    other_requirement: form.req_other,
+    reason: form.reason,
+  });
+
+  onSave();
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -56,19 +121,33 @@ function JobForm({ departments, branches, onSave, onClose }) {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">القسم *</label>
-                <select value={form.department} onChange={e=>set("department",e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                  <option value="">اختر القسم...</option>
-                  {departments.map(d=><option key={d.id} value={d.name}>{d.name}</option>)}
-                </select>
+              <select
+  value={form.department}
+  onChange={e => set("department", e.target.value)}
+>
+  <option value="">اختر القسم...</option>
+
+  {departments.map(d => (
+    <option key={d.id} value={d.id}>
+      {d.name}
+    </option>
+  ))}
+</select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">الفرع *</label>
-                <select value={form.branch} onChange={e=>set("branch",e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                  <option value="">اختر الفرع...</option>
-                  {branches.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
-                </select>
+              <select
+  value={form.branch}
+  onChange={e => set("branch", e.target.value)}
+>
+  <option value="">اختر الفرع...</option>
+
+  {branches.map(b => (
+    <option key={b.id} value={b.id}>
+      {b.name}
+    </option>
+  ))}
+</select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">نوع التوظيف *</label>
@@ -172,21 +251,44 @@ function JobForm({ departments, branches, onSave, onClose }) {
 }
 
 function InterviewModal({ app, users, currentUser, onSave, onClose }) {
-  const [interviews, setInterviews] = useState(app.interviews || []);
+const [interviews, setInterviews] = useState([]);
+
   const [finalResult, setFinalResult] = useState(app.final_result || "قيد المراجعة");
   const [hrNotes, setHrNotes] = useState(app.hr_notes || "");
   const [saving, setSaving] = useState(false);
+
   const [newInterview, setNewInterview] = useState({
     interview_type:"مقابلة HR", interview_date:"", interviewer_name:"", interviewer_email:"", score:"", notes:"", result:"في الانتظار"
   });
+  const normalizeMeetings = (meetings = []) =>
+  meetings.map(m => ({
+    interview_type: m.type_label || m.type || "",
+    interview_date: m.date ? m.date.split(" ")[0] : "",
+    interviewer_name: m.interviewers?.[0]?.name || "",
+    interviewer_email: "",
+    score: m.rating || 0,
+    notes: m.notes || "",
+    result: m.result_label || m.result || "في الانتظار"
+  }));
+useEffect(() => {
+  if (app?.meetings) {
+    setInterviews(normalizeMeetings(app.meetings));
+  }
+}, [app]);
+
+useEffect(() => {
+  console.log("currentUser", currentUser);
+}, [currentUser]);
 
   const matchesMe = (iv) =>
     (iv.interviewer_email && iv.interviewer_email === currentUser?.email) ||
     (!iv.interviewer_email && iv.interviewer_name && currentUser?.full_name &&
       iv.interviewer_name.trim().toLowerCase() === currentUser.full_name.trim().toLowerCase());
 
-  const isHR = currentUser?.role === "admin" || currentUser?.role === "hr";
-
+ const isHR =
+  currentUser?.data?.role === "Admin" ||
+  currentUser?.data?.role === "hr";
+  console.log('isHr',isHR);
   const addInterview = () => {
     if (!newInterview.interview_date || !newInterview.interviewer_name) return;
     setInterviews(prev => [...prev, { ...newInterview, score: +newInterview.score || 0 }]);
@@ -411,57 +513,83 @@ export default function Recruitment() {
   const [departments, setDepartments] = useState([]);
   const [branches, setBranches] = useState([]);
   const [users, setUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState(window.location.hash === "#my-interviews" ? "my-interviews" : "jobs");
   const [selectedJob, setSelectedJob] = useState(null);
   const [interviewApp, setInterviewApp] = useState(null);
   const [search, setSearch] = useState("");
+const [applicants, setApplicants] = useState([]);
 
-  const load = async () => {
-    const [js, apps, depts, brs, usrs, me] = await Promise.all([
-      base44.entities.Recruitment.list("-created_date"),
-      base44.entities.JobApplication.list("-created_date"),
-      base44.entities.Department.list(),
-      base44.entities.Branch.list(),
-      base44.entities.User.list(),
-      base44.auth.me(),
-    ]);
-    setJobs(js); setApplications(apps); setDepartments(depts); setBranches(brs);
-    setUsers(usrs); setCurrentUser(me); setLoading(false);
+const [currentUser, setCurrentUser] = useState(null);
+
+useEffect(() => {
+  const loadUser = async () => {
+    try {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+    } catch (err) {
+      console.error(err);
+    }
   };
+
+  loadUser();
+}, []);
+
+
+const load = async () => {
+  setLoading(true);
+
+  const [jobsResponse, departmentsResponse, branchesResponse, applicantsData] =
+    await Promise.all([
+      getJobs(),
+      getDepartments(),
+      getBranches(),
+      getApplicants(),
+    ]);
+
+  setJobs(jobsResponse.data || []);
+  setDepartments(departmentsResponse.data || []);
+  setBranches(branchesResponse.data || []);
+  setApplicants(applicantsData);
+
+  setLoading(false);
+};
 
   useEffect(() => { load(); }, []);
 
-  const approveJob = async (id) => {
-    const u = await base44.auth.me();
-    await base44.entities.Recruitment.update(id, { status:"معتمد - نشط", approved_by: u.full_name||u.email });
-    load();
-  };
-  const rejectJob = async (id) => {
-    await base44.entities.Recruitment.update(id, { status:"مرفوض" });
-    load();
-  };
-  const updateStage = async (appId, stage) => {
-    await base44.entities.JobApplication.update(appId, { stage });
-    load();
-  };
+ const approveJob = async (id) => {
+  await acceptJob(id);
+  load();
+};
+
+const rejectJob = async (id) => {
+  await rejectJobApi(id);
+  load();
+};
+ const updateStage = async (appId, stage) => {
+  await updateApplicant(appId, { stage });
+  load();
+};
 
   const displayedApps = selectedJob
-    ? applications.filter(a => a.recruitment_id === selectedJob.id)
-    : applications.filter(a => !search || a.applicant_name?.includes(search) || a.job_title?.includes(search));
+    ? applicants.filter(a => a.job_id === selectedJob.id)
+    : applicants.filter(a => !search || a.applicant_name?.includes(search) || a.job_title?.includes(search));
 
-  const activeJobs = jobs.filter(j => j.status === "معتمد - نشط");
-  const pendingJobs = jobs.filter(j => j.status === "قيد الاعتماد");
+ const activeJobs = jobs.filter(
+  j => j.state === "accepted"
+);
 
+const pendingJobs = jobs.filter(
+  j => j.state === "under_review"
+);
   const isMyInterview = (iv) =>
     (iv.interviewer_email && iv.interviewer_email === currentUser?.email) ||
     (!iv.interviewer_email && iv.interviewer_name && currentUser?.full_name &&
       iv.interviewer_name.trim().toLowerCase() === currentUser.full_name.trim().toLowerCase());
 
   // My interviews — match by email or by name (fallback for old records)
-  const myInterviewApps = applications.filter(a =>
+  const myInterviewApps = applicants.filter(a =>
     a.interviews?.some(iv => isMyInterview(iv))
   );
 
@@ -504,7 +632,7 @@ export default function Recruitment() {
       <div className="flex gap-1 border-b border-border">
         {[
           {id:"jobs", label:`الوظائف (${jobs.length})`},
-          {id:"applications", label:`المتقدمون (${applications.length})`},
+          {id:"applications", label:`المتقدمون (${applicants.length})`},
           {id:"my-interviews", label: myInterviewApps.length > 0 ? `مقابلاتي (${myInterviewApps.length})` : "مقابلاتي"},
         ].map(t=>(
           <button key={t.id} onClick={()=>{setActiveTab(t.id);setSelectedJob(null);}}
@@ -523,8 +651,8 @@ export default function Recruitment() {
                 {pendingJobs.map(j=>(
                   <div key={j.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-2.5 border border-amber-100">
                     <div>
-                      <p className="font-medium text-sm text-foreground">{j.job_title}</p>
-                      <p className="text-xs text-muted-foreground">{j.department} {j.branch?`— ${j.branch}`:""} — {j.vacancies_count} شاغر · {j.employment_type}</p>
+                      <p className="font-medium text-sm text-foreground">{j.name}</p>
+                      <p className="text-xs text-muted-foreground">{j.department_name} {j.branch_name?`— ${j.branch_name}`:""} — {j.target} شاغر · {j.employment_type}</p>
                     </div>
                     {canApprove && (
                       <div className="flex gap-2">
@@ -555,24 +683,26 @@ export default function Recruitment() {
                   const appCount = applications.filter(a=>a.recruitment_id===j.id).length;
                   return (
                     <tr key={j.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium text-foreground">{j.job_title}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">{j.name}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        <p>{j.department}</p>
-                        {j.branch && <p className="text-muted-foreground/70">{j.branch}</p>}
+                        <p>  {j.department_name || "-"}
+
+  </p>
+                        {j.branch_name && <p className="text-muted-foreground/70">{j.branch_name}</p>}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{j.employment_type}</td>
-                      <td className="px-4 py-3 text-center font-semibold">{j.vacancies_count}</td>
+                      <td className="px-4 py-3 text-center font-semibold">{j.target}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {j.salary_range_min>0?`${j.salary_range_min?.toLocaleString("ar-SA")} - ${j.salary_range_max?.toLocaleString("ar-SA")}`:"—"}
+                        {j.min_salary>0?`${j.min_salary?.toLocaleString("ar-SA")} - ${j.max_salary?.toLocaleString("ar-SA")}`:"—"}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{j.closing_date?new Date(j.closing_date).toLocaleDateString("ar-SA"):"—"}</td>
-                      <td className="px-4 py-3 text-center"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">{appCount}</span></td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{j.submission_end_date?new Date(j.submission_end_date).toLocaleDateString("ar-SA"):"—"}</td>
+                      <td className="px-4 py-3 text-center"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">{j.total_applicants}</span></td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          j.status==="معتمد - نشط"?"bg-green-100 text-green-700":
-                          j.status==="قيد الاعتماد"?"bg-amber-100 text-amber-700":
-                          j.status==="مرفوض"?"bg-red-100 text-red-600":"bg-gray-100 text-gray-600"}`}>
-                          {j.status}
+                          j.state==="accepted"?"bg-green-100 text-green-700":
+                          j.state==="under_review"?"bg-amber-100 text-amber-700":
+                          j.state==="rejected"?"bg-red-100 text-red-600":"bg-gray-100 text-gray-600"}`}>
+                          {j.state_label}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -626,8 +756,8 @@ export default function Recruitment() {
                         <td className="px-3 py-3">
                           <p className="font-medium text-foreground">{app.applicant_name}</p>
                           <p className="text-xs text-muted-foreground">{app.nationality}</p>
-                          {app.cv_url && (
-                            <a href={app.cv_url} target="_blank" rel="noopener noreferrer"
+                          {app.resume_url && (
+                            <a href={app.resume_url} target="_blank" rel="noopener noreferrer"
                               className="flex items-center gap-1 text-xs text-blue-600 hover:underline mt-0.5">
                               <ExternalLink className="w-3 h-3"/>CV
                             </a>
@@ -640,27 +770,33 @@ export default function Recruitment() {
                         </td>
                         <td className="px-3 py-3 text-center text-xs font-medium">{app.experience_years} سنة</td>
                         <td className="px-3 py-3 text-xs text-green-600 font-semibold">{app.expected_salary>0?`${app.expected_salary?.toLocaleString("ar-SA")} ر.س`:"—"}</td>
-                        <td className="px-3 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[app.stage]}`}>{app.stage}</span></td>
+                        <td className="px-3 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[app.stage]}`}>{STAGE_LABELS[app.stage]}</span></td>
                         <td className="px-3 py-3 text-center">
                           {avgScore ? <span className="font-bold text-amber-600 flex items-center gap-0.5 justify-center"><Star className="w-3 h-3"/>{avgScore}</span> : "—"}
                         </td>
                         <td className="px-3 py-3">
                           {app.final_result ? (
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RESULT_COLORS[app.final_result]||"bg-gray-100 text-gray-600"}`}>{app.final_result}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RESULT_COLORS[app.final_result]||"bg-gray-100 text-gray-600"}`}>{STAGE_MAP[app.final_result]}</span>
                           ) : "—"}
                         </td>
                         <td className="px-3 py-3 text-center">
                           <button onClick={()=>setInterviewApp(app)}
                             className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20">
                             <Calendar className="w-3 h-3"/>
-                            {app.interviews?.length || 0} مقابلة
+                            {app.total_meetings || 0} مقابلة
                           </button>
                         </td>
                         <td className="px-3 py-3">
-                          <select value={app.stage} onChange={e=>updateStage(app.id,e.target.value)}
-                            className="text-xs px-2 py-1 border border-border rounded-lg bg-background focus:outline-none">
-                            {STAGES.map(s=><option key={s}>{s}</option>)}
-                          </select>
+                        <select
+  value={app.stage}
+  onChange={e => updateStage(app.id, e.target.value)}
+>
+ {STAGES.map(s => (
+  <option key={s.value} value={s.value}>
+    {s.label}
+  </option>
+))}
+</select>
                         </td>
                       </tr>
                     );

@@ -1,5 +1,5 @@
 import { X, Edit, User, Briefcase, DollarSign, AlertCircle, Plane } from "lucide-react";
-import { formatCurrency, calcServiceYears, calcGOSI_Saudi, calcGOSI_NonSaudi, calcEndOfService, getExpiryStatus } from "../lib/hrUtils";
+import { formatCurrency, calcServiceYears, calcGOSI_Saudi, calcGOSI_NonSaudi, getExpiryStatus } from "../lib/hrUtils";
 
 const Row = ({ label, value, highlight }) => (
   <div className="flex justify-between py-2 border-b border-border/50 last:border-0">

@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import { Shield, Search, Check, Save, RotateCcw } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { ROLE_LABELS, ROLE_ACCESS } from "../lib/useRole";
+import { ROLE_ACCESS } from "../lib/useRole";
 import RolesBatchEditor from "../components/permissions/RolesBatchEditor";
 import CrudPermissionsEditor from "../components/permissions/CrudPermissionsEditor";
 import AuditLogViewer from "../components/permissions/AuditLogViewer";

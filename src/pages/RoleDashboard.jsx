@@ -5,9 +5,8 @@ import { useRole } from "../lib/useRole";
 import {
   Users, DollarSign, CalendarDays, Clock, Warehouse,
   ClipboardList, BarChart2, CheckSquare, UserPlus, AlertTriangle,
-  FileText, Calculator, TrendingUp, Bell, ArrowUpRight, LogOut
+  FileText, Calculator, TrendingUp, ArrowUpRight, LogOut
 } from "lucide-react";
-import { formatCurrency } from "../lib/hrUtils";
 
 // ─── Role-specific dashboard configs ─────────────────────────────────────────
 const ROLE_DASHBOARDS = {

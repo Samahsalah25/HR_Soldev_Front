@@ -143,6 +143,7 @@ export function normalizeEmployee(e) {
         // documents
         documents: e.documents || [],
         active: e.active,
+        user_role: e.user_role || "",
     };
 }
 
@@ -204,6 +205,7 @@ export function toApiPayload(form) {
         ticket_class: form.ticket_class === "اقتصادية" ? "economic" : form.ticket_class === "أعمال" ? "business" : form.ticket_class || "economic",
         ticket_destination: form.ticket_destination || "",
         ticket_price: form.ticket_value || 0,
+        user_role: form.user_role || "employee",
     };
 }
 

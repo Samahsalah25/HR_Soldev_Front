@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, X, AlertTriangle, FileWarning, CalendarDays, Clock, Plane, CheckCircle, UserX, CreditCard, Gift, MinusCircle } from "lucide-react";
+import { Bell, X, AlertTriangle, FileWarning, CalendarDays, CheckCircle, UserX, CreditCard, Gift, MinusCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { getExpiryStatus } from "../lib/hrUtils";
 

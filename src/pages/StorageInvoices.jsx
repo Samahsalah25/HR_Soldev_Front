@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { FileText, Plus, RefreshCw, Eye, CheckCircle, Clock, X, AlertCircle } from "lucide-react";
+import { FileText, Plus, RefreshCw, Eye, AlertCircle } from "lucide-react";
 import InvoiceTemplate from "../components/storage/InvoiceTemplate";
 
 function addMonths(dateStr, months) {

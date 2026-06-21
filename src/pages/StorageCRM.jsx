@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, X, Search, Phone, Mail, Eye, FileText, Receipt, ChevronDown, User, Edit2, Warehouse } from "lucide-react";
+import { Plus, X, Search, Phone, Eye, User, Edit2 } from "lucide-react";
 
 const PIPELINE_STAGES = ["جديد", "تواصل أولي", "في المفاوضة", "عرض مقدم", "محتمل إغلاق", "تم الإغلاق", "خسارة"];
 const STAGE_COLORS = {

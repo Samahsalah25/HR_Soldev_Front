@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, CalendarDays, DollarSign, Clock, Send, FileText, AlertTriangle, CheckCircle, ShieldAlert, ExternalLink, Upload, BookOpen, Briefcase, CreditCard, ClipboardList, Lock, Eye, EyeOff } from "lucide-react";
+import { User, CalendarDays, DollarSign, Clock, Send, FileText, AlertTriangle, CheckCircle, ShieldAlert, ExternalLink, BookOpen, Briefcase, CreditCard, ClipboardList, Lock, Eye, EyeOff } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatCurrency, calcPayslip, getLeaveEntitlement, calcServiceYears, calcAutoLeaveBalance } from "../lib/hrUtils";
 

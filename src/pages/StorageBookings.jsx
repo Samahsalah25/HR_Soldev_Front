@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Search, Eye, X, CheckCircle, Clock, FileText, Warehouse } from "lucide-react";
+import { Search, Eye, X, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const STATUS_COLORS = {

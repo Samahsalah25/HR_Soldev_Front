@@ -145,6 +145,38 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
   };
 
   const handleSubmit = async () => {
+    // التحقق من الحقول الإلزامية قبل الحفظ لتجنب أخطاء السيرفر
+    if (!form.full_name_ar?.trim()) {
+      alert("الرجاء إدخال الاسم الكامل (عربي) *");
+      setActiveTab("personal");
+      return;
+    }
+    if (!form.id_number?.trim()) {
+      alert("الرجاء إدخال رقم الهوية / الإقامة *");
+      setActiveTab("personal");
+      return;
+    }
+    if (!form.job_title?.trim()) {
+      alert("الرجاء إدخال المسمى الوظيفي *");
+      setActiveTab("job");
+      return;
+    }
+    if (!form.department_id && !form.department) {
+      alert("الرجاء اختيار القسم *");
+      setActiveTab("job");
+      return;
+    }
+    if (!form.join_date) {
+      alert("الرجاء تحديد تاريخ المباشرة *");
+      setActiveTab("job");
+      return;
+    }
+    if (form.basic_salary === undefined || form.basic_salary === null || form.basic_salary === "") {
+      alert("الرجاء إدخال الراتب الأساسي *");
+      setActiveTab("salary");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = toApiPayload(form);

@@ -1,14 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  Users, DollarSign, CalendarDays, Clock, AlertTriangle,
-  TrendingUp, TrendingDown, UserCheck, UserX, Building2,
-  Plane, FileWarning, ChevronLeft, ArrowUpRight
+  Users, DollarSign, CalendarDays, Clock, UserCheck, Building2, FileWarning, ChevronLeft, ArrowUpRight
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import StatCard from "../components/StatCard";
 import AlertBanner from "../components/AlertBanner";
-import { formatCurrency, calcServiceYears, getExpiryStatus } from "../lib/hrUtils";
+import { formatCurrency, getExpiryStatus } from "../lib/hrUtils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 export default function Dashboard() {

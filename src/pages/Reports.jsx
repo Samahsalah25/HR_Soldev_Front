@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, BarChart2, Users, DollarSign, CalendarDays, TrendingDown, Filter, Printer, FileSpreadsheet } from "lucide-react";
+import { Download, BarChart2, Users, DollarSign, CalendarDays, TrendingDown, Filter, Printer, FileSpreadsheet } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { formatCurrency, calcServiceYears, calcPayslip, calcEndOfService, getLeaveEntitlement, EXPAT_LEVY } from "../lib/hrUtils";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { formatCurrency, calcServiceYears, calcPayslip, getLeaveEntitlement, EXPAT_LEVY } from "../lib/hrUtils";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 export default function Reports() {
   const [activeReport, setActiveReport] = useState("payroll_summary");

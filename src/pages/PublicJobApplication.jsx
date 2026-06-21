@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Send, CheckCircle, Briefcase, Upload, ArrowRight, MapPin, Clock, Star, ChevronDown } from "lucide-react";
+import { Send, CheckCircle, Briefcase, Upload, ArrowRight, MapPin, Clock, ChevronDown } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { getJobs, applyForJob ,activeJobs } from "@/api/jobsApi"; // أو نفس الملف
 

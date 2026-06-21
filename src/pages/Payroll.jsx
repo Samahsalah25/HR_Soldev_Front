@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DollarSign, Calculator, Download, CheckCircle, FileText, Info } from "lucide-react";
+import { Download, CheckCircle, FileText, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";

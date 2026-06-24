@@ -207,6 +207,7 @@ export function canDo(user, module, action) {
   return (perms[module] || []).includes(action);
 }
 
+
 export function getRoleCrudDefaults(role) {
   return ROLE_CRUD_DEFAULTS[role] || ROLE_CRUD_DEFAULTS.employee;
 }

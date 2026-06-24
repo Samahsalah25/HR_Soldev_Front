@@ -31,11 +31,13 @@ const RESULT_TO_KEY = {
   "في الانتظار": "waiting",
   "ناجح": "accepted",
   "راسب": "rejected",
+  "قيد المراجعة": "under_review",
 };
 const RESULT_KEY_TO_LABEL = {
   "waiting": "في الانتظار",
   "accepted": "ناجح",
   "rejected": "راسب",
+  "under_review": "قيد المراجعة",
 };
 const STAGES = [
   { label: "جديد", value: "new" },
@@ -277,7 +279,10 @@ function JobForm({ departments, branches, onSave, onClose }) {
 function InterviewModal({ app, users, currentUser, onSave, onClose }) {
   const [interviews, setInterviews] = useState([]);
 
-  const [finalResult, setFinalResult] = useState(app.final_result || "قيد المراجعة");
+  // تحويل final_result من English لـ Arabic لعرضه في الـ select
+  const [finalResult, setFinalResult] = useState(
+    RESULT_KEY_TO_LABEL[app.final_result] || app.final_result || "قيد المراجعة"
+  );
   const [hrNotes, setHrNotes] = useState(app.hr_notes || "");
   const [saving, setSaving] = useState(false);
 
@@ -334,26 +339,29 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
     setSaving(true);
     try {
       // 1. حفظ النتيجة النهائية وملاحظات HR على المتقدم
-      await updateApplicant(app.id, {
-        final_result: finalResult,
+      // مزامنة المرحلة مع النتيجة النهائية
+      const finalResultKey = RESULT_TO_KEY[finalResult] || finalResult;
+      const updateData = {
+        final_result: finalResultKey,
         hr_notes: hrNotes,
-      });
+      };
+      if (finalResultKey === "accepted") {
+        updateData.stage = "accepted";
+      } else if (finalResultKey === "rejected") {
+        updateData.stage = "rejected";
+      }
+      await updateApplicant(app.id, updateData);
 
       // 2. تحديث المقابلات الموجودة (عندها id)
       const meetingUpdates = interviews
         .filter(iv => iv.id)
         .map(iv => {
           const payload = {
-            type: INTERVIEW_TYPE_TO_KEY[iv.interview_type] || iv.interview_type,
-            date: iv.interview_date ? `${iv.interview_date} 09:00:00` : null,
-            interviewer_ids: iv.interviewer_id ? [iv.interviewer_id] : [],
             rating: String(iv.score || 0),
             notes: iv.notes || "",
             result: RESULT_TO_KEY[iv.result] || iv.result || "waiting",
           };
-          console.log("Updating meeting:", iv.id, payload);
           return updateMeeting(iv.id, payload)
-            .then(res => console.log("Meeting update success:", res))
             .catch(e => console.warn("meeting update failed:", iv.id, e));
         });
 
@@ -457,16 +465,17 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">المحاور</label>
                     {isHR ? (
-                      <select value={iv.interviewer_email || ""} onChange={e => {
-                        const u = users.find(x => x.email === e.target.value);
+                      <select value={iv.interviewer_id ? String(iv.interviewer_id) : ""} onChange={e => {
+                        const u = users.find(x => String(x.id) === e.target.value);
                         setInterviews(prev => prev.map((item, i) => i === idx ? {
                           ...item,
-                          interviewer_email: e.target.value,
-                          interviewer_name: u?.full_name || u?.name || e.target.value
+                          interviewer_id: u?.id || null,
+                          interviewer_email: u?.email || "",
+                          interviewer_name: u?.full_name || u?.name || ""
                         } : item));
                       }} className="w-full px-2 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none">
                         <option value="">اختر محاوراً...</option>
-                        {users.map(u => <option key={u.id} value={u.email}>{u.full_name || u.name} ({u.role || u.job_title})</option>)}
+                        {users.map(u => <option key={u.id} value={String(u.id)}>{u.full_name || u.name} ({u.role || u.job_title})</option>)}
                       </select>
                     ) : (
                       <p className="px-2 py-1.5 text-xs border border-border rounded-lg bg-muted/30">{iv.interviewer_name}</p>
@@ -739,8 +748,8 @@ export default function Recruitment() {
         {[
           { label: "وظائف نشطة", value: activeJobs.length, color: "text-green-600" },
           { label: "قيد الاعتماد", value: pendingJobs.length, color: "text-amber-600" },
-          { label: "إجمالي المتقدمين", value: applications.length, color: "text-primary" },
-          { label: "مقبولون", value: applications.filter(a => a.stage === "مقبول").length, color: "text-secondary" },
+          { label: "إجمالي المتقدمين", value: applicants.length, color: "text-primary" },
+          { label: "مقبولون", value: applicants.filter(a => a.stage === "accepted" || a.stage === "مقبول").length, color: "text-secondary" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -967,7 +976,15 @@ export default function Recruitment() {
                         <ExternalLink className="w-3.5 h-3.5" />السيرة الذاتية
                       </a>
                     )}
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[app.stage]}`}>{app.stage}</span>
+                    {app.final_result && app.final_result !== "under_review" ? (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RESULT_COLORS[app.final_result] || "bg-gray-100 text-gray-600"}`}>
+                        {RESULT_KEY_TO_LABEL[app.final_result] || app.final_result}
+                      </span>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[app.stage]}`}>
+                        {STAGE_LABELS[app.stage] || app.stage_label || app.stage}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {/* My interviews for this applicant */}

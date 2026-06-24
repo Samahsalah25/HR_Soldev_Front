@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { CreditCard, Settings, Plus, Search, Eye, XCircle, DollarSign, Users, BarChart2, Clock } from "lucide-react";
+import { CreditCard, Settings, Plus, Search, Eye, XCircle, Clock } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "@/lib/useRole";
 import { formatCurrency } from "@/lib/hrUtils";
-import { generateRepaymentSchedule, nextMonth, logLoanAction, WORKFLOW_STATUS_COLORS } from "@/lib/loanUtils";
+import { generateRepaymentSchedule, nextMonth, logLoanAction } from "@/lib/loanUtils";
 import LoanTypeManager from "@/components/loans/LoanTypeManager";
 import LoanApplicationModal from "@/components/loans/LoanApplicationModal";
 import LoanDetailModal from "@/components/loans/LoanDetailModal";

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Plus, X, Save, CheckCircle, XCircle, AlertCircle, Upload, Trash2 } from "lucide-react";
+import { FileText, Plus, X, CheckCircle, AlertCircle, Upload, Trash2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const STATUS_COLORS = {

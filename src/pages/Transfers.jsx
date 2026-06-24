@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { ArrowLeftRight, Plus, X, Save, CheckCircle, XCircle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 
@@ -8,7 +7,6 @@ import {
   getEmployeeTransfers,
   createEmployeeTransfer,
   updateEmployeeTransfer,
-  deleteEmployeeTransfer,
 } from "@/api/employeeTransfersApi";
 import {
 getEmployees,getDepartments

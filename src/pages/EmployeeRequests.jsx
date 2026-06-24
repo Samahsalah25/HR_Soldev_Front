@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, Search, FileText, AlertTriangle, DollarSign, Briefcase, Package, CreditCard, Receipt, X, Save, ChevronDown } from "lucide-react";
+import { CheckCircle, XCircle, Search, FileText, AlertTriangle, DollarSign, Briefcase, Package, CreditCard, Receipt } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import LeaveRequestModal from "../components/requests/LeaveRequestModal";
 import ComplaintModal from "../components/requests/ComplaintModal";

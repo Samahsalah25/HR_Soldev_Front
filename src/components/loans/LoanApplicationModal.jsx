@@ -462,7 +462,6 @@ import {
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { calcServiceYears } from "@/lib/hrUtils";
 import { getSalaryAdvanceTypes } from "@/api/salaryAdvanceTypesApi";
 import {

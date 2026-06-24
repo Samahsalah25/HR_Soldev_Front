@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Briefcase, CheckCircle, XCircle, MapPin, DollarSign } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { Plus, CheckCircle, XCircle, MapPin } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 import { formatCurrency } from "../lib/hrUtils";
@@ -9,7 +8,6 @@ import {
   getMissions,
   createMission,
   updateMission,
-  deleteMission,
 } from "@/api/missionApi";
 
 import { getEmployees } from "@/api/departmentsApi";

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Search, MapPin, Maximize2, DollarSign, X, CheckCircle, ChevronDown, Warehouse, Phone, Mail, Tag, Calendar, Shield, Camera, Zap, User, LogIn } from "lucide-react";
+import { MapPin, X, Warehouse, Phone, Mail, Shield, Camera, Zap, User, LogIn } from "lucide-react";
 import { getCustomerSession, clearCustomerSession } from "../lib/customerAuth";
 
 const DISCOUNT_OPTIONS = [

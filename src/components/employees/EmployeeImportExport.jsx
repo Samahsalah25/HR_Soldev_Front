@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Download, Upload, X, CheckCircle, AlertCircle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import api from "@/api/axios";
+import { createEmployee, toApiPayload } from "@/api/employeesApi";
 
 // Excel template columns (maps to Employee entity fields)
 const TEMPLATE_COLUMNS = [
@@ -50,7 +51,27 @@ function downloadCSV(data, filename) {
 export default function EmployeeImportExport({ onImportDone, userRole }) {
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState(null);
+  const [allDepartments, setAllDepartments] = useState([]);
+  const [allBranches, setAllBranches] = useState([]);
   const fileRef = useRef();
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [deptsRes, branchesRes] = await Promise.all([
+          api.get("/departments"),
+          api.get("/branches")
+        ]);
+        const depts = deptsRes.data?.data || deptsRes.data || [];
+        const branches = branchesRes.data?.data || branchesRes.data || [];
+        setAllDepartments(Array.isArray(depts) ? depts : []);
+        setAllBranches(Array.isArray(branches) ? branches : []);
+      } catch (err) {
+        console.error("Error loading departments/branches for import:", err);
+      }
+    };
+    loadData();
+  }, []);
 
   // Download empty template CSV
   const handleDownloadTemplate = () => {
@@ -64,13 +85,37 @@ export default function EmployeeImportExport({ onImportDone, userRole }) {
     downloadCSV(`${header}\n${sampleRow}`, "employee_template.csv");
   };
 
-  // Parse CSV text
+  // Parse CSV text with separator detection
   const parseCSV = (text) => {
     const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim());
     if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map(h => h.trim().replace(/"/g, ""));
+    
+    // Detect separator (comma or semicolon)
+    const firstLine = lines[0];
+    const separator = firstLine.includes(";") && !firstLine.includes(",") ? ";" : ",";
+
+    const splitCSVLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === separator && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = splitCSVLine(lines[0]);
     return lines.slice(1).map(line => {
-      const vals = line.split(",").map(v => v.trim().replace(/"/g, ""));
+      const vals = splitCSVLine(line);
       const obj = {};
       headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
       return obj;
@@ -99,20 +144,61 @@ export default function EmployeeImportExport({ onImportDone, userRole }) {
     for (const row of rows) {
       const data = mapRowToFields(row);
       if (!data.full_name_ar) { failed++; continue; }
+      
       // clean types
       if (data.basic_salary) data.basic_salary = parseFloat(data.basic_salary) || 0;
       if (data.housing_allowance) data.housing_allowance = parseFloat(data.housing_allowance) || 0;
       if (data.transport_allowance) data.transport_allowance = parseFloat(data.transport_allowance) || 0;
-      if (data.is_saudi !== undefined) data.is_saudi = data.is_saudi === "true" || data.is_saudi === "1";
+      
+      if (data.is_saudi !== undefined) {
+        const lower = String(data.is_saudi).toLowerCase().trim();
+        data.is_saudi = lower === "true" || lower === "1" || lower === "نعم" || lower === "سعودي";
+      } else {
+        data.is_saudi = true;
+      }
+
+      if (data.role) {
+        data.user_role = data.role;
+      }
+
+      // Map department name to department_id
+      if (data.department) {
+        const foundDept = allDepartments.find(d => 
+          d.name?.trim().toLowerCase() === data.department.trim().toLowerCase() ||
+          d.department_name?.trim().toLowerCase() === data.department.trim().toLowerCase()
+        );
+        if (foundDept) {
+          data.department_id = foundDept.id;
+        }
+      }
+      
+      // Map branch name to branch_id
+      if (data.branch) {
+        const foundBranch = allBranches.find(b => 
+          b.name?.trim().toLowerCase() === data.branch.trim().toLowerCase() ||
+          b.branch_name?.trim().toLowerCase() === data.branch.trim().toLowerCase()
+        );
+        if (foundBranch) {
+          data.branch_id = foundBranch.id;
+        }
+      }
+
       // remove empty strings
       Object.keys(data).forEach(k => { if (data[k] === "") delete data[k]; });
 
       try {
-        await base44.entities.Employee.create(data);
+        const payload = toApiPayload(data);
+        await createEmployee(payload);
         success++;
       } catch (err) {
         failed++;
-        errors.push(data.full_name_ar + ": " + (err?.message || "خطأ"));
+        console.error("CSV Import item failed:", err);
+        const apiError = err?.response?.data;
+        const msg = apiError?.message
+          || apiError?.error
+          || (typeof apiError === "string" ? apiError : null)
+          || "خطأ في السيرفر";
+        errors.push(data.full_name_ar + ": " + msg);
       }
     }
 

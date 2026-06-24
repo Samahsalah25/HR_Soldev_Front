@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, Plus, X, Save, Search, CheckCircle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { AlertTriangle, Plus, X, CheckCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 

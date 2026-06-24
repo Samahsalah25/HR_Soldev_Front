@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Warehouse, AlertTriangle, CheckCircle, Clock, XCircle, TrendingUp, Calendar, User, Phone, Bell, RefreshCw, ExternalLink } from "lucide-react";
+import { Warehouse, CheckCircle, Clock, TrendingUp, Bell, RefreshCw, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 
 function daysBetween(date1, date2) {

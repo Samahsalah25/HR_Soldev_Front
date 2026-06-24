@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-
+import {getCurrentUser} from '../api/authApi'
 // Role definitions
 export const ROLES = {
   EMPLOYEE: "employee",
@@ -101,12 +101,24 @@ export function useRole() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      setRole(u?.role || "user");
-      setCustomPerms(u?.custom_permissions?.length ? u.custom_permissions : null);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    const loadUser = async () => {
+      try {
+        const res = await getCurrentUser();
+
+        // حسب الـ API عندك
+        const u = res?.data || res;
+
+        setUser(u);
+        setRole(u?.role?.toLowerCase() || "user");
+        setCustomPerms(u?.custom_permissions?.length ? u.custom_permissions : null);
+      } catch (err) {
+        console.log(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
   }, []);
 
   const access = getRoleAccess(role);

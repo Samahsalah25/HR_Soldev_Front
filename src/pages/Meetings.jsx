@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Calendar, Clock, Users, Building, Video, X, Save, ChevronLeft, ChevronRight } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { Plus, Calendar, Clock, Users, Building, X, Save, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 

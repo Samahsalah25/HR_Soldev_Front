@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { X, Save, User, Briefcase, DollarSign, FileText, Plane, Upload } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import api from "@/api/axios";
+import { createEmployee, updateEmployee, uploadEmployeeDocument, toApiPayload } from "@/api/employeesApi";
 
-const NATIONALITIES = ["سعودي","مصري","سوداني","يمني","باكستاني","هندي","فلبيني","إندونيسي","بنغلاديشي","نيبالي","إثيوبي","أردني","فلسطيني","سوري","لبناني","عراقي","كويتي","إماراتي","بحريني","قطري","عُماني","تونسي","جزائري","مغربي","ليبي","أمريكي","بريطاني","فرنسي","أخرى"];
+const NATIONALITIES = ["سعودي", "مصري", "سوداني", "يمني", "باكستاني", "هندي", "فلبيني", "إندونيسي", "بنغلاديشي", "نيبالي", "إثيوبي", "أردني", "فلسطيني", "سوري", "لبناني", "عراقي", "كويتي", "إماراتي", "بحريني", "قطري", "عُماني", "تونسي", "جزائري", "مغربي", "ليبي", "أمريكي", "بريطاني", "فرنسي", "أخرى"];
 function genEmployeeNumber() { return `EMP-${Date.now().toString().slice(-6)}`; }
 
 const tabs = [
@@ -44,15 +46,48 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
   const [docFiles, setDocFiles] = useState([]);
 
   useEffect(() => {
-    Promise.all([
-      base44.entities.Employee.list(),
-      base44.entities.Department.list(),
-      base44.entities.Branch.list(),
-    ]).then(([emps, depts, brs]) => {
-      setAllEmployees(emps);
-      setAllDepartments(depts);
-      setAllBranches(brs);
-    });
+    const loadFormData = async () => {
+      try {
+        const [emps, depts, brs] = await Promise.all([
+          api.get("/employees").then(r => {
+            const d = r.data?.data || r.data || [];
+            return Array.isArray(d) ? d : [];
+          }),
+          api.get("/departments").then(r => {
+            const d = r.data?.data || r.data || [];
+            return Array.isArray(d) ? d : [];
+          }),
+          api.get("/branches").then(r => {
+            const d = r.data?.data || r.data || [];
+            return Array.isArray(d) ? d : [];
+          }),
+        ]);
+        setAllEmployees(emps.map(e => ({
+          id: e.id,
+          full_name_ar: e.name_ar || e.name || "",
+          name: e.name || e.name_ar || "",
+          job_title: e.job_title || "",
+        })));
+        // Normalize departments: { id, name }
+        setAllDepartments(depts.map(d => ({ id: d.id, name: d.name || d.department_name || "" })));
+        // Normalize branches: { id, name }
+        setAllBranches(brs.map(b => ({ id: b.id, name: b.name || b.branch_name || "" })));
+      } catch (err) {
+        console.error("Form data load error:", err);
+        // Fallback to base44
+        try {
+          const [emps, depts, brs] = await Promise.all([
+            base44.entities.Employee.list(),
+            base44.entities.Department.list(),
+            base44.entities.Branch.list(),
+          ]);
+          setAllEmployees(emps);
+          setAllDepartments(depts);
+          setAllBranches(brs);
+        } catch { }
+      }
+    };
+    loadFormData();
   }, []);
 
   const [form, setForm] = useState({
@@ -80,40 +115,95 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
   const handleDocUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     setUploadingDoc(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    const newDocs = [...(form.documents || []), file_url];
-    set("documents", newDocs);
-    setDocFiles(prev => [...prev, { name: file.name, url: file_url }]);
-    setUploadingDoc(false);
+    try {
+      // Convert file to base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]); // strip data:...;base64,
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      if (employee?.id) {
+        // Upload to new API if employee already exists
+        await uploadEmployeeDocument(employee.id, {
+          document: base64,
+          filename: file.name,
+          notes: "",
+        });
+      } else {
+        // Store pending doc for after creation
+        const newDocs = [...(form.documents || []), { document: base64, filename: file.name, notes: "" }];
+        set("documents", newDocs);
+        setDocFiles(prev => [...prev, { name: file.name }]);
+      }
+    } catch (err) {
+      console.error("Doc upload error:", err);
+    } finally {
+      setUploadingDoc(false);
+    }
   };
 
   const handleSubmit = async () => {
-    setSaving(true);
-    if (employee?.id) {
-      await base44.entities.Employee.update(employee.id, form);
-    } else {
-      const created = await base44.entities.Employee.create(form);
-      // If email provided, invite user and set role
-      if (form.email && form.user_role) {
-        try {
-          await base44.users.inviteUser(form.email, form.user_role === "admin" ? "admin" : "user");
-          // Update role after short delay
-          setTimeout(async () => {
-            try {
-              const allUsers = await base44.entities.User.list();
-              const newUser = allUsers.find(u => u.email === form.email);
-              if (newUser && form.user_role !== "user") {
-                await base44.entities.User.update(newUser.id, {
-                  role: form.user_role,
-                  employee_id: created.id,
-                });
-              }
-            } catch {}
-          }, 3000);
-        } catch {}
-      }
+    // التحقق من الحقول الإلزامية قبل الحفظ لتجنب أخطاء السيرفر
+    if (!form.full_name_ar?.trim()) {
+      alert("الرجاء إدخال الاسم الكامل (عربي) *");
+      setActiveTab("personal");
+      return;
     }
-    onSave();
+    if (!form.id_number?.trim()) {
+      alert("الرجاء إدخال رقم الهوية / الإقامة *");
+      setActiveTab("personal");
+      return;
+    }
+    if (!form.job_title?.trim()) {
+      alert("الرجاء إدخال المسمى الوظيفي *");
+      setActiveTab("job");
+      return;
+    }
+    if (!form.department_id && !form.department) {
+      alert("الرجاء اختيار القسم *");
+      setActiveTab("job");
+      return;
+    }
+    if (!form.join_date) {
+      alert("الرجاء تحديد تاريخ المباشرة *");
+      setActiveTab("job");
+      return;
+    }
+    if (form.basic_salary === undefined || form.basic_salary === null || form.basic_salary === "") {
+      alert("الرجاء إدخال الراتب الأساسي *");
+      setActiveTab("salary");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = toApiPayload(form);
+
+      if (employee?.id) {
+        await updateEmployee(employee.id, payload);
+      } else {
+        // Include pending documents
+        const pendingDocs = (form.documents || []).filter(d => typeof d === "object" && d.document);
+        if (pendingDocs.length > 0) payload.documents = pendingDocs;
+        await createEmployee(payload);
+      }
+      onSave();
+    } catch (err) {
+      console.error("Employee save error:", err);
+      // Show detailed validation errors from API
+      const apiError = err?.response?.data;
+      const msg = apiError?.message
+        || apiError?.error
+        || (typeof apiError === "string" ? apiError : null)
+        || JSON.stringify(apiError)
+        || "حدث خطأ أثناء الحفظ";
+      console.error("API error details:", apiError);
+      alert(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -213,24 +303,43 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
                 <Input value={form.job_title} onChange={e => set("job_title", e.target.value)} />
               </Field>
               <Field label="القسم *">
-                <Select value={form.department} onChange={e => set("department", e.target.value)}>
+                <Select value={form.department_id || ""} onChange={e => {
+                  const dept = allDepartments.find(d => String(d.id) === e.target.value);
+                  setForm(f => ({ ...f, department_id: Number(e.target.value) || null, department: dept?.name || "" }));
+                }}>
                   <option value="">اختر القسم...</option>
-                  {allDepartments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  {allDepartments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </Select>
               </Field>
               <Field label="الدرجة الوظيفية">
-                <Input value={form.job_grade} onChange={e => set("job_grade", e.target.value)} />
+                <Select value={form.job_grade} onChange={e => set("job_grade", e.target.value)}>
+                  <option value="">اختر الدرجة...</option>
+                  <option value="موظف عادي">موظف عادي</option>
+                  <option value="مدير قسم">مدير قسم</option>
+                  <option value="محاسب">محاسب</option>
+                  <option value="موارد بشرية">موارد بشرية</option>
+                  <option value="مدير تنفيذي">مدير تنفيذي</option>
+                  <option value="مدير نظام">مدير نظام</option>
+                </Select>
               </Field>
               <Field label="المدير المباشر">
-                <Select value={form.manager} onChange={e => set("manager", e.target.value)}>
+                <Select value={form.direct_manager || ""} onChange={e => {
+                  const emp = allEmployees.find(em => String(em.id) === e.target.value);
+                  setForm(f => ({ ...f, direct_manager: Number(e.target.value) || null, manager: emp?.full_name_ar || emp?.name || "" }));
+                }}>
                   <option value="">بدون مدير</option>
-                  {allEmployees.filter(e=>e.id!==employee?.id).map(e => <option key={e.id} value={e.full_name_ar}>{e.full_name_ar} — {e.job_title}</option>)}
+                  {allEmployees.filter(e => e.id !== employee?.id).map(e => (
+                    <option key={e.id} value={e.id}>{e.full_name_ar || e.name} — {e.job_title}</option>
+                  ))}
                 </Select>
               </Field>
               <Field label="الفرع">
-                <Select value={form.branch} onChange={e => set("branch", e.target.value)}>
+                <Select value={form.branch_id || ""} onChange={e => {
+                  const br = allBranches.find(b => String(b.id) === e.target.value);
+                  setForm(f => ({ ...f, branch_id: Number(e.target.value) || null, branch: br?.name || "" }));
+                }}>
                   <option value="">اختر الفرع...</option>
-                  {allBranches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                  {allBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </Select>
               </Field>
               <Field label="مركز التكلفة">
@@ -318,7 +427,7 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">وثائق الموظف</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                  {["هوية / إقامة","جواز السفر","عقد العمل","الشهادات","الحساب البنكي","أخرى"].map(lbl=>(
+                  {["هوية / إقامة", "جواز السفر", "عقد العمل", "الشهادات", "الحساب البنكي", "أخرى"].map(lbl => (
                     <div key={lbl} className="p-2 bg-muted/30 rounded-lg border border-dashed border-border">{lbl}</div>
                   ))}
                 </div>
@@ -327,11 +436,11 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
                   <span className="text-sm text-primary font-medium">{uploadingDoc ? "جاري الرفع..." : "رفع وثيقة"}</span>
                   <input type="file" className="hidden" onChange={handleDocUpload} disabled={uploadingDoc} />
                 </label>
-                {(form.documents||[]).length > 0 && (
+                {(form.documents || []).length > 0 && (
                   <div className="space-y-1.5">
-                    {(form.documents||[]).map((url, i) => (
+                    {(form.documents || []).map((url, i) => (
                       <div key={i} className="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded-lg">
-                        <span className="text-xs text-green-700">📎 وثيقة {i+1}</span>
+                        <span className="text-xs text-green-700">📎 وثيقة {i + 1}</span>
                         <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">عرض</a>
                       </div>
                     ))}

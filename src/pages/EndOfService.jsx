@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calculator, TrendingDown, AlertCircle, CheckCircle, Info } from "lucide-react";
+import { Calculator, TrendingDown, CheckCircle, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, formatCurrency } from "../lib/hrUtils";
 

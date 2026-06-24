@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { X, Calendar, CheckCircle, Clock, AlertTriangle, RotateCcw, DollarSign } from "lucide-react";
-import { base44 } from "@/api/base44Client";
-import { formatMonth, logLoanAction } from "@/lib/loanUtils";
+import { X, Clock, RotateCcw, DollarSign } from "lucide-react";
+import { formatMonth } from "@/lib/loanUtils";
 import { formatCurrency } from "@/lib/hrUtils";
 import LoanWorkflowBadge from "./LoanWorkflowBadge";
 import {

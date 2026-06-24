@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UserX, Plus, X, Save, CheckCircle, Clock, AlertTriangle, FileText, DollarSign, Monitor, Package, Plane, Upload, Eye, RotateCcw } from "lucide-react";
+import { UserX, Plus, X, Save, CheckCircle, FileText, DollarSign, Monitor, Package, Plane, Upload, Eye, RotateCcw } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, calcTicketEncashment, formatCurrency } from "../lib/hrUtils";

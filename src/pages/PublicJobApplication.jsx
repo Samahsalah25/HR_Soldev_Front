@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Send, CheckCircle, Briefcase, Upload, ArrowRight, MapPin, Clock, Star, ChevronDown } from "lucide-react";
+import { Send, CheckCircle, Briefcase, Upload, ArrowRight, MapPin, Clock, ChevronDown } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { getJobs, applyForJob ,activeJobs } from "@/api/jobsApi"; // أو نفس الملف
 
 function JobCard({ job, selected, onClick }) {
   const [expanded, setExpanded] = useState(false);
@@ -91,44 +92,85 @@ export default function PublicJobApplication() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [cvUrl, setCvUrl] = useState("");
+  const [cvFile, setCvFile] = useState(null);
   const [form, setForm] = useState({
     applicant_name: "", email: "", phone: "", nationality: "",
     experience_years: 0, current_salary: 0, expected_salary: 0, cover_letter: "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  useEffect(() => {
-    base44.entities.Recruitment.filter({ status: "معتمد - نشط" }).then(rs => {
-      setJobs(rs); setLoading(false);
-    }).catch(() => {
-      base44.entities.Recruitment.list().then(rs => {
-        setJobs(rs.filter(r => r.status?.includes("معتمد") || r.status?.includes("نشط")));
-        setLoading(false);
-      }).catch(() => setLoading(false));
-    });
-  }, []);
+ useEffect(() => {
+  activeJobs()
+    .then((res) => {
+      const jobsData = res.data || res; // 👈 أهم سطر
 
-  const handleCvUpload = async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setCvUrl(file_url);
+      const jobsList = Array.isArray(jobsData)
+        ? jobsData
+        : [jobsData]; // لو جاي single job
+
+      const mapped = jobsList
+        .filter(job => job.active === true || job.state === "accepted")
+        .map(job => ({
+          id: job.id,
+          job_title: job.name,
+          department: job.department_name,
+          branch: job.branch_name,
+          employment_type: job.employment_type_label,
+          salary_range_min: job.min_salary,
+          salary_range_max: job.max_salary,
+          closing_date: job.submission_end_date,
+          description: job.job_description,
+          skills: job.required_skills,
+          req_experience_years: job.years_of_experience,
+          req_gender: job.gender_label,
+          req_qualification: job.qualification,
+          req_languages: job.languages,
+          req_age_range: job.age_range,
+          req_other: job.other_requirement,
+        }));
+
+      setJobs(mapped);
+      setLoading(false);
+    })
+    .catch((err) => {
+      console.log("Jobs API error:", err);
+      setJobs([]);
+      setLoading(false);
+    });
+}, []);
+
+const handleCvUpload = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  setUploading(true);
+
+  setTimeout(() => {
+    setCvFile(file);
     setUploading(false);
-  };
+  }, 800);
+};
 
-  const handleSubmit = async () => {
-    if (!selectedJob || !form.applicant_name || !form.email || !form.phone) return;
-    setSaving(true);
-    await base44.entities.JobApplication.create({
-      recruitment_id: selectedJob.id,
-      job_title: selectedJob.job_title,
-      ...form,
-      cv_url: cvUrl,
-      stage: "جديد",
-    });
-    setSubmitted(true);
-    setSaving(false);
-  };
+const handleSubmit = async () => {
+  if (!selectedJob || !form.applicant_name || !form.email || !form.phone) return;
+
+  setSaving(true);
+
+  await applyForJob(selectedJob.id, {
+    full_name: form.applicant_name,
+    nationality: form.nationality,
+    email: form.email,
+    mobile_no: form.phone,
+    years_of_experience: form.experience_years,
+    current_salary: form.current_salary,
+    expected_salary: form.expected_salary,
+    cover_letter: form.cover_letter,
+    resume: cvFile, // هنشرحها تحت
+  });
+
+  setSubmitted(true);
+  setSaving(false);
+};
 
   if (submitted) {
     return (
@@ -237,20 +279,29 @@ export default function PublicJobApplication() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">السيرة الذاتية (PDF)</label>
-              {cvUrl ? (
-                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="w-4 h-4 text-green-600"/>
-                  <span className="text-sm text-green-700 flex-1">تم رفع السيرة الذاتية</span>
-                  <a href={cvUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">عرض</a>
-                  <button onClick={()=>setCvUrl("")} className="text-xs text-red-500 hover:text-red-700">✕</button>
-                </div>
-              ) : (
-                <label className="flex items-center gap-3 p-4 border-2 border-dashed border-primary/30 rounded-xl cursor-pointer hover:bg-primary/5 transition-colors">
-                  <Upload className="w-5 h-5 text-primary"/>
-                  <span className="text-sm text-slate-500">{uploading?"جاري الرفع...":"اضغط لرفع السيرة الذاتية (PDF، Word)"}</span>
-                  <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleCvUpload} disabled={uploading}/>
-                </label>
-              )}
+          {cvFile ? (
+  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+    <CheckCircle className="w-4 h-4 text-green-600"/>
+    <span className="text-sm text-green-700 flex-1">
+      تم اختيار الملف: {cvFile.name}
+    </span>
+    <button onClick={() => setCvFile(null)} className="text-xs text-red-500 hover:text-red-700">✕</button>
+  </div>
+) : (
+  <label className="flex items-center gap-3 p-4 border-2 border-dashed border-primary/30 rounded-xl cursor-pointer hover:bg-primary/5 transition-colors">
+    <Upload className="w-5 h-5 text-primary"/>
+    <span className="text-sm text-slate-500">
+      {uploading ? "جاري الرفع..." : "اضغط لرفع السيرة الذاتية (PDF، Word)"}
+    </span>
+    <input
+      type="file"
+      className="hidden"
+      accept=".pdf,.doc,.docx"
+      onChange={handleCvUpload}
+      disabled={uploading}
+    />
+  </label>
+)}
             </div>
 
             <button onClick={handleSubmit}

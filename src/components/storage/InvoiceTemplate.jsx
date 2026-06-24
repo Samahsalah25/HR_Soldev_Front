@@ -1,4 +1,4 @@
-import { Printer, Download } from "lucide-react";
+import { Printer } from "lucide-react";
 
 const COMPANY = {
   name: "شركة سولديف للتخزين",

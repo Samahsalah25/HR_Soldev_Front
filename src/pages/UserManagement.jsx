@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ROLE_LABELS } from "../lib/useRole";
 import { UserPlus, Shield, Search, Edit2, Check, X, Mail } from "lucide-react";
 
 const ROLES = [

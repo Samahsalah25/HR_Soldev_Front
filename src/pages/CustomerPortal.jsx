@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { FileText, CreditCard, RefreshCw, Eye, Warehouse, CheckCircle, Clock, AlertCircle, LogOut } from "lucide-react";
+import { FileText, CreditCard, Eye, Warehouse, CheckCircle, AlertCircle, LogOut } from "lucide-react";
 import ContractView from "../components/storage/ContractView";
 import InvoiceView from "../components/storage/InvoiceView";
 import PaymentModal from "../components/storage/PaymentModal";

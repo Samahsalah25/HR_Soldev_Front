@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
 import { TrendingDown, Plus, X, Save, Search } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 import { getEmployees } from "@/api/departmentsApi";
 import {
   getDeductions,
-  getUnderApprovalDeductions,
   createDeduction,
   updateDeduction,
-  deleteDeduction,
 } from "@/api/deductionsApi";
 // const STATUS_COLORS = {
 //   "قيد الاعتماد": "bg-amber-100 text-amber-700",

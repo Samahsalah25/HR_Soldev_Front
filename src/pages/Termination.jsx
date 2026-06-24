@@ -3,7 +3,8 @@ import { UserX, Plus, X, Save, CheckCircle, FileText, DollarSign, Monitor, Packa
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, calcTicketEncashment, formatCurrency } from "../lib/hrUtils";
-
+import { getEmployees } from "@/api/departmentsApi";
+import {createEndOfService ,getEndOfService} from "@/api/endOfService"
 const WORKFLOW_STEPS = [
   { key: "Pending Manager", label: "تأكيد المدير", icon: "👔" },
   { key: "Pending HR Review", label: "مراجعة HR", icon: "📋" },
@@ -12,6 +13,8 @@ const WORKFLOW_STEPS = [
   { key: "Final Approval", label: "الموافقة النهائية", icon: "✅" },
   { key: "Completed", label: "مكتمل", icon: "🏁" },
 ];
+
+
 
 const STATUS_COLORS = {
   "Draft": "bg-gray-100 text-gray-600",
@@ -25,11 +28,11 @@ const STATUS_COLORS = {
 };
 
 const TYPE_LABELS = {
-  "Resignation": "استقالة",
-  "Company Termination": "إنهاء من الشركة",
-  "Contract End": "انتهاء عقد",
-  "Retirement": "تقاعد",
-  "End of Probation": "إنهاء فترة تجربة",
+  resign: "استقالة",
+  fired: "إنهاء من الشركة",
+  "end of contract": "انتهاء عقد",
+  retirement: "تقاعد",
+  "end of trial period": "إنهاء فترة تجربة",
 };
 
 // ─── New Request Form ─────────────────────────────────────────────────
@@ -43,11 +46,16 @@ function NewTerminationForm({ employees, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleEmpSelect = (id) => {
-    const emp = employees.find(e => e.id === id);
-    if (emp) { set("employee_id", id); set("employee_name", emp.full_name_ar); set("department", emp.department || ""); set("job_title", emp.job_title || ""); }
-  };
+ const handleEmpSelect = (id) => {
+  const emp = employees.find(e => String(e.id) === String(id));
 
+  if (emp) {
+    set("employee_id", id);
+    set("employee_name", emp.name_ar || "");
+    set("department", emp.department_name || "");
+    set("job_title", emp.job_title || "");
+  }
+};
   const handleUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     setUploading(true);
@@ -55,20 +63,34 @@ function NewTerminationForm({ employees, onSave, onClose }) {
     set("attachment_url", file_url); setUploading(false);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    const user = await base44.auth.me();
-    const req = await base44.entities.TerminationRequest.create({
-      ...form, status: "Pending Manager",
-    });
-    await base44.entities.LoanAuditLog.create({
-      employee_name: form.employee_name, action: "إنشاء",
-      performed_by: user.full_name || user.email, performed_by_role: user.role,
-      new_value: `طلب إنهاء خدمة — ${TYPE_LABELS[form.termination_type]}`,
-      notes: form.reason,
-    }).catch(() => {});
-    onSave();
-  };
+const handleSave = async () => {
+  setSaving(true);
+
+  try {
+    const payload = {
+      employee_id: form.employee_id,
+
+      departure_reason: form.termination_type, // أو form.reason حسب اختيارك
+      reason: form.reason,
+
+      departure_date: form.last_working_day,
+
+      notice_period: form.notice_period_days,
+
+      attachment: form.attachment_url,
+
+      status: "Pending Manager",
+    };
+
+    const res = await createEndOfService(payload);
+    onSave(res);
+
+  } catch (err) {
+    console.error(err?.response?.data || err);
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -80,11 +102,24 @@ function NewTerminationForm({ employees, onSave, onClose }) {
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">الموظف *</label>
-            <select value={form.employee_id} onChange={e => handleEmpSelect(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-              <option value="">اختر الموظف...</option>
-              {employees.map(e => <option key={e.id} value={e.id}>{e.full_name_ar} — {e.department}</option>)}
-            </select>
+    <select
+  value={form.employee_id}
+  onChange={e => handleEmpSelect(e.target.value)}
+  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+>
+  <option value="">اختر الموظف...</option>
+
+  {console.log("employees render:", employees)}
+
+  {employees?.length > 0 &&
+    employees.map(e => {
+      return (
+        <option key={e.id} value={e.id}>
+          {e.name ?? e.name ?? "بدون اسم"} — {e.department_name ?? ""}
+        </option>
+      );
+    })}
+</select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -647,27 +682,43 @@ export default function Termination() {
   const [selected, setSelected] = useState(null);
   const [filterStatus, setFilterStatus] = useState("");
 
-  const load = async () => {
-    const [reqs, emps] = await Promise.all([
+const load = async () => {
+  setLoading(true);
+
+  try {
+    const [reqs, empsRes] = await Promise.all([
       base44.entities.TerminationRequest.list("-created_date"),
-      base44.entities.Employee.list(),
+      getEmployees(),
     ]);
-    setRequests(reqs); setEmployees(emps);
-    if (user) {
-      const emp = emps.find(e => e.email?.toLowerCase() === user.email?.toLowerCase());
-      setMyEmployee(emp || null);
-    }
+
+
+    const emps =
+      Array.isArray(empsRes)
+        ? empsRes
+        : empsRes?.data ?? empsRes?.employees ?? [];
+
+
+
+    setRequests(reqs);
+    setEmployees(emps);
+
+  } catch (e) {
+    console.error(e);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
-  useEffect(() => { if (user !== null) load(); }, [user]);
-
+useEffect(() => {
+  if (user) load();
+}, [user]);
   const stats = {
     pending: requests.filter(r => !["Completed", "Cancelled", "Draft"].includes(r.status)).length,
     completed: requests.filter(r => r.status === "Completed").length,
     total: requests.length,
   };
 
+ 
   const filtered = requests.filter(r => !filterStatus || r.status === filterStatus);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
@@ -768,7 +819,7 @@ export default function Termination() {
         </table>
       </div>
 
-      {showForm && <NewTerminationForm employees={employees.filter(e => e.status === "نشط")} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
+      {showForm && <NewTerminationForm employees={employees.filter(e => e.active)} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
       {selected && <TerminationDetailModal req={selected} employees={employees} user={user} role={role} onClose={() => setSelected(null)} onUpdate={() => { load(); setSelected(null); }} />}
     </div>
   );

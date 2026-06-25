@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://korea-feed-government-robertson.trycloudflare.com/api/v1",
+  baseURL: "https://misc-speaking-informal-jazz.trycloudflare.com/api/v1",
   withCredentials: true,
   xsrfCookieName: "session_id",
   xsrfHeaderName: "X-Session-Id",

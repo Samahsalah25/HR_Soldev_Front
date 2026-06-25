@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, calcTicketEncashment, formatCurrency } from "../lib/hrUtils";
 import { getEmployees } from "@/api/departmentsApi";
-import {createEndOfService ,getEndOfService} from "@/api/endOfService"
+import { createEndOfService, getEndOfService, eosAction, getDepartureReasons } from "@/api/endOfService"
 const WORKFLOW_STEPS = [
   { key: "Pending Manager", label: "تأكيد المدير", icon: "👔" },
   { key: "Pending HR Review", label: "مراجعة HR", icon: "📋" },
@@ -30,67 +30,86 @@ const STATUS_COLORS = {
 const TYPE_LABELS = {
   resign: "استقالة",
   fired: "إنهاء من الشركة",
-  "end of contract": "انتهاء عقد",
+  end_of_contract: "انتهاء عقد",
   retirement: "تقاعد",
+  end_of_probation: "إنهاء فترة تجربة",
+  "end of contract": "انتهاء عقد",
   "end of trial period": "إنهاء فترة تجربة",
+  Resignation: "استقالة",
+  Resigned: "استقالة",
+  resigned: "استقالة",
+  resignation: "استقالة",
+  "Company Termination": "إنهاء من الشركة",
+  company_termination: "إنهاء من الشركة",
+  "Contract End": "انتهاء عقد",
+  Retirement: "تقاعد",
+  "End of Probation": "إنهاء فترة تجربة",
+  Fired: "إنهاء من الشركة",
+  fired_by_company: "إنهاء من الشركة",
+  "End of Contract": "انتهاء عقد",
+  "End of Trial Period": "إنهاء فترة تجربة",
+  end_of_trial_period: "إنهاء فترة تجربة",
+  "استقالة": "استقالة",
+  "إنهاء من الشركة": "إنهاء من الشركة",
+  "إنهاء من صاحب العمل": "إنهاء من صاحب العمل",
+  "انتهاء عقد": "انتهاء عقد",
+  "تقاعد": "تقاعد",
+  "إنهاء فترة تجربة": "إنهاء فترة تجربة",
 };
 
 // ─── New Request Form ─────────────────────────────────────────────────
 function NewTerminationForm({ employees, onSave, onClose }) {
   const [form, setForm] = useState({
-    employee_id: "", employee_name: "", department: "", job_title: "",
-    termination_type: "Resignation", reason: "",
-    last_working_day: "", notice_period_days: 30, attachment_url: "",
+    employee_id: "",
+    departure_reason: "resign",
+    notice_period: 30,
+    departure_date: "",
+    reason: "",
+    attachment: "",
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
- const handleEmpSelect = (id) => {
-  const emp = employees.find(e => String(e.id) === String(id));
+  const DEPARTURE_REASONS = [
+    { value: "resign", label: "استقالة" },
+    { value: "fired", label: "إنهاء من الشركة" },
+    { value: "end_of_contract", label: "انتهاء عقد" },
+    { value: "retirement", label: "تقاعد" },
+    { value: "end_of_probation", label: "إنهاء فترة تجربة" },
+  ];
 
-  if (emp) {
-    set("employee_id", id);
-    set("employee_name", emp.name_ar || "");
-    set("department", emp.department_name || "");
-    set("job_title", emp.job_title || "");
-  }
-};
+  const handleEmpSelect = (id) => {
+    const emp = employees.find(e => String(e.id) === String(id));
+    if (emp) set("employee_id", id);
+  };
+
   const handleUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     setUploading(true);
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    set("attachment_url", file_url); setUploading(false);
+    set("attachment", file_url); setUploading(false);
   };
 
-const handleSave = async () => {
-  setSaving(true);
-
-  try {
-    const payload = {
-      employee_id: form.employee_id,
-
-      departure_reason: form.termination_type, // أو form.reason حسب اختيارك
-      reason: form.reason,
-
-      departure_date: form.last_working_day,
-
-      notice_period: form.notice_period_days,
-
-      attachment: form.attachment_url,
-
-      status: "Pending Manager",
-    };
-
-    const res = await createEndOfService(payload);
-    onSave(res);
-
-  } catch (err) {
-    console.error(err?.response?.data || err);
-  } finally {
-    setSaving(false);
-  }
-};
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        employee_id: form.employee_id,
+        departure_reason: form.departure_reason,
+        notice_period: form.notice_period,
+        departure_date: form.departure_date,
+        reason: form.reason,
+        attachment: form.attachment || null,
+      };
+      const res = await createEndOfService(payload);
+      onSave(res);
+    } catch (err) {
+      console.error(err?.response?.data || err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -100,59 +119,70 @@ const handleSave = async () => {
           <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* الموظف */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">الموظف *</label>
-    <select
-  value={form.employee_id}
-  onChange={e => handleEmpSelect(e.target.value)}
-  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
->
-  <option value="">اختر الموظف...</option>
-
-  {console.log("employees render:", employees)}
-
-  {employees?.length > 0 &&
-    employees.map(e => {
-      return (
-        <option key={e.id} value={e.id}>
-          {e.name ?? e.name ?? "بدون اسم"} — {e.department_name ?? ""}
-        </option>
-      );
-    })}
-</select>
+            <select
+              value={form.employee_id}
+              onChange={e => handleEmpSelect(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+            >
+              <option value="">اختر الموظف...</option>
+              {employees?.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.name_ar || e.name || "بدون اسم"} — {e.department_name || ""}
+                </option>
+              ))}
+            </select>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
+            {/* نوع الإنهاء */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium">نوع الإنهاء *</label>
-              <select value={form.termination_type} onChange={e => set("termination_type", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              <select
+                value={form.departure_reason}
+                onChange={e => set("departure_reason", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+              >
+                {DEPARTURE_REASONS.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
               </select>
             </div>
+            {/* فترة الإشعار */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium">فترة الإشعار (يوم)</label>
-              <input type="number" min={0} value={form.notice_period_days} onChange={e => set("notice_period_days", +e.target.value)}
+              <input type="number" min={0} value={form.notice_period}
+                onChange={e => set("notice_period", +e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
             </div>
           </div>
+
+          {/* آخر يوم عمل */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">آخر يوم عمل *</label>
-            <input type="date" value={form.last_working_day} onChange={e => set("last_working_day", e.target.value)}
+            <input type="date" value={form.departure_date}
+              onChange={e => set("departure_date", e.target.value)}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
           </div>
+
+          {/* سبب الإنهاء */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">سبب الإنهاء *</label>
             <textarea value={form.reason} onChange={e => set("reason", e.target.value)} rows={3}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
           </div>
+
+          {/* مرفق */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">مرفق (اختياري)</label>
-            {form.attachment_url ? (
+            {form.attachment ? (
               <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg">
                 <CheckCircle className="w-4 h-4 text-green-600" />
                 <span className="text-xs text-green-700 flex-1">تم رفع المرفق</span>
-                <a href={form.attachment_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">عرض</a>
-                <button onClick={() => set("attachment_url", "")} className="text-xs text-red-500">إزالة</button>
+                <a href={form.attachment} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">عرض</a>
+                <button onClick={() => set("attachment", "")} className="text-xs text-red-500">إزالة</button>
               </div>
             ) : (
               <label className="flex items-center gap-2 p-3 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/30">
@@ -163,10 +193,14 @@ const handleSave = async () => {
             )}
           </div>
         </div>
+
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={handleSave} disabled={saving || !form.employee_id || !form.last_working_day || !form.reason}
-            className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+          <button
+            onClick={handleSave}
+            disabled={saving || !form.employee_id || !form.departure_date || !form.reason}
+            className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+          >
             <Save className="w-4 h-4" />{saving ? "جاري الإرسال..." : "إنشاء الطلب"}
           </button>
         </div>
@@ -206,25 +240,17 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
     }
   }, [emp, req.employee_id]);
 
-  const advance = async (newStatus, extraData = {}) => {
+  const handleAction = async (actionType) => {
     setSaving(true);
-    const now = new Date().toISOString().slice(0, 10);
-    const by = user?.full_name || user?.email;
-    const updateData = { status: newStatus, ...extraData };
-
-    // Final completion — update employee status + stop salary
-    if (newStatus === "Completed") {
-      await base44.entities.Employee.update(req.employee_id, { status: "مُنهي الخدمة" });
-      updateData.salary_stopped = true;
-      updateData.account_disabled = true;
-      updateData.insurance_terminated = true;
-      updateData.final_approved_by = by;
-      updateData.final_approved_at = now;
+    try {
+      const res = await eosAction(req.id, actionType, notes);
+      console.log("🔍 eosAction response:", res);
+      onUpdate();
+    } catch (err) {
+      console.error("EOS action error:", err?.response?.data || err);
+    } finally {
+      setSaving(false);
     }
-
-    await base44.entities.TerminationRequest.update(req.id, updateData);
-    setSaving(false);
-    onUpdate();
   };
 
   const stepIndex = WORKFLOW_STEPS.findIndex(s => s.key === req.status);
@@ -411,153 +437,135 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
 
           {/* Info Tab */}
           {activeTab !== "assets" && activeTab !== "workflow" && activeTab !== "tickets" && <>
-          {/* Basic Info */}
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {[
-              { label: "نوع الإنهاء", value: TYPE_LABELS[req.termination_type] || req.termination_type },
-              { label: "آخر يوم عمل", value: req.last_working_day ? new Date(req.last_working_day).toLocaleDateString("ar-SA") : "—" },
-              { label: "القسم", value: req.department },
-              { label: "فترة الإشعار", value: `${req.notice_period_days} يوم` },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-muted/30 rounded-lg px-3 py-2">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="font-medium text-foreground">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-muted/30 rounded-lg px-3 py-2">
-            <p className="text-xs text-muted-foreground">السبب</p>
-            <p className="text-sm text-foreground">{req.reason}</p>
-          </div>
-
-          {/* Settlement Preview */}
-          {settlement && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <p className="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2"><DollarSign className="w-4 h-4" />التسوية المالية التقديرية</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-center">
-                <div className="bg-white rounded-lg p-2 border border-amber-100">
-                  <p className="font-bold text-amber-700">{formatCurrency(settlement.eos.finalReward)}</p>
-                  <p className="text-muted-foreground">مكافأة ن.خدمة</p>
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {[
+                { label: "نوع الإنهاء", value: TYPE_LABELS[req.termination_type] || req.termination_type },
+                { label: "آخر يوم عمل", value: req.last_working_day ? new Date(req.last_working_day).toLocaleDateString("ar-SA") : "—" },
+                { label: "القسم", value: req.department },
+                { label: "فترة الإشعار", value: `${req.notice_period_days} يوم` },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-muted/30 rounded-lg px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="font-medium text-foreground">{value}</p>
                 </div>
-                <div className="bg-white rounded-lg p-2 border border-amber-100">
-                  <p className="font-bold text-amber-700">{formatCurrency(settlement.leaveEncash)}</p>
-                  <p className="text-muted-foreground">تصفية إجازات</p>
-                </div>
-                <div className="bg-white rounded-lg p-2 border border-amber-100">
-                  <p className={`font-bold ${settlement.ticketEncash > 0 ? "text-blue-600" : "text-muted-foreground"}`}>{formatCurrency(settlement.ticketEncash || 0)}</p>
-                  <p className="text-muted-foreground">تعويض تذاكر ✈️</p>
-                </div>
-                <div className="bg-white rounded-lg p-2 border border-amber-100">
-                  <p className="font-bold text-green-700">{formatCurrency(settlement.total)}</p>
-                  <p className="text-muted-foreground">الإجمالي</p>
-                </div>
-              </div>
-              {req.outstanding_loans > 0 && (
-                <p className="text-xs text-red-600 mt-2">⚠️ سلف متبقية: {formatCurrency(req.outstanding_loans)} — تُخصم من التسوية</p>
-              )}
+              ))}
             </div>
-          )}
 
-          {/* Action Area based on status & role */}
-          {req.status === "Pending Manager" && isManager && (
-            <ActionCard title="تأكيد المدير" icon="👔" color="blue"
-              notes={notes} setNotes={setNotes}
-              onApprove={() => advance("Pending HR Review", { manager_confirmed_by: user?.full_name || user?.email, manager_confirmed_at: new Date().toISOString().slice(0, 10), manager_notes: notes })}
-              onReject={() => advance("Cancelled", { manager_notes: `مرفوض: ${notes}` })}
-              saving={saving} />
-          )}
+            <div className="bg-muted/30 rounded-lg px-3 py-2">
+              <p className="text-xs text-muted-foreground">السبب</p>
+              <p className="text-sm text-foreground">{req.reason}</p>
+            </div>
 
-          {req.status === "Pending HR Review" && isHR && (
-            <ActionCard title="مراجعة HR وتحديد التسوية" icon="📋" color="purple"
-              notes={notes} setNotes={setNotes}
-              onApprove={() => advance("Pending Finance", {
-                hr_reviewed_by: user?.full_name || user?.email,
-                hr_reviewed_at: new Date().toISOString().slice(0, 10),
-                hr_notes: notes,
-                final_settlement_amount: settlement?.total || 0,
-              })}
-              onReject={() => advance("Cancelled", { hr_notes: `مرفوض: ${notes}` })}
-              saving={saving} />
-          )}
-
-          {req.status === "Pending Finance" && isFinance && (
-            <ActionCard title="تخليص المالية" icon="💰" color="orange"
-              notes={notes} setNotes={setNotes}
-              onApprove={async () => {
-                const loans = await base44.entities.Loan.filter({ employee_id: req.employee_id, status: "نشطة" });
-                const totalLoans = loans.reduce((s, l) => s + (l.remaining_amount || 0), 0);
-                advance("Pending IT/Assets", {
-                  finance_cleared_by: user?.full_name || user?.email,
-                  finance_cleared_at: new Date().toISOString().slice(0, 10),
-                  finance_notes: notes,
-                  outstanding_loans: totalLoans,
-                });
-              }}
-              onReject={() => advance("Cancelled", { finance_notes: `مرفوض: ${notes}` })}
-              saving={saving} />
-          )}
-
-          {req.status === "Pending IT/Assets" && (isIT || isHR) && (
-            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-semibold text-teal-800 flex items-center gap-2"><Monitor className="w-4 h-4" />تخليص IT والعهدة والسفر</p>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                {[
-                  { label: "IT - إلغاء الصلاحيات", field: "it_cleared" },
-                  { label: "العهدة - استلام الأصول", field: "assets_cleared" },
-                  { label: "السفر - مراجعة التذاكر", field: "travel_cleared" },
-                ].map(item => (
-                  <div key={item.field} className="bg-white rounded-lg p-2 border border-teal-100 text-center">
-                    <p className="text-muted-foreground">{item.label}</p>
-                    <span className="text-green-600">✓ جاهز</span>
+            {/* Settlement Preview */}
+            {settlement && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2"><DollarSign className="w-4 h-4" />التسوية المالية التقديرية</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-center">
+                  <div className="bg-white rounded-lg p-2 border border-amber-100">
+                    <p className="font-bold text-amber-700">{formatCurrency(settlement.eos.finalReward)}</p>
+                    <p className="text-muted-foreground">مكافأة ن.خدمة</p>
                   </div>
-                ))}
+                  <div className="bg-white rounded-lg p-2 border border-amber-100">
+                    <p className="font-bold text-amber-700">{formatCurrency(settlement.leaveEncash)}</p>
+                    <p className="text-muted-foreground">تصفية إجازات</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-amber-100">
+                    <p className={`font-bold ${settlement.ticketEncash > 0 ? "text-blue-600" : "text-muted-foreground"}`}>{formatCurrency(settlement.ticketEncash || 0)}</p>
+                    <p className="text-muted-foreground">تعويض تذاكر ✈️</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-amber-100">
+                    <p className="font-bold text-green-700">{formatCurrency(settlement.total)}</p>
+                    <p className="text-muted-foreground">الإجمالي</p>
+                  </div>
+                </div>
+                {req.outstanding_loans > 0 && (
+                  <p className="text-xs text-red-600 mt-2">⚠️ سلف متبقية: {formatCurrency(req.outstanding_loans)} — تُخصم من التسوية</p>
+                )}
               </div>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="ملاحظات..."
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
-              <button disabled={saving} onClick={() => advance("Final Approval", {
-                it_cleared_by: user?.full_name || user?.email, it_cleared_at: new Date().toISOString().slice(0, 10), it_notes: notes,
-                assets_cleared_by: user?.full_name || user?.email, assets_cleared_at: new Date().toISOString().slice(0, 10),
-                travel_cleared_by: user?.full_name || user?.email, travel_notes: notes,
-              })}
-                className="w-full py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
-                {saving ? "جاري الحفظ..." : "✓ تم التخليص الكامل"}
-              </button>
-            </div>
-          )}
+            )}
 
-          {req.status === "Final Approval" && isHR && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-semibold text-green-800 flex items-center gap-2"><CheckCircle className="w-4 h-4" />الموافقة النهائية وإغلاق الملف</p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
-                <p className="font-semibold">⚠️ سيتم تلقائياً عند الموافقة:</p>
-                <p>• تغيير حالة الموظف إلى "مُنهي الخدمة"</p>
-                <p>• إيقاف الراتب بعد آخر يوم عمل</p>
-                <p>• تعطيل حساب المستخدم</p>
-                <p>• إنهاء التأمين الاجتماعي</p>
+            {/* Action Area based on status & role */}
+            {req.status === "Pending Manager" && isManager && (
+              <ActionCard title="تأكيد المدير" icon="👔" color="blue"
+                notes={notes} setNotes={setNotes}
+                onApprove={() => handleAction("approve")}
+                onReject={() => handleAction("reject")}
+                saving={saving} />
+            )}
+
+            {req.status === "Pending HR Review" && isHR && (
+              <ActionCard title="مراجعة HR وتحديد التسوية" icon="📋" color="purple"
+                notes={notes} setNotes={setNotes}
+                onApprove={() => handleAction("approve")}
+                onReject={() => handleAction("reject")}
+                saving={saving} />
+            )}
+
+            {req.status === "Pending Finance" && isFinance && (
+              <ActionCard title="تخليص المالية" icon="💰" color="orange"
+                notes={notes} setNotes={setNotes}
+                onApprove={() => handleAction("approve")}
+                onReject={() => handleAction("reject")}
+                saving={saving} />
+            )}
+
+            {req.status === "Pending IT/Assets" && (isIT || isHR) && (
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-teal-800 flex items-center gap-2"><Monitor className="w-4 h-4" />تخليص IT والعهدة والسفر</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {[
+                    { label: "IT - إلغاء الصلاحيات", field: "it_cleared" },
+                    { label: "العهدة - استلام الأصول", field: "assets_cleared" },
+                    { label: "السفر - مراجعة التذاكر", field: "travel_cleared" },
+                  ].map(item => (
+                    <div key={item.field} className="bg-white rounded-lg p-2 border border-teal-100 text-center">
+                      <p className="text-muted-foreground">{item.label}</p>
+                      <span className="text-green-600">✓ جاهز</span>
+                    </div>
+                  ))}
+                </div>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="ملاحظات..."
+                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
+                <button disabled={saving} onClick={() => handleAction("approve")}
+                  className="w-full py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+                  {saving ? "جاري الحفظ..." : "✓ تم التخليص الكامل"}
+                </button>
               </div>
-              <button disabled={saving} onClick={() => advance("Completed")}
-                className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 disabled:opacity-50">
-                {saving ? "جاري الإغلاق..." : "✓ موافقة نهائية وإغلاق الملف"}
-              </button>
-            </div>
-          )}
+            )}
 
-          {req.status === "Completed" && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-              <CheckCircle className="w-10 h-10 text-green-600 mx-auto mb-2" />
-              <p className="font-semibold text-green-800">تم إنهاء الخدمة بنجاح</p>
-              {req.final_approved_at && <p className="text-xs text-muted-foreground mt-1">بواسطة: {req.final_approved_by} — {new Date(req.final_approved_at).toLocaleDateString("ar-SA")}</p>}
-              {req.final_settlement_amount > 0 && <p className="text-sm font-bold text-green-700 mt-2">التسوية النهائية: {formatCurrency(req.final_settlement_amount)}</p>}
-            </div>
-          )}
+            {req.status === "Final Approval" && isHR && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-green-800 flex items-center gap-2"><CheckCircle className="w-4 h-4" />الموافقة النهائية وإغلاق الملف</p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+                  <p className="font-semibold">⚠️ سيتم تلقائياً عند الموافقة:</p>
+                  <p>• تغيير حالة الموظف إلى "مُنهي الخدمة"</p>
+                  <p>• إيقاف الراتب بعد آخر يوم عمل</p>
+                  <p>• تعطيل حساب المستخدم</p>
+                  <p>• إنهاء التأمين الاجتماعي</p>
+                </div>
+                <button disabled={saving} onClick={() => handleAction("approve")}
+                  className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 disabled:opacity-50">
+                  {saving ? "جاري الإغلاق..." : "✓ موافقة نهائية وإغلاق الملف"}
+                </button>
+              </div>
+            )}
 
-          {req.attachment_url && (
-            <a href={req.attachment_url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-              <FileText className="w-4 h-4" />عرض المرفق
-            </a>
-          )}
+            {req.status === "Completed" && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <CheckCircle className="w-10 h-10 text-green-600 mx-auto mb-2" />
+                <p className="font-semibold text-green-800">تم إنهاء الخدمة بنجاح</p>
+                {req.final_approved_at && <p className="text-xs text-muted-foreground mt-1">بواسطة: {req.final_approved_by} — {new Date(req.final_approved_at).toLocaleDateString("ar-SA")}</p>}
+                {req.final_settlement_amount > 0 && <p className="text-sm font-bold text-green-700 mt-2">التسوية النهائية: {formatCurrency(req.final_settlement_amount)}</p>}
+              </div>
+            )}
+
+            {req.attachment_url && (
+              <a href={req.attachment_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                <FileText className="w-4 h-4" />عرض المرفق
+              </a>
+            )}
           </>}
 
           {/* Workflow Tab */}
@@ -642,7 +650,7 @@ function EmployeeTerminationView({ myEmployee }) {
       {myReqs.map(req => (
         <div key={req.id} className="bg-card rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="font-semibold text-foreground">{TYPE_LABELS[req.termination_type]}</p>
+            <p className="font-semibold text-foreground">{TYPE_LABELS[req.termination_type] || req.termination_type || "—"}</p>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[req.status]}`}>{req.status}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm mb-4">
@@ -682,43 +690,81 @@ export default function Termination() {
   const [selected, setSelected] = useState(null);
   const [filterStatus, setFilterStatus] = useState("");
 
-const load = async () => {
-  setLoading(true);
+  const load = async () => {
+    setLoading(true);
 
-  try {
-    const [reqs, empsRes] = await Promise.all([
-      base44.entities.TerminationRequest.list("-created_date"),
-      getEmployees(),
-    ]);
+    try {
+      const [eosRes, empsRes] = await Promise.all([
+        getEndOfService(),
+        getEmployees(),
+      ]);
 
+      const rawReqs = Array.isArray(eosRes) ? eosRes : eosRes?.data ?? eosRes?.requests ?? [];
 
-    const emps =
-      Array.isArray(empsRes)
-        ? empsRes
-        : empsRes?.data ?? empsRes?.employees ?? [];
+      // تحويل الـ field names من الـ backend للـ frontend
+      const STATE_MAP = {
+        "draft": "Draft",
+        "manager_approval": "Pending Manager",
+        "pending_manager": "Pending Manager",
+        "hr_review": "Pending HR Review",
+        "pending_hr_review": "Pending HR Review",
+        "finance": "Pending Finance",
+        "pending_finance": "Pending Finance",
+        "financial_settlement": "Pending Finance",
+        "it_assets": "Pending IT/Assets",
+        "pending_it_assets": "Pending IT/Assets",
+        "custody_clearance": "Pending IT/Assets",
+        "it_clearance": "Pending IT/Assets",
+        "assets_clearance": "Pending IT/Assets",
+        "final_approval": "Final Approval",
+        "pending_final_approval": "Final Approval",
+        "completed": "Completed",
+        "done": "Completed",
+        "closed": "Completed",
+        "refused": "Cancelled",
+        "rejected": "Cancelled",
+        "cancelled": "Cancelled",
+      };
 
+      if (rawReqs.length > 0) console.log("🔍 EOS raw record:", rawReqs[0]);
 
+      const reqs = rawReqs.map(r => ({
+        ...r,
+        employee_name: r.employee_name || r.employee || "",
+        termination_type: r.termination_type || r.departure_reason || "",
+        last_working_day: r.last_working_day || r.departure_date || "",
+        status: STATE_MAP[r.status] || STATE_MAP[r.state] || r.status || r.state || "Draft",
+        created_date: r.created_date || r.date_of_request || r.created_at || "",
+        department: r.department || r.department_name || "",
+        reason: r.reason || "",
+        notice_period_days: r.notice_period_days ?? r.notice_period ?? 30,
+      }));
 
-    setRequests(reqs);
-    setEmployees(emps);
+      const emps =
+        Array.isArray(empsRes)
+          ? empsRes
+          : empsRes?.data ?? empsRes?.employees ?? [];
 
-  } catch (e) {
-    console.error(e);
-  } finally {
-    setLoading(false);
-  }
-};
+      setRequests(reqs);
+      setEmployees(emps);
 
-useEffect(() => {
-  if (user) load();
-}, [user]);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) load();
+  }, [user]);
   const stats = {
     pending: requests.filter(r => !["Completed", "Cancelled", "Draft"].includes(r.status)).length,
     completed: requests.filter(r => r.status === "Completed").length,
     total: requests.length,
   };
 
- 
+
   const filtered = requests.filter(r => !filterStatus || r.status === filterStatus);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
@@ -796,7 +842,9 @@ useEffect(() => {
                   <p className="text-xs text-muted-foreground">{req.department}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{TYPE_LABELS[req.termination_type]}</span>
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                    {TYPE_LABELS[req.termination_type] || req.termination_type || "—"}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {req.last_working_day ? new Date(req.last_working_day).toLocaleDateString("ar-SA") : "—"}

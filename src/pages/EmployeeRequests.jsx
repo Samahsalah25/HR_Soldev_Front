@@ -8,7 +8,7 @@ import CustodySettleModal from "../components/requests/CustodySettleModal";
 import LoanRequestModal from "../components/requests/LoanRequestModal";
 import ExpenseModal from "../components/requests/ExpenseModal";
 import { getEmployees } from "@/api/departmentsApi";
-import {getAllRequests ,requestAction} from "@/api/requestsApi"
+import { getAllRequests, requestAction, sendToManager as apiSendToManager, managerApprove as apiManagerApprove } from "@/api/requestsApi"
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
   { type: "تقديم شكوى", icon: AlertTriangle, color: "bg-red-50 text-red-700 border-red-200", modal: "complaint" },
@@ -55,66 +55,56 @@ export default function EmployeeRequests() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("requests");
 
-const load = async () => {
-  const [reqs, emps, custs, lns] = await Promise.all([
-    getAllRequests(),
-    getEmployees(),
-    base44.entities.Custody.list("-created_date"),
-    base44.entities.Loan.list("-created_date"),
-  ]);
+  const load = async () => {
+    const [reqs, emps, custs, lns] = await Promise.all([
+      getAllRequests(),
+      getEmployees(),
+      base44.entities.Custody.list("-created_date"),
+      base44.entities.Loan.list("-created_date"),
+    ]);
 
-  setRequests(reqs?.data || []);
-  setEmployees(emps?.data || emps?.employees || emps || []);
-  setCustodies(custs);
-  setLoans(lns);
-  setLoading(false);
-};
+    setRequests(reqs?.data || []);
+    setEmployees(emps?.data || emps?.employees || emps || []);
+    setCustodies(custs);
+    setLoans(lns);
+    setLoading(false);
+  };
 
   useEffect(() => { load(); }, []);
 
   const sendToManager = async (id) => {
-    const req = requests.find(r => r.id === id);
-    const user = await base44.auth.me();
-    await base44.entities.EmployeeRequest.update(id, { status: "انتظار موافقة المدير" });
-    // Create a task for department manager
-    if (req) {
-      await base44.entities.Task.create({
-        title: `اعتماد طلب: ${req.request_type} — ${req.employee_name}`,
-        description: `يرجى مراجعة ${req.request_type} المقدم من ${req.employee_name} والبت فيه قبل إحالته لـ HR.\nالتفاصيل: ${req.details || ""}`,
-        assigned_by: user.full_name || user.email,
-        department: req.department || "",
-        priority: "عالية",
-        status: "قيد العمل",
-        due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-        notes: `request_id:${id}`,
-      });
+    try {
+      await apiSendToManager(id);
+      load();
+    } catch (err) {
+      console.error(err?.response?.data || err);
+      load(); // refresh anyway in case it partially worked
     }
-    load();
   };
 
   const managerApprove = async (id) => {
-    const user = await base44.auth.me();
-    await base44.entities.EmployeeRequest.update(id, {
-      status: "قيد مراجعة HR",
-      reviewed_by: user.full_name || user.email,
-      review_date: new Date().toISOString().slice(0, 10),
-    });
-    load();
+    try {
+      await apiManagerApprove(id);
+      load();
+    } catch (err) {
+      console.error(err?.response?.data || err);
+      alert("حصل خطأ");
+    }
   };
 
-const updateStatus = async (id, status) => {
-  try {
-    const action = status === "مقبولة" ? "accept" : "reject";
+  const updateStatus = async (id, status) => {
+    try {
+      const action = status === "مقبولة" ? "accept" : "reject";
 
-    await requestAction(id, action);
+      await requestAction(id, action);
 
-    // optional: refresh data
-    load();
-  } catch (err) {
-    console.error(err);
-    alert("حصل خطأ في تحديث الحالة");
-  }
-};
+      // optional: refresh data
+      load();
+    } catch (err) {
+      console.error(err);
+      alert("حصل خطأ في تحديث الحالة");
+    }
+  };
 
   const settleCustody = async (custodyId) => {
     await base44.entities.Custody.update(custodyId, {
@@ -129,8 +119,15 @@ const updateStatus = async (id, status) => {
   const onRequestSaved = () => { closeModal(); load(); };
 
   const filtered = requests
-    .filter(r => !filterStatus || r.status === filterStatus)
-    .filter(r => !search || r.request_type?.includes(search) || r.employee_name?.includes(search));
+    .map(r => ({ ...r, _normalizedStatus: normalizeStatus(r.state || r.status || "") }))
+    .filter(r => !filterStatus || r._normalizedStatus === filterStatus)
+    .filter(r => !search || r.request_type?.includes(search) || r.employee_name?.includes(search))
+    .sort((a, b) => {
+      const dateA = new Date(b.created_at || b.date_of_submission || b.created || 0);
+      const dateB = new Date(a.created_at || a.date_of_submission || a.created || 0);
+      if (dateA - dateB !== 0) return dateA - dateB;
+      return (b.id || 0) - (a.id || 0); // fallback by ID (bigger = newer)
+    });
 
   const activeCustodies = custodies.filter(c => c.status === "نشطة");
   const activeLoans = loans.filter(l => l.status === "نشطة");
@@ -204,98 +201,90 @@ const updateStatus = async (id, status) => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا توجد بيانات</td></tr>
                 ) :
-               filtered.map(req => {
-  const status = normalizeStatus(req.state);
+                  filtered.map(req => {
+                    const status = req._normalizedStatus || normalizeStatus(req.state || req.status || "");
 
-  return (
-    <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    return (
+                      <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
 
-      {/* Employee */}
-      <td className="px-4 py-3">
-        <p className="font-medium text-foreground">{req.employee || "—"}</p>
-        <p className="text-xs text-muted-foreground">{req.department || ""}</p>
-      </td>
+                        {/* Employee */}
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-foreground">{req.employee || "—"}</p>
+                          <p className="text-xs text-muted-foreground">{req.department || ""}</p>
+                        </td>
 
-      {/* Request Type */}
-      <td className="px-4 py-3">
-        <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full font-medium">
-          {req.request_type || "—"}
-        </span>
-      </td>
+                        {/* Request Type */}
+                        <td className="px-4 py-3">
+                          <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full font-medium">
+                            {req.request_type || "—"}
+                          </span>
+                        </td>
 
-      {/* Date */}
-      <td className="px-4 py-3 text-muted-foreground text-xs">
-        {req.date_of_submission
-          ? new Date(req.date_of_submission).toLocaleDateString("ar-SA")
-          : "—"}
-      </td>
+                        {/* Date */}
+                        <td className="px-4 py-3 text-muted-foreground text-xs">
+                          {req.date_of_submission
+                            ? new Date(req.date_of_submission).toLocaleDateString("ar-SA")
+                            : "—"}
+                        </td>
 
-      {/* Amount */}
-      <td className="px-4 py-3 text-foreground text-sm">
-        {req.amount && req.amount !== "—" && req.amount > 0
-          ? `${Number(req.amount).toLocaleString("ar-SA")} ر.س`
-          : "—"}
-      </td>
+                        {/* Amount */}
+                        <td className="px-4 py-3 text-foreground text-sm">
+                          {req.amount && req.amount !== "—" && req.amount > 0
+                            ? `${Number(req.amount).toLocaleString("ar-SA")} ر.س`
+                            : "—"}
+                        </td>
 
-      {/* Status */}
-      <td className="px-4 py-3">
-        <span
-          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            STATUS_COLORS[status] || "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {status}
-        </span>
-      </td>
+                        {/* Status */}
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] || "bg-gray-100 text-gray-600"
+                              }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
 
-      {/* Actions */}
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap gap-1">
+                        {/* Actions */}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {!["مقبولة", "مرفوضة"].includes(status) && (
+                              <>
+                                {/* رفض */}
+                                <button
+                                  onClick={() => updateStatus(req.id, "مرفوضة")}
+                                  title="رفض"
+                                  className="p-1.5 hover:bg-red-50 text-red-500 rounded"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
 
-          {status === "قيد المراجعة" && (
-            <button
-              onClick={() => sendToManager(req.id)}
-              className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200"
-            >
-              ⟳ أحل للمدير
-            </button>
-          )}
+                                {/* قبول */}
+                                <button
+                                  onClick={() => updateStatus(req.id, "مقبولة")}
+                                  title="قبول"
+                                  className="p-1.5 hover:bg-green-50 text-green-600 rounded"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
 
-          {status === "انتظار موافقة المدير" && (
-            <button
-              onClick={() => managerApprove(req.id)}
-              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200"
-            >
-              ✓ اعتماد المدير
-            </button>
-          )}
+                                {/* أحل للمدير */}
+                                {status !== "انتظار موافقة المدير" && (
+                                  <button
+                                    onClick={() => sendToManager(req.id)}
+                                    title="أحل للمدير"
+                                    className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200"
+                                  >
+                                    ⟳ أحل للمدير
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
 
-          {(status === "قيد المراجعة" || status === "قيد مراجعة HR") && (
-            <>
-              <button
-                onClick={() => updateStatus(req.id, "مقبولة")}
-                title="قبول HR"
-                className="p-1.5 hover:bg-green-50 text-green-600 rounded"
-              >
-                <CheckCircle className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => updateStatus(req.id, "مرفوضة")}
-                title="رفض"
-                className="p-1.5 hover:bg-red-50 text-red-600 rounded"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            </>
-          )}
-
-        </div>
-      </td>
-
-    </tr>
-  );
-})
+                      </tr>
+                    );
+                  })
                 }
               </tbody>
             </table>

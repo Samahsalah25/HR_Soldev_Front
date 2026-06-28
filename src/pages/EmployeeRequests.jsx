@@ -7,7 +7,8 @@ import CustodyRequestModal from "../components/requests/CustodyRequestModal";
 import CustodySettleModal from "../components/requests/CustodySettleModal";
 import LoanRequestModal from "../components/requests/LoanRequestModal";
 import ExpenseModal from "../components/requests/ExpenseModal";
-
+import { getEmployees } from "@/api/departmentsApi";
+import {getAllRequests ,requestAction} from "@/api/requestsApi"
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
   { type: "تقديم شكوى", icon: AlertTriangle, color: "bg-red-50 text-red-700 border-red-200", modal: "complaint" },
@@ -18,6 +19,22 @@ const REQUEST_TYPES = [
   { type: "طلب بدل", icon: DollarSign, color: "bg-green-50 text-green-700 border-green-200", modal: "expense" },
   { type: "رفع مصروف/فاتورة", icon: Receipt, color: "bg-indigo-50 text-indigo-700 border-indigo-200", modal: "expense" },
 ];
+const normalizeStatus = (status) => {
+  switch (status) {
+    case "under_review":
+      return "قيد المراجعة";
+    case "waiting_manager_approval":
+      return "انتظار موافقة المدير";
+    case "accepted":
+      return "مقبولة";
+    case "rejected":
+      return "مرفوضة";
+    case "hr_under_review":
+      return "قيد مراجعة HR";
+    default:
+      return status;
+  }
+};
 
 const STATUS_COLORS = {
   "انتظار موافقة المدير": "bg-purple-100 text-purple-700",
@@ -38,15 +55,20 @@ export default function EmployeeRequests() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("requests");
 
-  const load = async () => {
-    const [reqs, emps, custs, lns] = await Promise.all([
-      base44.entities.EmployeeRequest.list("-created_date"),
-      base44.entities.Employee.filter({ status: "نشط" }),
-      base44.entities.Custody.list("-created_date"),
-      base44.entities.Loan.list("-created_date"),
-    ]);
-    setRequests(reqs); setEmployees(emps); setCustodies(custs); setLoans(lns); setLoading(false);
-  };
+const load = async () => {
+  const [reqs, emps, custs, lns] = await Promise.all([
+    getAllRequests(),
+    getEmployees(),
+    base44.entities.Custody.list("-created_date"),
+    base44.entities.Loan.list("-created_date"),
+  ]);
+
+  setRequests(reqs?.data || []);
+  setEmployees(emps?.data || emps?.employees || emps || []);
+  setCustodies(custs);
+  setLoans(lns);
+  setLoading(false);
+};
 
   useEffect(() => { load(); }, []);
 
@@ -80,56 +102,19 @@ export default function EmployeeRequests() {
     load();
   };
 
-  const updateStatus = async (id, status) => {
-    const user = await base44.auth.me();
-    const req = requests.find(r => r.id === id);
-    await base44.entities.EmployeeRequest.update(id, {
-      status, reviewed_by: user.full_name || user.email,
-      review_date: new Date().toISOString().slice(0, 10)
-    });
+const updateStatus = async (id, status) => {
+  try {
+    const action = status === "مقبولة" ? "accept" : "reject";
 
-    if (status === "مقبولة" && req) {
-      if (req.request_type === "طلب سلفة" && req.amount > 0) {
-        const installments = req.installments || 1;
-        await base44.entities.Loan.create({
-          employee_id: req.employee_id,
-          employee_name: req.employee_name,
-          department: req.department || "",
-          amount: req.amount,
-          reason: req.details,
-          installments,
-          monthly_deduction: Math.ceil(req.amount / installments),
-          paid_amount: 0,
-          remaining_amount: req.amount,
-          issue_date: new Date().toISOString().slice(0, 10),
-          status: "نشطة",
-          request_id: id,
-        });
-      }
-      // Auto accounting entry for custody
-      if (req.request_type === "طلب عهدة" && req.amount > 0) {
-        const accounts = await base44.entities.AccountChart.list();
-        const custodyAcc = accounts.find(a => a.account_name?.includes("عهد") && !a.is_parent);
-        const cashAcc = accounts.find(a => (a.account_name?.includes("صندوق") || a.account_name?.includes("نقد")) && !a.is_parent);
-        if (custodyAcc && cashAcc) {
-          await base44.entities.JournalEntry.create({
-            entry_number: `JE-CUST-${Date.now().toString().slice(-6)}`,
-            entry_date: new Date().toISOString().slice(0, 10),
-            description: `عهدة موظف: ${req.employee_name} — ${req.details}`,
-            lines: [
-              { account_id: custodyAcc.id, account_code: custodyAcc.account_code, account_name: custodyAcc.account_name, debit: req.amount, credit: 0 },
-              { account_id: cashAcc.id, account_code: cashAcc.account_code, account_name: cashAcc.account_name, debit: 0, credit: req.amount },
-            ],
-            total_debit: req.amount, total_credit: req.amount,
-            status: "مرحل", source: "عهدة موظف", source_id: id,
-            posted_by: user.full_name || user.email,
-            posted_date: new Date().toISOString().slice(0, 10),
-          });
-        }
-      }
-    }
+    await requestAction(id, action);
+
+    // optional: refresh data
     load();
-  };
+  } catch (err) {
+    console.error(err);
+    alert("حصل خطأ في تحديث الحالة");
+  }
+};
 
   const settleCustody = async (custodyId) => {
     await base44.entities.Custody.update(custodyId, {
@@ -168,6 +153,7 @@ export default function EmployeeRequests() {
               <span className="text-xs font-medium leading-tight">{type}</span>
             </button>
           ))}
+
         </div>
       </div>
 
@@ -217,46 +203,100 @@ export default function EmployeeRequests() {
                   <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا توجد بيانات</td></tr>
-                ) : filtered.map(req => (
-                  <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{req.employee_name}</p>
-                      <p className="text-xs text-muted-foreground">{req.department}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full font-medium">{req.request_type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {req.created_date ? new Date(req.created_date).toLocaleDateString("ar-SA") : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-foreground text-sm">
-                      {req.amount > 0 ? `${req.amount?.toLocaleString("ar-SA")} ر.س` : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[req.status]}`}>{req.status}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {req.status === "قيد المراجعة" && (
-                          <button onClick={() => sendToManager(req.id)}
-                            className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200">⟳ أحل للمدير</button>
-                        )}
-                        {req.status === "انتظار موافقة المدير" && (
-                          <button onClick={() => managerApprove(req.id)}
-                            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200">✓ اعتماد المدير</button>
-                        )}
-                        {(req.status === "قيد المراجعة" || req.status === "قيد مراجعة HR") && (
-                          <>
-                            <button onClick={() => updateStatus(req.id, "مقبولة")} title="قبول HR"
-                              className="p-1.5 hover:bg-green-50 text-green-600 rounded"><CheckCircle className="w-4 h-4" /></button>
-                            <button onClick={() => updateStatus(req.id, "مرفوضة")} title="رفض"
-                              className="p-1.5 hover:bg-red-50 text-red-600 rounded"><XCircle className="w-4 h-4" /></button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                ) :
+               filtered.map(req => {
+  const status = normalizeStatus(req.state);
+
+  return (
+    <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+
+      {/* Employee */}
+      <td className="px-4 py-3">
+        <p className="font-medium text-foreground">{req.employee || "—"}</p>
+        <p className="text-xs text-muted-foreground">{req.department || ""}</p>
+      </td>
+
+      {/* Request Type */}
+      <td className="px-4 py-3">
+        <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full font-medium">
+          {req.request_type || "—"}
+        </span>
+      </td>
+
+      {/* Date */}
+      <td className="px-4 py-3 text-muted-foreground text-xs">
+        {req.date_of_submission
+          ? new Date(req.date_of_submission).toLocaleDateString("ar-SA")
+          : "—"}
+      </td>
+
+      {/* Amount */}
+      <td className="px-4 py-3 text-foreground text-sm">
+        {req.amount && req.amount !== "—" && req.amount > 0
+          ? `${Number(req.amount).toLocaleString("ar-SA")} ر.س`
+          : "—"}
+      </td>
+
+      {/* Status */}
+      <td className="px-4 py-3">
+        <span
+          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+            STATUS_COLORS[status] || "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {status}
+        </span>
+      </td>
+
+      {/* Actions */}
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap gap-1">
+
+          {status === "قيد المراجعة" && (
+            <button
+              onClick={() => sendToManager(req.id)}
+              className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200"
+            >
+              ⟳ أحل للمدير
+            </button>
+          )}
+
+          {status === "انتظار موافقة المدير" && (
+            <button
+              onClick={() => managerApprove(req.id)}
+              className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200"
+            >
+              ✓ اعتماد المدير
+            </button>
+          )}
+
+          {(status === "قيد المراجعة" || status === "قيد مراجعة HR") && (
+            <>
+              <button
+                onClick={() => updateStatus(req.id, "مقبولة")}
+                title="قبول HR"
+                className="p-1.5 hover:bg-green-50 text-green-600 rounded"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => updateStatus(req.id, "مرفوضة")}
+                title="رفض"
+                className="p-1.5 hover:bg-red-50 text-red-600 rounded"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
+        </div>
+      </td>
+
+    </tr>
+  );
+})
+                }
               </tbody>
             </table>
           </div>

@@ -4,6 +4,19 @@ import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 import { formatCurrency, calcLeaveEncashment, getLeaveEntitlement, calcServiceYears } from "../lib/hrUtils";
+import {
+  getAllVacationRequests,
+  createVacationRequest,
+  getVacationYearlyBalance,
+  getFlyingTicket,
+  requestAction,
+} from "@/api/requestsApi";
+
+const STATUS_MAP = {
+  confirm: "قيد الانتظار",
+  validate: "معتمدة",
+  refuse: "مرفوضة",
+};
 
 const LEAVE_DAYS = {
   "سنوية": null, "مرضية": 120, "أمومة": 70, "أبوة": 3,
@@ -34,15 +47,22 @@ export default function Leaves() {
     include_ticket: false, notes: "",
   });
   const [saving, setSaving] = useState(false);
+const [balances, setBalances] = useState([]);
+const [tickets, setTickets] = useState([]);
 
-  const load = async () => {
-    const [ls, emps] = await Promise.all([
-      base44.entities.LeaveRequest.list("-created_date"),
-      base44.entities.Employee.filter({ status: "نشط" }),
-    ]);
-    setLeaves(ls); setEmployees(emps); setLoading(false);
-  };
+const load = async () => {
+  const [vacationsRes, balancesRes, ticketsRes] = await Promise.all([
+    getAllVacationRequests(),
+    getVacationYearlyBalance(),
+    getFlyingTicket(),
+  ]);
+console.log(vacationsRes.data)
+  setLeaves(vacationsRes?.data || []);
+  setBalances(balancesRes?.data || []);
+  setTickets(ticketsRes?.data || []);
 
+  setLoading(false);
+};
   useEffect(() => { load(); }, []);
 
   const calcDays = (start, end) => {
@@ -71,22 +91,13 @@ export default function Leaves() {
     load();
   };
 
-  const updateStatus = async (id, status) => {
-    await base44.entities.LeaveRequest.update(id, { status, approval_date: new Date().toISOString().slice(0, 10) });
-    // خصم الأيام من رصيد الموظف عند الاعتماد
-    if (status === "معتمدة") {
-      const leave = leaves.find(l => l.id === id);
-      if (leave && leave.leave_type === "سنوية") {
-        const emp = await base44.entities.Employee.get(leave.employee_id).catch(() => null);
-        if (emp) {
-          const currentBalance = emp.annual_leave_balance || 0;
-          const newBalance = Math.max(0, currentBalance - (leave.days_count || 0));
-          await base44.entities.Employee.update(emp.id, { annual_leave_balance: newBalance });
-        }
-      }
-    }
-    load();
-  };
+ 
+const updateStatus = async (id, action) => {
+  await requestAction(id, action);
+  console.log("sending id:", id); // 👈 للتأكد
+  // لو عايزة تعملي refresh للداتا
+  load();
+};
 
   const filtered = leaves.filter(l => !filterStatus || l.status === filterStatus);
 
@@ -159,27 +170,38 @@ export default function Leaves() {
                 ) : filtered.map(leave => (
                   <tr key={leave.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{leave.employee_name}</p>
+                      <p className="font-medium text-foreground">{leave.employee?.name_ar}</p>
                       <p className="text-xs text-muted-foreground">{leave.department}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">{leave.leave_type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{leave.start_date ? new Date(leave.start_date).toLocaleDateString("ar-SA") : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{leave.end_date ? new Date(leave.end_date).toLocaleDateString("ar-SA") : "—"}</td>
-                    <td className="px-4 py-3 font-semibold text-center">{leave.days_count}</td>
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">{leave.type_of_timeoff}</span>
+                    </td><td className="px-4 py-3 text-muted-foreground">
+  {leave.from
+    ? new Date(leave.from).toLocaleDateString("ar-SA")
+    : "—"}
+</td>
+
+<td className="px-4 py-3 text-muted-foreground">
+  {leave.to
+    ? new Date(leave.to).toLocaleDateString("ar-SA")
+    : "—"}
+</td>
+
+<td className="px-4 py-3 font-semibold text-center">
+  {leave.days ?? "—"}
+</td>
                     <td className="px-4 py-3 text-center">
-                      {leave.include_ticket ? <Plane className="w-4 h-4 text-secondary mx-auto" /> : "—"}
+                      {leave.ticket ? <Plane className="w-4 h-4 text-secondary mx-auto" /> : "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[leave.status] || ""}`}>{leave.status}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[leave.state] || ""}`}>{STATUS_MAP[leave.state] || leave.state}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {leave.status === "قيد الانتظار" && canApprove && (
+                      {leave.state === "confirm" && canApprove && (
                         <div className="flex gap-1">
-                          <button onClick={() => updateStatus(leave.id, "معتمدة")} title="قبول"
+                          <button onClick={() => updateStatus(leave.id, "accept")} title="قبول"
                             className="p-1.5 rounded hover:bg-green-50 text-green-600"><CheckCircle className="w-4 h-4" /></button>
-                          <button onClick={() => updateStatus(leave.id, "مرفوضة")} title="رفض"
+                          <button onClick={() => updateStatus(leave.id, "reject")} title="رفض"
                             className="p-1.5 rounded hover:bg-red-50 text-red-600"><XCircle className="w-4 h-4" /></button>
                         </div>
                       )}
@@ -204,26 +226,34 @@ export default function Leaves() {
                 </tr>
               </thead>
               <tbody>
-                {employees.map(emp => {
-                  const years = emp.join_date ? calcServiceYears(emp.join_date) : 0;
-                  const entitlement = getLeaveEntitlement(years);
-                  const balance = emp.annual_leave_balance || 0;
-                  const encashVal = calcLeaveEncashment(emp.basic_salary || 0, emp.housing_allowance || 0, balance);
-                  return (
-                    <tr key={emp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{emp.full_name_ar}</p>
-                        <p className="text-xs text-muted-foreground">{emp.department}</p>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{years.toFixed(1)} سنة</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">{entitlement} يوم / سنة</span>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-secondary">{balance} يوم</td>
-                      <td className="px-4 py-3 text-purple-600">{formatCurrency(encashVal)}</td>
-                    </tr>
-                  );
-                })}
+       {balances.map(emp => (
+  <tr key={emp.employee.id} className="border-b border-border hover:bg-muted/20">
+
+    <td className="px-4 py-3">
+      <p className="font-medium">{emp.employee?.name_ar}</p>
+      <p className="text-xs text-muted-foreground">{emp.employee?.name}</p>
+    </td>
+
+    <td className="px-4 py-3 text-muted-foreground">
+      {emp.years_of_service}
+    </td>
+
+    <td className="px-4 py-3">
+      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs">
+        {emp.yearly_vacation_days_left} يوم
+      </span>
+    </td>
+
+    <td className="px-4 py-3 font-bold text-secondary">
+      {emp.yearly_vacation_days_left} يوم
+    </td>
+
+    <td className="px-4 py-3 text-purple-600">
+      {emp.settlement_value} ر.س
+    </td>
+
+  </tr>
+))}
               </tbody>
             </table>
           </div>
@@ -242,23 +272,43 @@ export default function Leaves() {
                 </tr>
               </thead>
               <tbody>
-                {employees.filter(e => e.ticket_entitlement !== "غير مستحق").map(emp => (
-                  <tr key={emp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{emp.full_name_ar}</p>
-                      <p className="text-xs text-muted-foreground">{emp.nationality}</p>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{emp.ticket_destination || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">{emp.ticket_class || "اقتصادية"}</span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{emp.ticket_entitlement}</td>
-                    <td className="px-4 py-3 font-semibold text-secondary">{formatCurrency(emp.ticket_value)}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">مستحقة</span>
-                    </td>
-                  </tr>
-                ))}
+   {tickets.map(emp => (
+  <tr key={emp.employee.id} className="border-b border-border hover:bg-muted/20">
+
+    <td className="px-4 py-3">
+      <p className="font-medium">{emp.employee?.name_ar}</p>
+    </td>
+
+    <td className="px-4 py-3">
+      {emp.ticket_destination || "—"}
+    </td>
+
+    <td className="px-4 py-3 text-secondary font-semibold ">
+      {emp.ticket_class || "—"}
+    </td>
+
+    <td className="px-4 py-3">
+      {emp.ticket_entitlement}
+    </td>
+
+    <td className="px-4 py-3 font-semibold text-secondary">
+      {emp.ticket_price}
+    </td>
+
+    <td className="px-4 py-3">
+      <span className={`px-2 py-0.5 rounded-full text-xs ${
+        emp.state_of_entitlement === "entitled"
+          ? "bg-green-100 text-green-700"
+          : "bg-gray-100 text-gray-600"
+      }`}>
+        {emp.state_of_entitlement === "entitled"
+          ? "مستحق"
+          : "غير مستحق"}
+      </span>
+    </td>
+
+  </tr>
+))}
               </tbody>
             </table>
           </div>

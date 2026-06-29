@@ -99,11 +99,17 @@ const updateStatus = async (id, action) => {
   load();
 };
 
-  const filtered = leaves.filter(l => !filterStatus || l.status === filterStatus);
+const filtered = leaves.filter(
+  l => !filterStatus || l.state === filterStatus
+);
 
-  const pending = leaves.filter(l => l.status === "قيد الانتظار");
-  const approved = leaves.filter(l => l.status === "معتمدة");
-
+const pending = leaves.filter(
+  l => l.state === "confirm"
+);
+const rejected = leaves.filter(l => l.state === "refuse");
+const approved = leaves.filter(
+  l => l.state === "validate"
+);
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -125,7 +131,7 @@ const updateStatus = async (id, action) => {
           { label: "إجمالي الطلبات", value: leaves.length, color: "text-primary" },
           { label: "بانتظار الموافقة", value: pending.length, color: "text-amber-600" },
           { label: "معتمدة", value: approved.length, color: "text-green-600" },
-          { label: "مرفوضة", value: leaves.filter(l => l.status === "مرفوضة").length, color: "text-red-600" },
+          { label: "مرفوضة", value: rejected.length, color: "text-red-600" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>

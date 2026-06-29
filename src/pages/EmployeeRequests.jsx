@@ -9,13 +9,16 @@ import LoanRequestModal from "../components/requests/LoanRequestModal";
 import ExpenseModal from "../components/requests/ExpenseModal";
 import { getEmployees } from "@/api/departmentsApi";
 import { getAllRequests, requestAction, sendToManager as apiSendToManager, managerApprove as apiManagerApprove } from "@/api/requestsApi"
+import {getSalaryAdvances} from "@/api/salaryAdvancesApi";
+import {getCustodyRequests} from "@/api/assetsApi"; 
+
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
   { type: "تقديم شكوى", icon: AlertTriangle, color: "bg-red-50 text-red-700 border-red-200", modal: "complaint" },
   { type: "تقديم اعتراض", icon: AlertTriangle, color: "bg-amber-50 text-amber-700 border-amber-200", modal: "objection" },
-  { type: "طلب عهدة", icon: Briefcase, color: "bg-purple-50 text-purple-700 border-purple-200", modal: "custody" },
-  { type: "تصفية عهدة", icon: Package, color: "bg-orange-50 text-orange-700 border-orange-200", modal: "settle" },
-  { type: "طلب سلفة", icon: CreditCard, color: "bg-teal-50 text-teal-700 border-teal-200", modal: "loan" },
+  // { type: "طلب عهدة", icon: Briefcase, color: "bg-purple-50 text-purple-700 border-purple-200", modal: "custody" },
+  // { type: "تصفية عهدة", icon: Package, color: "bg-orange-50 text-orange-700 border-orange-200", modal: "settle" },
+  // { type: "طلب سلفة", icon: CreditCard, color: "bg-teal-50 text-teal-700 border-teal-200", modal: "loan" },
   { type: "طلب بدل", icon: DollarSign, color: "bg-green-50 text-green-700 border-green-200", modal: "expense" },
   { type: "رفع مصروف/فاتورة", icon: Receipt, color: "bg-indigo-50 text-indigo-700 border-indigo-200", modal: "expense" },
 ];
@@ -36,6 +39,27 @@ const normalizeStatus = (status) => {
   }
 };
 
+const normalizeLoanStatus = (state) => {
+  switch (state) {
+    case "waiting_manager":
+      return "انتظار موافقة المدير";
+
+    case "waiting_hr":
+      return "انتظار موافقة الموارد البشرية";
+
+    case "approved":
+      return "معتمد";
+
+    case "certified":
+      return "مُعتمد نهائيًا";
+
+    case "rejected":
+      return "مرفوض";
+
+    default:
+      return state;
+  }
+};
 const STATUS_COLORS = {
   "انتظار موافقة المدير": "bg-purple-100 text-purple-700",
   "قيد المراجعة": "bg-amber-100 text-amber-700",
@@ -55,21 +79,23 @@ export default function EmployeeRequests() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("requests");
 
-  const load = async () => {
-    const [reqs, emps, custs, lns] = await Promise.all([
-      getAllRequests(),
-      getEmployees(),
-      base44.entities.Custody.list("-created_date"),
-      base44.entities.Loan.list("-created_date"),
-    ]);
+ const load = async () => {
+ const [reqs, emps, custodyRes, loanRes] = await Promise.all([
+  getAllRequests(),
+  getEmployees(),
+  getCustodyRequests(),
+  getSalaryAdvances(),
+]);
 
-    setRequests(reqs?.data || []);
-    setEmployees(emps?.data || emps?.employees || emps || []);
-    setCustodies(custs);
-    setLoans(lns);
-    setLoading(false);
-  };
+setRequests(reqs?.data || []);
+setEmployees(emps?.data || emps?.employees || emps || []);
+console.log("custodyRes full:", custodyRes);
+setCustodies(custodyRes || custodyRes?.data || []);
+setLoans(loanRes?.data || []);
 
+ 
+  setLoading(false);
+};
   useEffect(() => { load(); }, []);
 
   const sendToManager = async (id) => {
@@ -129,8 +155,11 @@ export default function EmployeeRequests() {
       return (b.id || 0) - (a.id || 0); // fallback by ID (bigger = newer)
     });
 
-  const activeCustodies = custodies.filter(c => c.status === "نشطة");
-  const activeLoans = loans.filter(l => l.status === "نشطة");
+const activeCustodies = custodies.filter(
+  c => c.state !== "rejected"
+);
+ console.log("  العهد" ,activeCustodies)
+const activeLoans = loans;
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -142,7 +171,7 @@ export default function EmployeeRequests() {
       {/* Request Type Buttons */}
       <div>
         <p className="text-sm font-semibold text-foreground mb-3">الطلبات المتاحة</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 justify-center ">
           {REQUEST_TYPES.map(({ type, icon: Icon, color, modal }) => (
             <button key={type} onClick={() => openModal(modal, type)}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-center hover:shadow-sm transition-all ${color}`}>
@@ -245,42 +274,63 @@ export default function EmployeeRequests() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1 items-center">
-                            {!["مقبولة", "مرفوضة"].includes(status) && (
-                              <>
-                                {/* رفض */}
-                                <button
-                                  onClick={() => updateStatus(req.id, "مرفوضة")}
-                                  title="رفض"
-                                  className="p-1.5 hover:bg-red-50 text-red-500 rounded"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
+                     {/* Actions */}
+{/* Actions */}
+<td className="px-4 py-3">
+  <div className="flex flex-wrap gap-1 items-center">
 
-                                {/* قبول */}
-                                <button
-                                  onClick={() => updateStatus(req.id, "مقبولة")}
-                                  title="قبول"
-                                  className="p-1.5 hover:bg-green-50 text-green-600 rounded"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
+    {/* الطلب في انتظار موافقة المدير */}
+    {status === "انتظار موافقة المدير" ? (
+      <>
+        <button
+          onClick={() => managerApprove(req.id)}
+          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200"
+        >
+          ✓ اعتماد المدير
+        </button>
 
-                                {/* أحل للمدير */}
-                                {status !== "انتظار موافقة المدير" && (
-                                  <button
-                                    onClick={() => sendToManager(req.id)}
-                                    title="أحل للمدير"
-                                    className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200"
-                                  >
-                                    ⟳ أحل للمدير
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
+        <button
+          onClick={() => updateStatus(req.id, "مرفوضة")}
+          title="رفض"
+          className="p-1.5 hover:bg-red-50 text-red-500 rounded"
+        >
+          <XCircle className="w-4 h-4" />
+        </button>
+      </>
+    ) : !["مقبولة", "مرفوضة"].includes(status) ? (
+      <>
+        {/* رفض */}
+        <button
+          onClick={() => updateStatus(req.id, "مرفوضة")}
+          title="رفض"
+          className="p-1.5 hover:bg-red-50 text-red-500 rounded"
+        >
+          <XCircle className="w-4 h-4" />
+        </button>
+
+        {/* قبول */}
+        <button
+          onClick={() => updateStatus(req.id, "مقبولة")}
+          title="قبول"
+          className="p-1.5 hover:bg-green-50 text-green-600 rounded"
+        >
+          <CheckCircle className="w-4 h-4" />
+        </button>
+
+        {/* أحل للمدير */}
+        {status === "قيد المراجعة" && (
+          <button
+            onClick={() => sendToManager(req.id)}
+            className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200"
+          >
+            ⟳ أحل للمدير
+          </button>
+        )}
+      </>
+    ) : null}
+
+  </div>
+</td>
 
                       </tr>
                     );
@@ -297,7 +347,7 @@ export default function EmployeeRequests() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
-                {["الموظف", "العهدة", "الرقم التسلسلي", "القيمة", "تاريخ الإصدار", "الحالة", "تصفية"].map(h => (
+                {["الموظف", "العهدة", "الرقم التسلسلي", "السبب", "تاريخ الإصدار", "الحالة"].map(h => (
                   <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
@@ -311,19 +361,19 @@ export default function EmployeeRequests() {
                     <p className="font-medium text-foreground">{c.employee_name}</p>
                     <p className="text-xs text-muted-foreground">{c.department}</p>
                   </td>
-                  <td className="px-4 py-3 font-medium text-foreground">{c.item_name}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs font-mono">{c.serial_number || "—"}</td>
-                  <td className="px-4 py-3 text-purple-600 font-semibold">{c.value > 0 ? `${c.value?.toLocaleString("ar-SA")} ر.س` : "—"}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.issue_date ? new Date(c.issue_date).toLocaleDateString("ar-SA") : "—"}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{c.equipment_name}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs font-mono">{c.name || "—"}</td>
+                  <td className="px-4 py-3 text-purple-600 font-semibold">{c.reason}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.request_date ? new Date(c.request_date).toLocaleDateString("ar-SA") : "—"}</td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{c.status}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{c.state_label}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  {/* <td className="px-4 py-3">
                     <button onClick={() => settleCustody(c.id)}
                       className="text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 font-medium">
                       تصفية
                     </button>
-                  </td>
+                  </td> */}
                 </tr>
               ))}
             </tbody>
@@ -351,12 +401,26 @@ export default function EmployeeRequests() {
                     <p className="text-xs text-muted-foreground">{l.department}</p>
                   </td>
                   <td className="px-4 py-3 font-bold text-foreground">{l.amount?.toLocaleString("ar-SA")} ر.س</td>
-                  <td className="px-4 py-3 text-green-600">{l.paid_amount?.toLocaleString("ar-SA")} ر.س</td>
+                  <td className="px-4 py-3 text-green-600">{l.total_paid?.toLocaleString("ar-SA")} ر.س</td>
                   <td className="px-4 py-3 text-red-600 font-semibold">{l.remaining_amount?.toLocaleString("ar-SA")} ر.س</td>
-                  <td className="px-4 py-3 text-amber-600">{l.monthly_deduction?.toLocaleString("ar-SA")} ر.س/شهر</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{l.issue_date ? new Date(l.issue_date).toLocaleDateString("ar-SA") : "—"}</td>
+                  <td className="px-4 py-3 text-amber-600">{l.installment_amount?.toLocaleString("ar-SA")} ر.س/شهر</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{l.start_date? new Date(l.start_date).toLocaleDateString("ar-SA") : "—"}</td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">{l.status}</span>
+               <span
+  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+    l.state === "rejected"
+      ? "bg-red-100 text-red-700"
+      : l.state === "waiting_manager"
+      ? "bg-purple-100 text-purple-700"
+      : l.state === "waiting_hr"
+      ? "bg-blue-100 text-blue-700"
+      : l.state === "approved"
+      ? "bg-green-100 text-green-700"
+      : "bg-teal-100 text-teal-700"
+  }`}
+>
+  {normalizeLoanStatus(l.state)}
+</span>
                   </td>
                 </tr>
               ))}

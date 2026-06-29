@@ -1,12 +1,13 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://significantly-advertising-benefit-prisoner.trycloudflare.com/api/v1",
+  baseURL: "https://undelved-semiacademical-roxann.ngrok-free.dev/api/v1",
   withCredentials: true,
   xsrfCookieName: "session_id",
   xsrfHeaderName: "X-Session-Id",
   headers: {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true", // أضيفي ده
   },
 });
 

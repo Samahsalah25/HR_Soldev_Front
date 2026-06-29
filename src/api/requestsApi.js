@@ -139,6 +139,15 @@ export const requestAction = async (id, action) => {
 };
 
 // =============================
+// APPROVE / REJECT VACATION REQUEST
+// =============================
+export const vacationAction = async (id, action) => {
+  // action: "accept" | "refuse"
+  const res = await api.post(`/requests/vacation/${id}/action`, { action });
+  return res.data;
+};
+
+// =============================
 // SEND TO MANAGER
 // =============================
 export const sendToManager = async (id) => {
@@ -151,5 +160,21 @@ export const sendToManager = async (id) => {
 // =============================
 export const managerApprove = async (id) => {
   const res = await api.post(`/requests/${id}/manager_approve`);
+  return res.data;
+};
+
+// =============================
+// SEND VACATION TO MANAGER
+// =============================
+export const sendVacationToManager = async (id) => {
+  const res = await api.post(`/requests/vacation/${id}/send_to_manager`);
+  return res.data;
+};
+
+// =============================
+// MANAGER APPROVE VACATION
+// =============================
+export const managerApproveVacation = async (id) => {
+  const res = await api.post(`/requests/vacation/${id}/manager_approve`);
   return res.data;
 };

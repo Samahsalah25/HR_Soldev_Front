@@ -6,7 +6,7 @@ import { canDo } from "../lib/crudPermissions";
 import {
   getCases,
   createCase,
-} from "../API/casesApi";
+} from "../api/casesApi";
 const CASE_STATUS_COLORS = {
   new: "bg-blue-100 text-blue-700",
   in_progress: "bg-amber-100 text-amber-700",

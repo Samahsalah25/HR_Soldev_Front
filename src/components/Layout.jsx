@@ -40,19 +40,19 @@ const ALL_NAV_GROUPS = [
   {
     label: "المالية",
     items: [
-    { path: "/payroll", icon: DollarSign, label: "الرواتب والتأمينات" },
+      { path: "/payroll", icon: DollarSign, label: "الرواتب والتأمينات" },
       { path: "/accounting", icon: Calculator, label: "نظام الحسابات" },
       { path: "/financial-reports", icon: BarChart2, label: "التقارير المالية" },
     ]
   },
   {
-  label: "التشغيل",
-  items: [
-    { path: "/tasks", icon: CheckSquare, label: "المهام" },
-    { path: "/requests", icon: ClipboardList, label: "طلبات الموظفين" },
-    { path: "/assets", icon: Package, label: "إدارة الأصول" },
-    { path: "/meetings", icon: Video, label: "الاجتماعات" },
-  ]
+    label: "التشغيل",
+    items: [
+      { path: "/tasks", icon: CheckSquare, label: "المهام" },
+      { path: "/requests", icon: ClipboardList, label: "طلبات الموظفين" },
+      { path: "/assets", icon: Package, label: "إدارة الأصول" },
+      { path: "/meetings", icon: Video, label: "الاجتماعات" },
+    ]
   },
   {
     label: "وحدات التخزين",
@@ -71,7 +71,7 @@ const ALL_NAV_GROUPS = [
       { path: "/company-records", icon: FolderOpen, label: "سجلات الشركة" },
       { path: "/policies", icon: FileText, label: "سياسات الشركة" },
       { path: "/legal", icon: Scale, label: "الشؤون القانونية" },
-    { path: "/reports", icon: FileText, label: "التقارير" },
+      { path: "/reports", icon: FileText, label: "التقارير" },
       { path: "/permissions", icon: Shield, label: "الصلاحيات" },
       { path: "/user-management", icon: UserCircle, label: "إدارة المستخدمين" },
     ]
@@ -88,21 +88,28 @@ export default function Layout() {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const { lang, toggle, isAr } = useLanguage();
 
-
   const toggleGroup = (label) => setCollapsedGroups(g => ({ ...g, [label]: !g[label] }));
-const navigate = useNavigate();
+  const navigate = useNavigate();
 
-const handleLogout = async () => {
-  try {
-    await logoutUser(); // call backend logout
-  } catch (err) {
-    console.log("logout error:", err);
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.log("logout error:", err);
+    }
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+
+  // انتظر لحد ما الصلاحيات تتحمل قبل ما ترسم السايد بار
+  if (roleLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+      </div>
+    );
   }
 
-  localStorage.removeItem("user"); // امسحي السيشن المحلي
-  navigate("/"); // رجعي للوجين
-};
-  
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -174,7 +181,7 @@ const handleLogout = async () => {
     </div>
   );
 
-return (
+  return (
     <div className="flex h-screen bg-background overflow-hidden" dir="rtl">
       {/* Desktop Sidebar */}
       <aside className={`hidden lg:flex flex-col bg-sidebar transition-all duration-300 flex-shrink-0 ${sidebarOpen ? "w-56" : "w-14"}`}>

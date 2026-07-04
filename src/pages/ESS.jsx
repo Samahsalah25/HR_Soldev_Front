@@ -2,7 +2,11 @@ import { useState, useEffect } from "react";
 import { User, CalendarDays, DollarSign, Clock, Send, FileText, AlertTriangle, CheckCircle, ShieldAlert, ExternalLink, BookOpen, Briefcase, CreditCard, ClipboardList, Lock, Eye, EyeOff } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatCurrency, calcPayslip, getLeaveEntitlement, calcServiceYears, calcAutoLeaveBalance } from "../lib/hrUtils";
-
+import {
+  getPortalOverview,
+  getPortalProfile,
+  getPortalVacations
+} from "@/api/portalService";
 const LEAVE_TYPES_CONFIG = {
   "سنوية":      { usesBalance: true,  maxDays: null },
   "مرضية":      { usesBalance: false, maxDays: 120 },
@@ -40,32 +44,58 @@ export default function ESS() {
   const [myLoans, setMyLoans] = useState([]);
   const [myViolations, setMyViolations] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
+const [kpis, setKpis] = useState(null);
+const loadData = async () => {
+  try {
+    const [overview, profile, vacations] = await Promise.all([
+      getPortalOverview(),
+      getPortalProfile(),
+      getPortalVacations(),
+    ]);
 
-  const loadData = async () => {
-    const user = await base44.auth.me();
-    const allEmps = await base44.entities.Employee.list();
-    const emp = allEmps.find(e => e.email?.toLowerCase() === user.email?.toLowerCase()) || allEmps[0];
+    // ======================
+    // Employee merge
+    // ======================
+    const emp = {
+      ...overview.data.employee,
+      ...profile.data.personal_info,
+      ...profile.data.job_info,
+    };
+
     setEmployee(emp);
-    if (emp) {
-      const [lvs, att, pols, custs, lns, viols, reqs] = await Promise.all([
-        base44.entities.LeaveRequest.filter({ employee_id: emp.id }),
-        base44.entities.AttendanceRecord.filter({ employee_id: emp.id }),
-        base44.entities.CompanyPolicy.filter({ is_active: true }),
-        base44.entities.Custody.filter({ employee_id: emp.id }),
-        base44.entities.Loan.filter({ employee_id: emp.id }),
-        base44.entities.Violation.filter({ employee_id: emp.id }),
-        base44.entities.EmployeeRequest.filter({ employee_id: emp.id }),
-      ]);
-      setMyLeaves(lvs);
-      setMyAttendance(att.slice(0, 30));
-      setPolicies(pols);
-      setMyCustodies(custs);
-      setMyLoans(lns);
-      setMyViolations(viols);
-      setMyRequests(reqs);
-    }
+
+    // ======================
+    // KPIs (source of truth)
+    // ======================
+    setKpis(overview?.data?.kpis ?? null);
+
+    // ======================
+    // Leaves (NORMALIZED)
+    // ======================
+    const mappedLeaves = (vacations?.data || []).map((l) => ({
+      id: l.id,
+      leave_type: l.type_of_timeoff,
+      start_date: l.from,
+      end_date: l.to,
+      days_count: l.days,
+      status:
+        l.state === "confirm"
+          ? "معتمدة"
+          : l.state === "reject"
+          ? "مرفوضة"
+          : "قيد الانتظار",
+      notes: l.notes,
+    }));
+
+    setMyLeaves(mappedLeaves);
+  } catch (error) {
+    console.error("loadData error:", error);
+    setKpis(null);
+    setMyLeaves([]);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   useEffect(() => { loadData().catch(() => setLoading(false)); }, []);
 
@@ -84,9 +114,31 @@ export default function ESS() {
     (employee.transport_allowance || 0) + (employee.food_allowance || 0) +
     (employee.communication_allowance || 0) + (employee.other_allowances || 0) : 0;
 
-  const requestedDays = calcDays(leaveForm.start_date, leaveForm.end_date);
-  const isAnnual = leaveForm.leave_type === "سنوية";
-  const exceedsBalance = isAnnual && requestedDays > autoBalance && !leaveForm.is_exceptional;
+
+const kpiBalance = kpis?.remaining_vacation_days ?? 0;
+
+const ticket = kpis?.ticket_entitlement ?? null;
+
+const attendanceCount =
+  kpis?.attendance_last_30_records_count ?? 0;
+
+const pendingRequests =
+  kpis?.vacation_requests_waiting_approval_count ?? 0;
+
+// أيام الطلب
+const requestedDays = calcDays(
+  leaveForm.start_date,
+  leaveForm.end_date
+);
+
+const isAnnual = leaveForm.leave_type === "سنوية";
+
+// منع الحساب لو مفيش KPI
+const exceedsBalance =
+  !!kpis &&
+  isAnnual &&
+  requestedDays > kpiBalance &&
+  !leaveForm.is_exceptional;
 
   const handleLeaveSubmit = async () => {
     if (!employee || exceedsBalance) return;
@@ -142,39 +194,75 @@ export default function ESS() {
       <div className="bg-gradient-to-l from-slate-50 to-slate-100 rounded-2xl border border-border p-6">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl font-bold text-primary-foreground">{employee.full_name_ar?.charAt(0)}</span>
+            <span className="text-2xl font-bold text-primary-foreground">{employee.name?.charAt(0)}</span>
           </div>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-foreground">{employee.full_name_ar}</h1>
+            <h1 className="text-xl font-bold text-foreground">{employee.name}</h1>
             <p className="text-sm text-muted-foreground">{employee.job_title} — {employee.department}</p>
             <div className="flex flex-wrap gap-2 mt-2">
               <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{employee.is_saudi ? "🇸🇦 سعودي" : `🌍 ${employee.nationality}`}</span>
-              <span className="text-xs bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-medium">{years.toFixed(1)} سنة خدمة</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${employee.status === "نشط" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{employee.status}</span>
+              <span className="text-xs bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-medium">{employee.years_of_service?.toFixed(1)} سنة خدمة</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${employee?.state?.label_ar === "نشط" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{employee?.state?.label_ar}</span>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-secondary">{formatCurrency(payslip.netSalary)}</p>
+    <p className="text-2xl font-bold text-secondary">
+  {formatCurrency(employee?.net_salary)}
+</p>
             <p className="text-xs text-muted-foreground">صافي الراتب الشهري</p>
           </div>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "رصيد الإجازات", value: `${autoBalance} يوم`, sub: `استحقاق ${entitlement} يوم/سنة`, color: autoBalance < 5 ? "text-red-600" : "text-secondary" },
-          { label: "تذكرة الطيران", value: employee.ticket_entitlement || "غير محدد", sub: employee.ticket_destination || "—", color: "text-blue-600" },
-          { label: "سجلات الحضور", value: myAttendance.length, sub: "آخر 30 سجل", color: "text-primary" },
-          { label: "طلبات الإجازة", value: myLeaves.length, sub: `${myLeaves.filter(l => l.status === "قيد الانتظار").length} قيد الانتظار`, color: "text-amber-600" },
-        ].map(s => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
-            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs font-medium text-foreground mt-0.5">{s.label}</p>
-            <p className="text-xs text-muted-foreground">{s.sub}</p>
-          </div>
-        ))}
-      </div>
+{/* Quick Stats */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  {[
+    {
+      label: "رصيد الإجازات",
+      value: `${kpis?.remaining_vacation_days ?? 0} يوم`,
+      sub: "رصيد متبقي حسب النظام",
+      color:
+        (kpis?.remaining_vacation_days ?? 0) < 5
+          ? "text-red-600"
+          : "text-secondary",
+    },
+
+    {
+      label: "تذكرة الطيران",
+      value: kpis?.ticket_entitlement?.label_ar ?? "لا يوجد استحقاق",
+      sub: kpis?.ticket_entitlement?.destination
+        ? "تشمل وجهة"
+        : "بدون وجهة",
+      color: "text-blue-600",
+    },
+
+    {
+      label: "سجلات الحضور",
+      value: kpis?.attendance_last_30_records_count ?? 0,
+      sub: "آخر 30 يوم",
+      color: "text-primary",
+    },
+
+    {
+      label: "طلبات الإجازة",
+      value: kpis?.vacation_requests_waiting_approval_count ?? 0,
+      sub: "قيد الانتظار",
+      color: "text-amber-600",
+    },
+  ].map((s) => (
+    <div
+      key={s.label}
+      className="bg-card rounded-xl border border-border p-4"
+    >
+      <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+      <p className="text-xs font-medium text-foreground mt-0.5">
+        {s.label}
+      </p>
+      <p className="text-xs text-muted-foreground">{s.sub}</p>
+    </div>
+  ))}
+</div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto">
@@ -200,90 +288,148 @@ export default function ESS() {
       {activeTab === "profile" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <Section title="البيانات الشخصية">
-            <Row label="الاسم الكامل" value={employee.full_name_ar} />
-            <Row label="رقم الهوية/الإقامة" value={employee.id_number} />
+            <Row label="الاسم الكامل" value={employee.name} />
+            <Row label="رقم الهوية/الإقامة" value={employee.identification_number} />
             <Row label="الجنسية" value={employee.nationality} />
-            <Row label="رقم الجوال" value={employee.phone} />
+            <Row label="رقم الجوال" value={employee.mobile_number} />
             <Row label="البريد الإلكتروني" value={employee.email} />
           </Section>
           <Section title="بيانات الوظيفة">
             <Row label="رقم الملف" value={employee.employee_number} />
             <Row label="المسمى الوظيفي" value={employee.job_title} />
             <Row label="القسم" value={employee.department} />
-            <Row label="المدير المباشر" value={employee.manager} />
-            <Row label="تاريخ المباشرة" value={employee.join_date ? new Date(employee.join_date).toLocaleDateString("ar-SA") : "—"} />
+            <Row label="المدير المباشر" value={employee.direct_manager} />
+            <Row label="تاريخ المباشرة" value={employee.start_date ? new Date(employee.start_date).toLocaleDateString("ar-SA") : "—"} />
             <Row label="نوع العقد" value={employee.contract_type} />
-            <Row label="البنك / IBAN" value={employee.bank_name ? `${employee.bank_name} — ${employee.iban || ""}` : "—"} />
+            <Row label="البنك / IBAN" value={employee.bank_iban ? `${employee.bank_iban} — ${employee.iban || ""}` : "—"} />
           </Section>
         </div>
       )}
 
-      {activeTab === "leaves" && (
-        <div className="space-y-4">
-          {/* Balance Card */}
-          <div className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground">رصيد الإجازة السنوية المتراكم</p>
-                <p className="text-xs text-muted-foreground mt-0.5">محتسب من {employee.join_date ? new Date(employee.join_date).toLocaleDateString("ar-SA") : "—"} | معتمد مُستهلك: {approvedAnnualDays} يوم</p>
-              </div>
-              <div className="text-right">
-                <p className={`text-3xl font-bold ${autoBalance < 5 ? "text-red-600" : "text-secondary"}`}>{autoBalance}</p>
-                <p className="text-xs text-muted-foreground">يوم متاح</p>
-              </div>
-            </div>
-            {/* Progress Bar */}
-            <div className="mt-3">
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-secondary h-2 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (autoBalance / entitlement) * 100)}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{autoBalance} / {entitlement} يوم سنوي</p>
-            </div>
-          </div>
+   {activeTab === "leaves" && (
+  <div className="space-y-4">
 
-          <div className="flex justify-end">
-            <button onClick={() => setShowLeaveForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium">
-              <Send className="w-4 h-4" />تقديم طلب إجازة
-            </button>
-          </div>
+    {/* Balance Card */}
+    <div className="bg-card rounded-xl border border-border p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            رصيد الإجازة السنوية المتراكم
+          </p>
 
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/30 border-b border-border">
-                  {["نوع الإجازة", "من", "إلى", "الأيام", "الحالة", "ملاحظات"].map(h => (
-                    <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {myLeaves.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-muted-foreground text-sm">لا توجد طلبات إجازة</td></tr>
-                ) : myLeaves.map(l => (
-                  <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {l.leave_type}
-                      {l.notes?.startsWith("[استثنائية]") && <span className="mr-1 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">استثنائية</span>}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{l.start_date ? new Date(l.start_date).toLocaleDateString("ar-SA") : "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{l.end_date ? new Date(l.end_date).toLocaleDateString("ar-SA") : "—"}</td>
-                    <td className="px-4 py-3 text-center font-semibold text-foreground">{l.days_count}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${l.status === "معتمدة" ? "bg-green-100 text-green-700" : l.status === "مرفوضة" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
-                        {l.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-32 truncate">{l.notes || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            معتمد مُستهلك: {approvedAnnualDays} يوم
+          </p>
         </div>
-      )}
 
+        <div className="text-right">
+          <p className="text-3xl font-bold text-secondary">
+            {kpis?.remaining_vacation_days ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground">يوم متاح</p>
+        </div>
+      </div>
+
+      {/* Progress */}
+      <div className="mt-3">
+        <div className="w-full bg-muted rounded-full h-2">
+          <div
+            className="bg-secondary h-2 rounded-full"
+            style={{
+              width: `${Math.min(
+                100,
+                ((kpis?.remaining_vacation_days ?? 0) / (entitlement || 1)) * 100
+              )}%`,
+            }}
+          />
+        </div>
+
+        <p className="text-xs text-muted-foreground mt-1">
+          {kpis?.remaining_vacation_days ?? 0} / {entitlement} يوم سنوي
+        </p>
+      </div>
+    </div>
+
+    {/* Button */}
+    <div className="flex justify-end">
+      <button
+        onClick={() => setShowLeaveForm(true)}
+        className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
+      >
+        <Send className="w-4 h-4" />
+        تقديم طلب إجازة
+      </button>
+    </div>
+
+    {/* Table */}
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-muted/30 border-b border-border">
+            {["نوع الإجازة", "من", "إلى", "الأيام", "الحالة", "ملاحظات"].map(h => (
+              <th
+                key={h}
+                className="text-right px-4 py-3 text-xs font-medium text-muted-foreground"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {myLeaves.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                لا توجد طلبات إجازة
+              </td>
+            </tr>
+          ) : (
+            myLeaves.map(l => (
+              <tr
+                key={l.id}
+                className="border-b border-border hover:bg-muted/20"
+              >
+                <td className="px-4 py-3 font-medium">
+                  {l.leave_type}
+                </td>
+
+                <td className="px-4 py-3 text-xs text-muted-foreground">
+                  {l.start_date}
+                </td>
+
+                <td className="px-4 py-3 text-xs text-muted-foreground">
+                  {l.end_date}
+                </td>
+
+                <td className="px-4 py-3 text-center font-semibold">
+                  {l.days_count}
+                </td>
+
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${
+                    l.status === "معتمدة"
+                      ? "bg-green-100 text-green-700"
+                      : l.status === "مرفوضة"
+                      ? "bg-red-100 text-red-600"
+                      : "bg-amber-100 text-amber-700"
+                  }`}>
+                    {l.status}
+                  </span>
+                </td>
+
+                <td className="px-4 py-3 text-xs text-muted-foreground">
+                  {l.notes || "—"}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+)}
       {activeTab === "payslip" && (
         <div className="bg-card rounded-xl border border-border p-6 max-w-md">
           <div className="flex items-center gap-2 mb-4">

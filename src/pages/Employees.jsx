@@ -17,10 +17,10 @@ const STATUS_COLORS = {
 };
 
 export default function Employees() {
-  const { user } = useRole();
-  const canAdd = canDo(user, "employees", "create");
-  const canEdit = canDo(user, "employees", "edit");
-  const canDelete = canDo(user, "employees", "delete");
+  const { user, canDo } = useRole();
+  const canAdd = canDo("employees", "create");
+  const canEdit = canDo("employees", "edit");
+  const canDelete = canDo("employees", "delete");
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

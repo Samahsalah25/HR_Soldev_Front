@@ -134,7 +134,11 @@ export default function Layout() {
                 <ChevronDown className={`w-3 h-3 transition-transform ${collapsedGroups[group.label] ? "-rotate-90" : ""}`} />
               </button>
             )}
-            {!collapsedGroups[group.label] && group.items.filter(item => canSee(item.path.replace("/", "") || "dashboard")).map(({ path, icon: Icon, label }) => {
+            {!collapsedGroups[group.label] && group.items.filter(item => {
+              // احذف الـ / الأول فقط من الـ path عشان تعمل match مع الـ canSee
+              const navKey = item.path.startsWith("/") ? item.path.slice(1) : item.path;
+              return canSee(navKey);
+            }).map(({ path, icon: Icon, label }) => {
               const active = location.pathname === path;
               return (
                 <Link key={path} to={path} onClick={() => setMobileSidebarOpen(false)}

@@ -50,6 +50,7 @@ export const PERMISSION_MODULES = [
     { key: "branches", label: "الفروع والأقسام" },
     { key: "settings", label: "الإعدادات" },
     { key: "my_portal", label: "بوابتي" },
+    { key: "user_management", label: "إدارة المستخدمين" },
 ];
 
 // =============================

@@ -86,6 +86,7 @@ const PERMISSION_KEY_TO_NAV = {
   branches: "branches",
   settings: "settings",
   my_portal: "ess",
+  user_management: "user-management",
 };
 
 // Map عكسي: nav path → permissions API key
@@ -174,20 +175,23 @@ export function useRole() {
   const canSee = (path) => {
     const permKey = NAV_TO_PERMISSION_KEY[path];
 
+    // الأولوية 1: صلاحيات مخصصة للموظف
     if (hasOverrides && employeePerms) {
       if (permKey && permKey in employeePerms) {
         return employeePerms[permKey]?.is_active === true;
       }
-      return false;
+      // مسار مش في الـ employee perms — ارجع للـ role default
     }
 
+    // الأولوية 2: صلاحيات الدور من الـ API
     if (rolePerms) {
       if (permKey && permKey in rolePerms) {
         return rolePerms[permKey] === true;
       }
-      return false;
+      // المسار مش في الـ rolePerms (مثل user-management) — ارجع للـ fallback
     }
 
+    // الأولوية 3: fallback ثابت في الكود
     if (!access) return false;
     if (access.nav.includes("all")) return true;
     return access.nav.includes(path);

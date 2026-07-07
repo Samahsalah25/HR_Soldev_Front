@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Plane, CheckCircle, XCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import {
   getAllVacationRequests,
   createVacationRequest,

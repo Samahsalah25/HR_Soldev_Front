@@ -5,6 +5,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { PermissionsProvider } from '@/lib/PermissionsContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { base44 } from '@/api/base44Client';
 // Add page imports here
@@ -59,16 +60,16 @@ import { useNavigate } from "react-router-dom";
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 
-const handleLogout = async () => {
-  try {
-    await logoutUser(); // 
-  } catch (err) {
-    console.log("logout error:", err);
-  }
+  const handleLogout = async () => {
+    try {
+      await logoutUser(); // 
+    } catch (err) {
+      console.log("logout error:", err);
+    }
 
-  localStorage.removeItem("user"); 
-  navigate("/"); // أو "/"
-};
+    localStorage.removeItem("user");
+    navigate("/"); // أو "/"
+  };
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background" dir="rtl">
       <div className="max-w-md w-full mx-4 text-center space-y-6">
@@ -88,7 +89,7 @@ const handleLogout = async () => {
           </p>
         </div>
         <button
-          onClick={() =>handleLogout()}
+          onClick={() => handleLogout()}
           className="px-6 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
           تسجيل الخروج
@@ -160,51 +161,51 @@ const AuthenticatedApp = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/login-empolyee" element={<EmployeeEntry />} />
       <Route element={<ProtectedRoute />}>
-      <Route element={<Layout />}>
-      
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/home-dashboard" element={<RoleDashboard />} />
-        <Route path="/employees" element={<Employees />} />
-        <Route path="/payroll" element={<Payroll />} />
-        <Route path="/leaves" element={<Leaves />} />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/end-of-service" element={<EndOfService />} />
-        <Route path="/missions" element={<Missions />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/ess" element={<ESS />} />
-        <Route path="/branches" element={<BranchesDepartments />} />
-        <Route path="/policies" element={<Policies />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/requests" element={<EmployeeRequests />} />
-        <Route path="/meetings" element={<Meetings />} />
-        <Route path="/accounting" element={<Accounting />} />
-        <Route path="/legal" element={<Legal />} />
-        <Route path="/violations" element={<Violations />} />
-        <Route path="/recruitment" element={<Recruitment />} />
-        <Route path="/company-records" element={<CompanyRecords />} />
-        <Route path="/transfers" element={<Transfers />} />
-        <Route path="/deductions" element={<Deductions />} />
-        <Route path="/bonuses" element={<Bonuses />} />
-        <Route path="/financial-reports" element={<FinancialReports />} />
-        <Route path="/manager-dashboard" element={<ManagerDashboard />} />
-        <Route path="/permissions" element={<Permissions />} />
-        <Route path="/user-management" element={<UserManagement />} />
-        <Route path="/storage-units" element={<StorageUnits />} />
-        <Route path="/storage-bookings" element={<StorageBookings />} />
-        <Route path="/storage-dashboard" element={<StorageDashboard />} />
-        <Route path="/storage-contracts" element={<StorageContracts />} />
-        <Route path="/storage-crm" element={<StorageCRM />} />
-        <Route path="/assets" element={<AssetManagement />} />
-        <Route path="/loan-management" element={<LoanManagement />} />
-        <Route path="/termination" element={<Termination />} />
-      </Route></Route>
+        <Route element={<Layout />}>
+
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/home" element={<RoleDashboard />} />
+          <Route path="/home-dashboard" element={<RoleDashboard />} />
+          <Route path="/employees" element={<Employees />} />
+          <Route path="/payroll" element={<Payroll />} />
+          <Route path="/leaves" element={<Leaves />} />
+          <Route path="/attendance" element={<Attendance />} />
+          <Route path="/end-of-service" element={<EndOfService />} />
+          <Route path="/missions" element={<Missions />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/ess" element={<ESS />} />
+          <Route path="/branches" element={<BranchesDepartments />} />
+          <Route path="/policies" element={<Policies />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/requests" element={<EmployeeRequests />} />
+          <Route path="/meetings" element={<Meetings />} />
+          <Route path="/accounting" element={<Accounting />} />
+          <Route path="/legal" element={<Legal />} />
+          <Route path="/violations" element={<Violations />} />
+          <Route path="/recruitment" element={<Recruitment />} />
+          <Route path="/company-records" element={<CompanyRecords />} />
+          <Route path="/transfers" element={<Transfers />} />
+          <Route path="/deductions" element={<Deductions />} />
+          <Route path="/bonuses" element={<Bonuses />} />
+          <Route path="/financial-reports" element={<FinancialReports />} />
+          <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+          <Route path="/permissions" element={<Permissions />} />
+          <Route path="/user-management" element={<UserManagement />} />
+          <Route path="/storage-units" element={<StorageUnits />} />
+          <Route path="/storage-bookings" element={<StorageBookings />} />
+          <Route path="/storage-dashboard" element={<StorageDashboard />} />
+          <Route path="/storage-contracts" element={<StorageContracts />} />
+          <Route path="/storage-crm" element={<StorageCRM />} />
+          <Route path="/assets" element={<AssetManagement />} />
+          <Route path="/loan-management" element={<LoanManagement />} />
+          <Route path="/termination" element={<Termination />} />
+        </Route></Route>
       <Route path="/careers" element={<PublicJobApplication />} />
       <Route path="/storage-booking" element={<StorageBookingFlow />} />
       <Route path="/my-storage" element={<CustomerPortal />} />
       <Route path="/customer-login" element={<CustomerLogin />} />
       <Route path="/my-account" element={<MyAccount />} />
-      <Route path="/home" element={<RoleDashboard />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
@@ -215,12 +216,14 @@ function App() {
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
+      <PermissionsProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <AuthenticatedApp />
+          </Router>
+          <Toaster />
+        </QueryClientProvider>
+      </PermissionsProvider>
     </AuthProvider>
   )
 }

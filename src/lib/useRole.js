@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
-import { getCurrentUser } from '../api/authApi';
-import { getEmployeePermissions, getPermissionRoles } from '../api/permissionsApi';
-import { getEffectiveCrudPermissions } from './crudPermissions';
+/**
+ * useRole Hook
+ * ============
+ * Wrapper hook للوصول لـ PermissionsContext
+ * يستخدم نفس الصلاحيات المشتركة في كل التطبيق
+ */
+
+import { usePermissions } from './PermissionsContext';
 
 export const ROLES = {
   EMPLOYEE: "employee",
@@ -59,6 +63,7 @@ export const ROLE_ACCESS = {
   },
 };
 
+<<<<<<< Updated upstream
 // Map: permissions API key → sidebar nav path
 const PERMISSION_KEY_TO_NAV = {
   dashboard: "dashboard",
@@ -93,11 +98,17 @@ const NAV_TO_PERMISSION_KEY = Object.fromEntries(
   Object.entries(PERMISSION_KEY_TO_NAV).map(([k, v]) => [v, k])
 );
 
+=======
+>>>>>>> Stashed changes
 export function getRoleAccess(role) {
   return ROLE_ACCESS[role] || ROLE_ACCESS.employee;
 }
 
+/**
+ * Main Hook — يستخدم PermissionsContext مباشرةً
+ */
 export function useRole() {
+<<<<<<< Updated upstream
   const [role, setRole] = useState(null);
   const [user, setUser] = useState(null);
   const [employeePerms, setEmployeePerms] = useState(null);
@@ -222,4 +233,7 @@ export function useRole() {
   };
 
   return { role, user, access, loading, canSee, canDo };
+=======
+  return usePermissions();
+>>>>>>> Stashed changes
 }

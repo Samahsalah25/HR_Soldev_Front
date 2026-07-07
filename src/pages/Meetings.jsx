@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { Plus, Calendar, Clock, Users, Building, X, Save, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 
 import {
   getMeetings,
   createMeeting,
   updateMeeting,
-    deleteMeeting as apiDeleteMeeting,
+  deleteMeeting as apiDeleteMeeting,
 } from "@/api/meetingsApi";
 
 import { getEmployees } from "@/api/departmentsApi";
@@ -19,19 +18,19 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
     external_company: "", agenda: "", status: "مجدول", attendees: [], ...(meeting || {})
   });
   const [showAttendeesPopup, setShowAttendeesPopup] =
-  useState(false);
+    useState(false);
   const [saving, setSaving] = useState(false);
   const [attendeeInput, setAttendeeInput] = useState("");
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleEmpSelect = (id) => {
-  const emp = employees.find(e => e.id === Number(id));
+    const emp = employees.find(e => e.id === Number(id));
 
-  if (emp) {
-    set("assigned_employee_id", emp.id);
-    set("assigned_employee_name", emp.name);
-  }
-};
+    if (emp) {
+      set("assigned_employee_id", emp.id);
+      set("assigned_employee_name", emp.name);
+    }
+  };
 
   const addAttendee = () => {
     if (attendeeInput.trim()) { set("attendees", [...(form.attendees || []), attendeeInput.trim()]); setAttendeeInput(""); }
@@ -39,43 +38,43 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
 
   const removeAttendee = (i) => set("attendees", form.attendees.filter((_, idx) => idx !== i));
 
- const handleSave = async () => {
-  setSaving(true);
+  const handleSave = async () => {
+    setSaving(true);
 
-  const payload = {
-    name: form.title,
-    meeting_type: form.type === "داخلي" ? "internal" : "external",
-    state:
-      form.status === "مجدول"
-        ? "scheduled"
-        : form.status === "مكتمل"
-        ? "complete"
-        : "cancelled",
+    const payload = {
+      name: form.title,
+      meeting_type: form.type === "داخلي" ? "internal" : "external",
+      state:
+        form.status === "مجدول"
+          ? "scheduled"
+          : form.status === "مكتمل"
+            ? "complete"
+            : "cancelled",
 
-    date: form.date,
-    time: form.time,
-    duration: form.duration_minutes,
-    location: form.location,
+      date: form.date,
+      time: form.time,
+      duration: form.duration_minutes,
+      location: form.location,
 
-    organizer_id: form.assigned_employee_id || null,
+      organizer_id: form.assigned_employee_id || null,
 
-    attendee_ids: (form.attendees || []).map((a) => a.id),
+      attendee_ids: (form.attendees || []).map((a) => a.id),
 
-    description: form.agenda,
-  };
+      description: form.agenda,
+    };
 
-  try {
-    if (meeting?.id) {
-      await updateMeeting(meeting.id, payload);
-    } else {
-      await createMeeting(payload);
+    try {
+      if (meeting?.id) {
+        await updateMeeting(meeting.id, payload);
+      } else {
+        await createMeeting(payload);
+      }
+
+      onSave();
+    } finally {
+      setSaving(false);
     }
-
-    onSave();
-  } finally {
-    setSaving(false);
-  }
-};
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
       <div className="bg-card rounded-2xl border border-border w-full max-w-xl shadow-2xl max-h-[90vh] flex flex-col">
@@ -137,17 +136,17 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">تعيين موظف مسؤول</label>
             <select
-  value={form.assigned_employee_id}
-  onChange={e => handleEmpSelect(e.target.value)}
-  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none"
->
-  <option value="">بدون تعيين</option>
-  {employees.map(e => (
-    <option key={e.id} value={e.id}>
-      {e.name || "بدون اسم"}
-    </option>
-  ))}
-</select>
+              value={form.assigned_employee_id}
+              onChange={e => handleEmpSelect(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none"
+            >
+              <option value="">بدون تعيين</option>
+              {employees.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.name || "بدون اسم"}
+                </option>
+              ))}
+            </select>
           </div>
           {/* <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">الحضور</label>
@@ -166,50 +165,50 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
               ))}
             </div>
           </div> */}
-    <div className="space-y-2">
-  <label className="text-sm font-medium text-foreground">
-    الحضور
-  </label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              الحضور
+            </label>
 
-  <button
-    type="button"
-    onClick={() => setShowAttendeesPopup(true)}
-    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm text-right hover:bg-muted"
-  >
-    + إضافة حضور
-  </button>
+            <button
+              type="button"
+              onClick={() => setShowAttendeesPopup(true)}
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm text-right hover:bg-muted"
+            >
+              + إضافة حضور
+            </button>
 
-  <div className="flex flex-wrap gap-2 mt-3">
-    {(form.attendees || []).map((emp, index) => (
-      <div
-        key={emp.id}
-        className="flex items-center gap-2 px-2 py-1 bg-secondary/10 rounded-full"
-      >
-        <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
-          {emp.name?.slice(0, 1)}
-        </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {(form.attendees || []).map((emp, index) => (
+                <div
+                  key={emp.id}
+                  className="flex items-center gap-2 px-2 py-1 bg-secondary/10 rounded-full"
+                >
+                  <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+                    {emp.name?.slice(0, 1)}
+                  </div>
 
-        <span className="text-xs text-secondary">
-          {emp.name}
-        </span>
+                  <span className="text-xs text-secondary">
+                    {emp.name}
+                  </span>
 
-        <button
-          type="button"
-          onClick={() =>
-            set(
-              "attendees",
-              form.attendees.filter(
-                (_, i) => i !== index
-              )
-            )
-          }
-        >
-          <X className="w-3 h-3 text-red-500" />
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      set(
+                        "attendees",
+                        form.attendees.filter(
+                          (_, i) => i !== index
+                        )
+                      )
+                    }
+                  >
+                    <X className="w-3 h-3 text-red-500" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">جدول الأعمال</label>
             <textarea value={form.agenda} onChange={e => set("agenda", e.target.value)} rows={3}
@@ -225,94 +224,93 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
         </div>
       </div>
       {showAttendeesPopup && (
-  <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-    <div className="bg-card w-full max-w-md rounded-2xl border border-border p-5">
-      
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-foreground">
-          اختيار الحضور
-        </h3>
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-md rounded-2xl border border-border p-5">
 
-        <button
-          onClick={() =>
-            setShowAttendeesPopup(false)
-          }
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-foreground">
+                اختيار الحضور
+              </h3>
 
-      <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
-        {employees.map((emp) => {
-          const selected = (
-            form.attendees || []
-          ).some((a) => a.id === emp.id);
-
-          return (
-            <button
-              key={emp.id}
-              type="button"
-              onClick={() => {
-                if (selected) {
-                  set(
-                    "attendees",
-                    form.attendees.filter(
-                      (a) => a.id !== emp.id
-                    )
-                  );
-                } else {
-                  set("attendees", [
-                    ...(form.attendees || []),
-                    {
-                      id: emp.id,
-                      name: emp.full_name_ar,
-                    },
-                  ]);
+              <button
+                onClick={() =>
+                  setShowAttendeesPopup(false)
                 }
-              }}
-              className={`p-3 rounded-xl border transition-all text-center ${
-                selected
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:bg-muted"
-              }`}
-            >
-              <div className="w-14 h-14 mx-auto rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold mb-2">
-                {emp.name
-                  ?.split(" ")
-                  .slice(0, 2)
-                  .map((n) => n[0])
-                  .join("")}
-              </div>
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <p className="text-sm font-medium text-foreground">
-                {emp.name}
-              </p>
+            <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
+              {employees.map((emp) => {
+                const selected = (
+                  form.attendees || []
+                ).some((a) => a.id === emp.id);
 
-              {emp.department_name && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {emp.department_name}
-                </p>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                return (
+                  <button
+                    key={emp.id}
+                    type="button"
+                    onClick={() => {
+                      if (selected) {
+                        set(
+                          "attendees",
+                          form.attendees.filter(
+                            (a) => a.id !== emp.id
+                          )
+                        );
+                      } else {
+                        set("attendees", [
+                          ...(form.attendees || []),
+                          {
+                            id: emp.id,
+                            name: emp.full_name_ar,
+                          },
+                        ]);
+                      }
+                    }}
+                    className={`p-3 rounded-xl border transition-all text-center ${selected
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted"
+                      }`}
+                  >
+                    <div className="w-14 h-14 mx-auto rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold mb-2">
+                      {emp.name
+                        ?.split(" ")
+                        .slice(0, 2)
+                        .map((n) => n[0])
+                        .join("")}
+                    </div>
 
-      <div className="flex justify-end mt-5">
-        <button
-          type="button"
-          onClick={() =>
-            setShowAttendeesPopup(false)
-          }
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
-        >
-          تم
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-    
+                    <p className="text-sm font-medium text-foreground">
+                      {emp.name}
+                    </p>
+
+                    {emp.department_name && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {emp.department_name}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end mt-5">
+              <button
+                type="button"
+                onClick={() =>
+                  setShowAttendeesPopup(false)
+                }
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm"
+              >
+                تم
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -326,7 +324,7 @@ function MiniCalendar({ meetings, onSelectDate, selectedDate }) {
   const cells = Array(firstDay).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
   const meetingDates = new Set(meetings.map(m => m.date));
   const DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-  const MONTHS_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 
   return (
     <div className="bg-card rounded-xl border border-border p-4">
@@ -361,7 +359,7 @@ function MiniCalendar({ meetings, onSelectDate, selectedDate }) {
 export default function Meetings() {
   const { user } = useRole();
   const canCreate = canDo(user, "meetings", "create");
-  const canEdit   = canDo(user, "meetings", "edit");
+  const canEdit = canDo(user, "meetings", "edit");
   const canDelete = canDo(user, "meetings", "delete");
   const [meetings, setMeetings] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -369,51 +367,51 @@ export default function Meetings() {
   const [showForm, setShowForm] = useState(false);
   const [editMeeting, setEditMeeting] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
-// 👇 فوق component
-const normalizeMeetings = (data) =>
-  data.map(m => ({
-    id: m.id,
-    title: m.name,
-    type: m.meeting_type === "external" ? "خارجي" : "داخلي",
-    status:
-      m.state === "scheduled"
-        ? "مجدول"
-        : m.state === "complete"
-        ? "مكتمل"
-        : "ملغى",
+  // 👇 فوق component
+  const normalizeMeetings = (data) =>
+    data.map(m => ({
+      id: m.id,
+      title: m.name,
+      type: m.meeting_type === "external" ? "خارجي" : "داخلي",
+      status:
+        m.state === "scheduled"
+          ? "مجدول"
+          : m.state === "complete"
+            ? "مكتمل"
+            : "ملغى",
 
-    date: m.date,
-    time: m.time,
-    duration_minutes: m.duration,
+      date: m.date,
+      time: m.time,
+      duration_minutes: m.duration,
 
-    location: m.location || "",
+      location: m.location || "",
 
-    assigned_employee_name: m.organizer_name || "",
-    assigned_employee_id: m.organizer_id || "",
+      assigned_employee_name: m.organizer_name || "",
+      assigned_employee_id: m.organizer_id || "",
 
-    attendees: m.attendees || [],
-  }));
+      attendees: m.attendees || [],
+    }));
 
-const load = async () => {
-  try {
-    setLoading(true);
+  const load = async () => {
+    try {
+      setLoading(true);
 
-    const [ms, emps] = await Promise.all([
-      getMeetings(),
-      getEmployees(),
-    ]);
+      const [ms, emps] = await Promise.all([
+        getMeetings(),
+        getEmployees(),
+      ]);
 
-   setMeetings(normalizeMeetings(ms?.data || ms));
-    setEmployees(emps?.data || emps);
-  } finally {
-    setLoading(false);
-  }
-};
+      setMeetings(normalizeMeetings(ms?.data || ms));
+      setEmployees(emps?.data || emps);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => { load(); }, []);
 
   const deleteMeeting = async (id) => {
-    if (confirm("حذف هذا الاجتماع؟")) {  await apiDeleteMeeting(id); load(); }
+    if (confirm("حذف هذا الاجتماع؟")) { await apiDeleteMeeting(id); load(); }
   };
 
   const today = new Date().toISOString().slice(0, 10);
@@ -488,8 +486,8 @@ const load = async () => {
             <h3 className="font-semibold text-sm text-secondary mb-2">اجتماعات الأسبوع</h3>
             {weekMeetings.length === 0 ? <p className="text-xs text-muted-foreground">لا توجد اجتماعات لباقي الأسبوع</p>
               : weekMeetings.slice(0, 3).map(m => <div key={m.id} className="text-xs py-1.5 border-b border-border text-muted-foreground last:border-0">
-                  <span className="font-medium text-foreground">{m.title}</span> — {m.date} {m.time && `(${m.time})`}
-                </div>)}
+                <span className="font-medium text-foreground">{m.title}</span> — {m.date} {m.time && `(${m.time})`}
+              </div>)}
           </div>
         </div>
 

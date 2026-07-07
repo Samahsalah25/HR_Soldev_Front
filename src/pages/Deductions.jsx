@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { TrendingDown, Plus, X, Save, Search } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import { getEmployees } from "@/api/departmentsApi";
 import {
   getDeductions,
@@ -47,15 +46,15 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
- const handleEmpSelect = (id) => {
-  const emp = employees.find(e => String(e.id) === String(id));
+  const handleEmpSelect = (id) => {
+    const emp = employees.find(e => String(e.id) === String(id));
 
-  if (emp) {
-    set("employee_id", id);
-    set("employee_name", emp.full_name_ar || emp.name || "");
-    set("department", emp.department || emp.department_name || "");
-  }
-};
+    if (emp) {
+      set("employee_id", id);
+      set("employee_name", emp.full_name_ar || emp.name || "");
+      set("department", emp.department || emp.department_name || "");
+    }
+  };
 
   const handleViolationSelect = (vid) => {
     const v = violations.find(x => x.id === vid);
@@ -66,26 +65,26 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
     }
   };
 
- const handleSave = async () => {
-  try {
-    setSaving(true);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
 
-    await createDeduction({
-      employee: form.employee_id,
-      deduction_type: form.deduction_type,
-      date: form.month,
-      amount: form.amount,
-      reason: form.reason,
-      state: "قيد الاعتماد",
-    });
+      await createDeduction({
+        employee: form.employee_id,
+        deduction_type: form.deduction_type,
+        date: form.month,
+        amount: form.amount,
+        reason: form.reason,
+        state: "قيد الاعتماد",
+      });
 
-    onSave();
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setSaving(false);
-  }
-};
+      onSave();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const eligibleViolations = violations.filter(v => v.penalty === "خصم راتب" && v.status === "مؤكدة");
 
@@ -122,7 +121,7 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
               <label className="text-sm font-medium">نوع الخصم</label>
               <select value={form.deduction_type} onChange={e => set("deduction_type", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                {["خصم غياب","خصم تأخير","خصم مخالفة","خصم قسط سلفة","خصم تأميني","خصم إداري","أخرى"].map(t => <option key={t}>{t}</option>)}
+                {["خصم غياب", "خصم تأخير", "خصم مخالفة", "خصم قسط سلفة", "خصم تأميني", "خصم إداري", "أخرى"].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
@@ -156,7 +155,7 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
 
 export default function Deductions() {
   const { user } = useRole();
-  const canCreate  = canDo(user, "deductions", "create");
+  const canCreate = canDo(user, "deductions", "create");
   const canApprove = canDo(user, "deductions", "approve");
   const [deductions, setDeductions] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -167,100 +166,100 @@ export default function Deductions() {
   const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState("");
 
-const load = async () => {
-  try {
-    setLoading(true);
+  const load = async () => {
+    try {
+      setLoading(true);
 
-    const [ds, emps] = await Promise.all([
-      getDeductions(),
-      getEmployees(),
-    ]);
+      const [ds, emps] = await Promise.all([
+        getDeductions(),
+        getEmployees(),
+      ]);
 
-    // normalize deductions
-    const deductionsData = ds?.data ?? ds ?? [];
-const normalizedDeductions = deductionsData.map((d) => ({
-  id: d.id,
-  employee_name: d.employee_name,
-  department: d.department,
-  deduction_type: d.deduction_type,
-  month: d.month_of_deduction,
-  amount: d.amount,
-  reason: d.reason,
+      // normalize deductions
+      const deductionsData = ds?.data ?? ds ?? [];
+      const normalizedDeductions = deductionsData.map((d) => ({
+        id: d.id,
+        employee_name: d.employee_name,
+        department: d.department,
+        deduction_type: d.deduction_type,
+        month: d.month_of_deduction,
+        amount: d.amount,
+        reason: d.reason,
 
-  // مهم جداً
-  raw_state: d.state,
+        // مهم جداً
+        raw_state: d.state,
 
-  // عرض عربي فقط
-  status: STATE_LABELS[d.state] || d.state,
-}));
+        // عرض عربي فقط
+        status: STATE_LABELS[d.state] || d.state,
+      }));
 
-    setDeductions(normalizedDeductions);
+      setDeductions(normalizedDeductions);
 
-    // normalize employees
-    const employeesData = emps?.data ?? emps ?? [];
+      // normalize employees
+      const employeesData = emps?.data ?? emps ?? [];
 
-    const normalizedEmployees = employeesData.map((e) => ({
-      id: e.id,
-      full_name_ar: e.name,
-      department: e.department_name,
-      department_id: e.department_id,
-    }));
+      const normalizedEmployees = employeesData.map((e) => ({
+        id: e.id,
+        full_name_ar: e.name,
+        department: e.department_name,
+        department_id: e.department_id,
+      }));
 
-    setEmployees(normalizedEmployees);
+      setEmployees(normalizedEmployees);
 
-  } catch (err) {
-    console.error("LOAD DEDUCTIONS ERROR:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+    } catch (err) {
+      console.error("LOAD DEDUCTIONS ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => { load(); }, []);
 
- const approve = async (id) => {
-  await updateDeduction(id, {
-    state: "approved",
-  });
-  load();
-};
- const reject = async (id) => {
-  await updateDeduction(id, {
-    state: "rejected",
-  });
-  load();
-};
- const apply = async (id) => {
-  await updateDeduction(id, {
-    state: "paid",
-  });
-  load();
-};
+  const approve = async (id) => {
+    await updateDeduction(id, {
+      state: "approved",
+    });
+    load();
+  };
+  const reject = async (id) => {
+    await updateDeduction(id, {
+      state: "rejected",
+    });
+    load();
+  };
+  const apply = async (id) => {
+    await updateDeduction(id, {
+      state: "paid",
+    });
+    load();
+  };
 
- const pending = deductions.filter(
-  d => d.status === "قيد الاعتماد"
-);
-
-const filtered = deductions
-  .filter(d =>
-    activeTab === "pending"
-      ? d.status === "قيد الاعتماد"
-      : true
-  )
-  .filter(d => !filterMonth || d.month === filterMonth)
-  .filter(d =>
-    !search ||
-    d.employee_name?.includes(search) ||
-    d.deduction_type?.includes(search)
+  const pending = deductions.filter(
+    d => d.status === "قيد الاعتماد"
   );
 
-const totals = {
-  pending: deductions.filter(d => d.status === "قيد الاعتماد").length,
+  const filtered = deductions
+    .filter(d =>
+      activeTab === "pending"
+        ? d.status === "قيد الاعتماد"
+        : true
+    )
+    .filter(d => !filterMonth || d.month === filterMonth)
+    .filter(d =>
+      !search ||
+      d.employee_name?.includes(search) ||
+      d.deduction_type?.includes(search)
+    );
 
-  approved: deductions.filter(d => d.status === "معتمد").length,
+  const totals = {
+    pending: deductions.filter(d => d.status === "قيد الاعتماد").length,
 
-  applied: deductions
-    .filter(d => d.status === "مطبَّق")
-    .reduce((s, d) => s + (Number(d.amount) || 0), 0),
-};
+    approved: deductions.filter(d => d.status === "معتمد").length,
+
+    applied: deductions
+      .filter(d => d.status === "مطبَّق")
+      .reduce((s, d) => s + (Number(d.amount) || 0), 0),
+  };
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -323,37 +322,37 @@ const totals = {
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-muted/30 border-b border-border">
-            {["الموظف","نوع الخصم","الشهر","المبلغ","السبب","الحالة","الإجراءات"].map(h => (
+            {["الموظف", "نوع الخصم", "الشهر", "المبلغ", "السبب", "الحالة", "الإجراءات"].map(h => (
               <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
             ))}
           </tr></thead>
           <tbody>
             {loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد خصومات</td></tr>
-              : filtered.map(d => (
-                <tr key={d.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${d.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-foreground">{d.employee_name}</p>
-                    <p className="text-xs text-muted-foreground">{d.department}</p>
-                  </td>
-                  <td className="px-4 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{DEDUCTION_TYPE_LABELS[d.deduction_type] || d.deduction_type}</span></td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{d.month}</td>
-                  <td className="px-4 py-3 font-bold text-red-600">{d.amount?.toLocaleString("ar-SA")} ر.س</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground max-w-40 truncate">{d.reason}</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[d.raw_state]}`}>{d.status}</span></td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      {d.status === "قيد الاعتماد" && canApprove && <>
-                        <button onClick={() => approve(d.id)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 font-medium">اعتماد</button>
-                        <button onClick={() => reject(d.id)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200 font-medium">رفض</button>
-                      </>}
-                      {d.status === "معتمد" && canApprove && (
-                        <button onClick={() => apply(d.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium">تطبيق</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                : filtered.map(d => (
+                  <tr key={d.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${d.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-foreground">{d.employee_name}</p>
+                      <p className="text-xs text-muted-foreground">{d.department}</p>
+                    </td>
+                    <td className="px-4 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{DEDUCTION_TYPE_LABELS[d.deduction_type] || d.deduction_type}</span></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{d.month}</td>
+                    <td className="px-4 py-3 font-bold text-red-600">{d.amount?.toLocaleString("ar-SA")} ر.س</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-40 truncate">{d.reason}</td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[d.raw_state]}`}>{d.status}</span></td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        {d.status === "قيد الاعتماد" && canApprove && <>
+                          <button onClick={() => approve(d.id)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 font-medium">اعتماد</button>
+                          <button onClick={() => reject(d.id)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200 font-medium">رفض</button>
+                        </>}
+                        {d.status === "معتمد" && canApprove && (
+                          <button onClick={() => apply(d.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium">تطبيق</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
           </tbody>
         </table>
       </div>

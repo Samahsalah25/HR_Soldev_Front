@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { Gift, Plus, X, Save, DollarSign } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import {
   getAdditions,
   createAddition,
   updateAddition,
 } from "@/api/additionsApi";
 import {
-getEmployees,getDepartments
+  getEmployees, getDepartments
 } from "@/api/departmentsApi";
 
 const STATUS_COLORS = {
@@ -28,76 +27,76 @@ function BonusForm({ employees, departments, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-const handleEmpSelect = (id) => {
-  const emp = employees.find(
-    (e) => e.id === Number(id)
-  );
-
-  if (emp) {
-    set("employee_id", emp.id);
-
-    set(
-      "employee_name",
-      emp.full_name_ar
+  const handleEmpSelect = (id) => {
+    const emp = employees.find(
+      (e) => e.id === Number(id)
     );
 
-    set(
-      "department",
-      emp.department_id || ""
-    );
-  }
-};
- const handleSave = async () => {
-  try {
-    setSaving(true);
+    if (emp) {
+      set("employee_id", emp.id);
 
-    const payload = {
-      add_to:
-        form.scope === "فردية"
-          ? "employee"
-          : form.scope === "قسم"
-          ? "department"
-          : "all",
+      set(
+        "employee_name",
+        emp.full_name_ar
+      );
 
-      employee:
-        form.scope === "فردية"
-          ? Number(form.employee_id)
-          : null,
+      set(
+        "department",
+        emp.department_id || ""
+      );
+    }
+  };
+  const handleSave = async () => {
+    try {
+      setSaving(true);
 
-      department:
-        form.scope === "قسم"
-          ? Number(form.department)
-          : null,
+      const payload = {
+        add_to:
+          form.scope === "فردية"
+            ? "employee"
+            : form.scope === "قسم"
+              ? "department"
+              : "all",
 
-      addition_type:
-        form.bonus_type,
+        employee:
+          form.scope === "فردية"
+            ? Number(form.employee_id)
+            : null,
 
-      date: form.period,
+        department:
+          form.scope === "قسم"
+            ? Number(form.department)
+            : null,
 
-      amount: Number(form.amount),
+        addition_type:
+          form.bonus_type,
 
-      reason: form.reason,
+        date: form.period,
 
-      state: "under_approval",
-    };
+        amount: Number(form.amount),
 
-    console.log("PAYLOAD =>", payload);
+        reason: form.reason,
 
-    await createAddition(payload);
+        state: "under_approval",
+      };
 
-    onSave();
+      console.log("PAYLOAD =>", payload);
 
-  } catch (err) {
-    console.error(
-      "CREATE BONUS ERROR",
-      err?.response?.data || err
-    );
+      await createAddition(payload);
 
-    alert("فشل إنشاء المكافأة");
-  } finally {
-    setSaving(false);
-  }
-};
+      onSave();
+
+    } catch (err) {
+      console.error(
+        "CREATE BONUS ERROR",
+        err?.response?.data || err
+      );
+
+      alert("فشل إنشاء المكافأة");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -110,7 +109,7 @@ const handleEmpSelect = (id) => {
           <div className="space-y-1.5">
             <label className="text-sm font-medium">نطاق المكافأة *</label>
             <div className="flex gap-2">
-              {["فردية","قسم","الشركة"].map(s => (
+              {["فردية", "قسم", "الشركة"].map(s => (
                 <button key={s} onClick={() => set("scope", s)}
                   className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${form.scope === s ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
                   {s === "فردية" ? "👤 فردية" : s === "قسم" ? "🏢 قسم" : "🏭 الشركة"}
@@ -134,20 +133,20 @@ const handleEmpSelect = (id) => {
               <select value={form.department} onChange={e => { set("department", e.target.value); set("employee_id", ""); set("employee_name", ""); }}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
                 <option value="">اختر القسم...</option>
-             {departments.map((d) => (
-  <option
-    key={d.id}
-    value={d.id}
-  >
-    {d.name} (
-    {
-      employees.filter(
-        (e) =>
-          e.department_id === d.id
-      ).length
-    } موظف)
-  </option>
-))}
+                {departments.map((d) => (
+                  <option
+                    key={d.id}
+                    value={d.id}
+                  >
+                    {d.name} (
+                    {
+                      employees.filter(
+                        (e) =>
+                          e.department_id === d.id
+                      ).length
+                    } موظف)
+                  </option>
+                ))}
               </select>
             </div>
           )}
@@ -161,7 +160,7 @@ const handleEmpSelect = (id) => {
               <label className="text-sm font-medium">نوع المكافأة</label>
               <select value={form.bonus_type} onChange={e => set("bonus_type", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                {["مكافأة أداء","مكافأة إنجاز","مكافأة سنوية","مكافأة رمضان","مكافأة عيد","مكافأة مشروع","أخرى"].map(t => <option key={t}>{t}</option>)}
+                {["مكافأة أداء", "مكافأة إنجاز", "مكافأة سنوية", "مكافأة رمضان", "مكافأة عيد", "مكافأة مشروع", "أخرى"].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
@@ -174,20 +173,20 @@ const handleEmpSelect = (id) => {
             <label className="text-sm font-medium">المبلغ (ريال) *</label>
             <input type="number" min={0} value={form.amount} onChange={e => set("amount", +e.target.value)}
               className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-         {form.scope !== "فردية" && form.amount > 0 && (
-  <p className="text-xs text-muted-foreground">
-    الإجمالي: {(
-      (
-        form.scope === "قسم"
-          ? employees.filter(
-              (e) =>
-                e.department_id === Number(form.department)
-            ).length
-          : employees.length
-      ) * form.amount
-    )?.toLocaleString("ar-SA")} ر.س
-  </p>
-)}
+            {form.scope !== "فردية" && form.amount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                الإجمالي: {(
+                  (
+                    form.scope === "قسم"
+                      ? employees.filter(
+                        (e) =>
+                          e.department_id === Number(form.department)
+                      ).length
+                      : employees.length
+                  ) * form.amount
+                )?.toLocaleString("ar-SA")} ر.س
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">السبب *</label>
@@ -219,7 +218,7 @@ const handleEmpSelect = (id) => {
 
 export default function Bonuses() {
   const { user } = useRole();
-  const canCreate  = canDo(user, "bonuses", "create");
+  const canCreate = canDo(user, "bonuses", "create");
   const canApprove = canDo(user, "bonuses", "approve");
   const [bonuses, setBonuses] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -229,177 +228,181 @@ export default function Bonuses() {
   const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState("");
 
-const load = async () => {
-  try {
-    setLoading(true);
+  const load = async () => {
+    try {
+      setLoading(true);
 
-    const [
-      additionsRes,
-      employeesRes,
-      departmentsRes,
-    ] = await Promise.all([
-      getAdditions(),
-      getEmployees(),
-      getDepartments(),
-    ]);
+      const [
+        additionsRes,
+        employeesRes,
+        departmentsRes,
+      ] = await Promise.all([
+        getAdditions(),
+        getEmployees(),
+        getDepartments(),
+      ]);
 
-    // =========================
-    // BONUSES
-    // =========================
-    const bonusesData =
-      additionsRes?.data || [];
+      // =========================
+      // BONUSES
+      // =========================
+      const bonusesData =
+        additionsRes?.data || [];
 
-    const normalizedBonuses =
-      bonusesData.map((b) => ({
-        id: b.id,
+      const normalizedBonuses =
+        bonusesData.map((b) => ({
+          id: b.id,
 
-        employee_id: b.employee_id,
-        employee_name: b.employee_name,
+          employee_id: b.employee_id,
+          employee_name: b.employee_name,
 
-        department_id: b.department_id,
-        department: b.department_name,
+          department_id: b.department_id,
+          department: b.department_name,
 
-        bonus_type:
-          b.addition_type_arabic ||
-          b.addition_type,
+          bonus_type:
+            b.addition_type_arabic ||
+            b.addition_type,
 
-        scope:
-          b.add_to === "employee"
-            ? "فردية"
-            : b.add_to === "department"
-            ? "قسم"
-            : "الشركة",
+          scope:
+            b.add_to === "employee"
+              ? "فردية"
+              : b.add_to === "department"
+                ? "قسم"
+                : "الشركة",
 
-        amount: b.amount,
+          amount: b.amount,
 
-        reason: b.reason,
+          reason: b.reason,
 
-        period: b.date,
+          period: b.date,
 
-        status: b.state_arabic,
+          status: b.state_arabic,
 
-        raw_state: b.state,
+          raw_state: b.state,
 
-        approved_by: b.approved_by_name,
+          approved_by: b.approved_by_name,
 
-        approval_date: b.approve_date,
-      }));
+          approval_date: b.approve_date,
+        }));
 
-    setBonuses(normalizedBonuses);
+      setBonuses(normalizedBonuses);
 
-    // =========================
-    // EMPLOYEES
-    // =========================
-    const employeesData =
-      employeesRes?.data || [];
+      // =========================
+      // EMPLOYEES
+      // =========================
+      const employeesData =
+        employeesRes?.data || [];
 
-    const normalizedEmployees =
-      employeesData.map((e) => ({
-        id: e.id,
+      const normalizedEmployees =
+        employeesData.map((e) => ({
+          id: e.id,
 
-        full_name_ar:
-          e.name,
+          full_name_ar:
+            e.name,
 
-        department:
-          e.department_name,
+          department:
+            e.department_name,
 
-        department_id:
-          e.department_id,
+          department_id:
+            e.department_id,
 
-        employee_number:
-          e.employee_number,
+          employee_number:
+            e.employee_number,
 
-        job_title:
-          e.job_title,
-      }));
+          job_title:
+            e.job_title,
+        }));
 
-    setEmployees(
-      normalizedEmployees
-    );
+      setEmployees(
+        normalizedEmployees
+      );
 
-    // =========================
-    // DEPARTMENTS
-    // =========================
-    const departmentsData =
-      departmentsRes?.data || [];
+      // =========================
+      // DEPARTMENTS
+      // =========================
+      const departmentsData =
+        departmentsRes?.data || [];
 
-    const normalizedDepartments =
-      departmentsData.map((d) => ({
-        id: d.id,
+      const normalizedDepartments =
+        departmentsData.map((d) => ({
+          id: d.id,
 
-        name:
-          d.name_ar ||
-          d.name,
+          name:
+            d.name_ar ||
+            d.name,
 
-        english_name:
-          d.name,
+          english_name:
+            d.name,
 
-        total_employee:
-          d.total_employee,
-      }));
+          total_employee:
+            d.total_employee,
+        }));
 
-    setDepartments(
-      normalizedDepartments
-    );
+      setDepartments(
+        normalizedDepartments
+      );
 
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => { load(); }, []);
 
   const approve = async (id) => {
     const u = await base44.auth.me();
-await updateAddition(id, {
-  state: "approved",
-});
+    await updateAddition(id, {
+      state: "approved",
+    });
     load();
   };
-  const reject = async (id) => { await await updateAddition(id, {
-  state: "rejected",
-});; load(); };
-  const pay = async (id) => { await updateAddition(id, {
-  state: "paid",
-}); load(); };
+  const reject = async (id) => {
+    await await updateAddition(id, {
+      state: "rejected",
+    });; load();
+  };
+  const pay = async (id) => {
+    await updateAddition(id, {
+      state: "paid",
+    }); load();
+  };
 
- const pending = bonuses.filter(
-  b => b.raw_state === "under_approval"
-);
-
-const displayed =
-  (activeTab === "pending"
-    ? pending
-    : bonuses
-  ).filter(
-    b =>
-      !filterMonth ||
-      b.period === filterMonth
+  const pending = bonuses.filter(
+    b => b.raw_state === "under_approval"
   );
-console.log(
-  bonuses.map(b => ({
-    id: b.id,
-    raw_state: b.raw_state,
-    amount: b.amount,
-  }))
-);
-const totals = {
-  pending: pending.length,
 
-  approved: bonuses.filter(
-    b => b.raw_state === "approved"
-  ).length,
+  const displayed =
+    (activeTab === "pending"
+      ? pending
+      : bonuses
+    ).filter(
+      b =>
+        !filterMonth ||
+        b.period === filterMonth
+    );
+  console.log(
+    bonuses.map(b => ({
+      id: b.id,
+      raw_state: b.raw_state,
+      amount: b.amount,
+    }))
+  );
+  const totals = {
+    pending: pending.length,
 
-  paid: bonuses
-    .filter(
-      b => b.raw_state === "paid"
-    )
-    .reduce(
-      (s, b) => s + (b.amount || 0),
-      0
-    ),
-};
+    approved: bonuses.filter(
+      b => b.raw_state === "approved"
+    ).length,
+
+    paid: bonuses
+      .filter(
+        b => b.raw_state === "paid"
+      )
+      .reduce(
+        (s, b) => s + (b.amount || 0),
+        0
+      ),
+  };
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -457,37 +460,37 @@ const totals = {
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-muted/30 border-b border-border">
-            {["الموظف","نوع المكافأة","النطاق","الفترة","المبلغ","الحالة","الإجراءات"].map(h => (
+            {["الموظف", "نوع المكافأة", "النطاق", "الفترة", "المبلغ", "الحالة", "الإجراءات"].map(h => (
               <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
             ))}
           </tr></thead>
           <tbody>
             {loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : displayed.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مكافآت</td></tr>
-              : displayed.map(b => (
-                <tr key={b.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${b.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-foreground">{b.employee_name || "—"}</p>
-                    <p className="text-xs text-muted-foreground">{b.department}</p>
-                  </td>
-                  <td className="px-4 py-3"><span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{b.bonus_type}</span></td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{b.scope}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{b.period}</td>
-                  <td className="px-4 py-3 font-bold text-green-600">{b.amount?.toLocaleString("ar-SA")} ر.س</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[b.status]}`}>{b.status}</span></td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      {b.status === "قيد الاعتماد" && canApprove && <>
-                        <button onClick={() => approve(b.id)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 font-medium">اعتماد</button>
-                        <button onClick={() => reject(b.id)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200 font-medium">رفض</button>
-                      </>}
-                      {b.status === "معتمدة" && canApprove && (
-                        <button onClick={() => pay(b.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium flex items-center gap-1"><DollarSign className="w-3 h-3" />صرف</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                : displayed.map(b => (
+                  <tr key={b.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${b.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-foreground">{b.employee_name || "—"}</p>
+                      <p className="text-xs text-muted-foreground">{b.department}</p>
+                    </td>
+                    <td className="px-4 py-3"><span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{b.bonus_type}</span></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{b.scope}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{b.period}</td>
+                    <td className="px-4 py-3 font-bold text-green-600">{b.amount?.toLocaleString("ar-SA")} ر.س</td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[b.status]}`}>{b.status}</span></td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        {b.status === "قيد الاعتماد" && canApprove && <>
+                          <button onClick={() => approve(b.id)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 font-medium">اعتماد</button>
+                          <button onClick={() => reject(b.id)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200 font-medium">رفض</button>
+                        </>}
+                        {b.status === "معتمدة" && canApprove && (
+                          <button onClick={() => pay(b.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium flex items-center gap-1"><DollarSign className="w-3 h-3" />صرف</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
           </tbody>
         </table>
       </div>

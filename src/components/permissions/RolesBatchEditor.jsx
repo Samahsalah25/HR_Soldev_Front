@@ -5,8 +5,8 @@ import {
   updateRolePermissions,
   PERMISSION_MODULES,
 } from "@/api/permissionsApi";
+import { usePermissions } from "@/lib/PermissionsContext";
 
-// القيم بالظبط كما يرجعها الـ API في data keys
 const ROLE_OPTIONS = [
   { value: "Admin", label: "مدير النظام", color: "bg-red-100 text-red-700" },
   { value: "CEO", label: "الرئيس التنفيذي (CEO)", color: "bg-green-100 text-green-700" },
@@ -17,38 +17,59 @@ const ROLE_OPTIONS = [
   { value: "Employee", label: "موظف", color: "bg-gray-100 text-gray-700" },
 ];
 
+// الـ keys اللي الـ Backend مش بيحفظها
+const BACKEND_UNSUPPORTED_KEYS = new Set([
+  "home", "accounting", "loan_management", "user_management",
+  "storage_dashboard", "storage_units", "storage_bookings",
+  "storage_contracts", "storage_crm",
+]);
+
+// localStorage key لحفظ قيم الـ unsupported keys
+const LS_KEY = "rolePermsOverrides";
+
+function loadOverridesFromStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveOverridesToStorage(overrides) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(overrides));
+  } catch { /* ignore */ }
+}
+
 function buildEmptyPerms() {
   const perms = {};
   PERMISSION_MODULES.forEach((m) => { perms[m.key] = false; });
   return perms;
 }
 
-// يحول الـ API response لـ map: { "Admin": { dashboard: true, ... }, ... }
-// الـ response شكله: { success: true, data: { Admin: {...}, HR: {...}, ... } }
+// merge الـ API response مع كل الـ modules
+function mergeWithAllModules(apiPerms) {
+  return { ...buildEmptyPerms(), ...apiPerms };
+}
+
+// parse الـ API response
 function parseRolesResponse(data) {
   const map = {};
-
-  // استخرج الـ object الفعلي — إما data.data أو data مباشرة
   let rolesObj = null;
 
   if (data && typeof data === "object") {
     if (data.data && typeof data.data === "object" && !Array.isArray(data.data)) {
-      // { success: true, data: { Admin: {...}, ... } }
       rolesObj = data.data;
     } else if (Array.isArray(data.data)) {
-      // { data: [{ job_grade, permissions }, ...] }
       data.data.forEach((item) => {
-        if (item?.job_grade) map[item.job_grade] = item.permissions ?? buildEmptyPerms();
+        if (item?.job_grade) map[item.job_grade] = mergeWithAllModules(item.permissions ?? {});
       });
       return map;
     } else if (Array.isArray(data)) {
-      // [{ job_grade, permissions }, ...]
       data.forEach((item) => {
-        if (item?.job_grade) map[item.job_grade] = item.permissions ?? buildEmptyPerms();
+        if (item?.job_grade) map[item.job_grade] = mergeWithAllModules(item.permissions ?? {});
       });
       return map;
     } else {
-      // object مباشر { Admin: {...}, ... }
       rolesObj = data;
     }
   }
@@ -56,13 +77,22 @@ function parseRolesResponse(data) {
   if (rolesObj) {
     Object.entries(rolesObj).forEach(([key, val]) => {
       if (val && typeof val === "object") {
-        // الـ API بيرجع permissions مباشرة كـ { dashboard: true, employees: false, ... }
-        // مش nested تحت "permissions" key
-        map[key] = val;
+        map[key] = mergeWithAllModules(val);
       }
     });
   }
 
+  return map;
+}
+
+// طبّق الـ overrides المحفوظة من localStorage على الـ map
+function applyStoredOverrides(map) {
+  const overrides = loadOverridesFromStorage();
+  Object.entries(overrides).forEach(([roleName, roleOverrides]) => {
+    if (map[roleName]) {
+      map[roleName] = { ...map[roleName], ...roleOverrides };
+    }
+  });
   return map;
 }
 
@@ -75,14 +105,21 @@ export default function RolesBatchEditor() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
+  const { refreshPermissions } = usePermissions();
+
+  // ─── Load ──────────────────────────────────────────────────────────────────
+
   const loadRoles = async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getPermissionRoles();
       const map = parseRolesResponse(data);
+
+      // ✨ طبّق الـ overrides المحفوظة (unsupported keys)
+      applyStoredOverrides(map);
+
       setRolesData(map);
-      // نضبط localPerms مباشرة من map — مش من state عشان تجنب stale closure
       setLocalPerms(map[selectedRole] ?? buildEmptyPerms());
     } catch (e) {
       const msg = e?.response?.data?.message || e?.message || "خطأ غير معروف";
@@ -93,12 +130,14 @@ export default function RolesBatchEditor() {
     }
   };
 
-  useEffect(() => { loadRoles(); }, []);
+  useEffect(() => { loadRoles(); }, []); // eslint-disable-line
 
   useEffect(() => {
     setLocalPerms(rolesData[selectedRole] ?? buildEmptyPerms());
     setSaved(false);
   }, [selectedRole, rolesData]);
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
 
   const toggle = (moduleKey) => {
     setLocalPerms((prev) => ({ ...prev, [moduleKey]: !prev[moduleKey] }));
@@ -114,18 +153,41 @@ export default function RolesBatchEditor() {
     setSaving(true);
     setError(null);
     try {
-      const result = await updateRolePermissions(selectedRole, localPerms);
-      console.log("=== POST /permissions/roles result ===", JSON.stringify(result));
-      setRolesData((prev) => ({ ...prev, [selectedRole]: localPerms }));
+      await updateRolePermissions(selectedRole, localPerms);
+
+      // ✨ احفظ قيم الـ unsupported keys في localStorage
+      const unsupportedVals = {};
+      Object.entries(localPerms).forEach(([key, val]) => {
+        if (BACKEND_UNSUPPORTED_KEYS.has(key)) {
+          unsupportedVals[key] = val;
+        }
+      });
+
+      // حدّث الـ localStorage
+      const storedOverrides = loadOverridesFromStorage();
+      storedOverrides[selectedRole] = {
+        ...(storedOverrides[selectedRole] || {}),
+        ...unsupportedVals,
+      };
+      saveOverridesToStorage(storedOverrides);
+
+      // حدّث الـ state المحلي
+      setRolesData((prev) => ({ ...prev, [selectedRole]: { ...localPerms } }));
       setSaved(true);
+
+      // حدّث الـ Sidebar
+      await refreshPermissions();
+
     } catch (e) {
-      console.error("=== POST /permissions/roles error ===", e?.response?.status, e?.response?.data);
+      console.error("save error:", e?.response?.status, e?.response?.data);
       const msg = e?.response?.data?.message || e?.message || "خطأ غير معروف";
       setError(`تعذّر حفظ الصلاحيات: ${msg}`);
     } finally {
       setSaving(false);
     }
   };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   const roleOpt = ROLE_OPTIONS.find((r) => r.value === selectedRole);
   const activeCount = Object.values(localPerms).filter(Boolean).length;
@@ -187,9 +249,12 @@ export default function RolesBatchEditor() {
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
                 }`}
             >
-              {saved ? <><Check className="w-3.5 h-3.5" />محفوظ</>
-                : saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />جاري الحفظ...</>
-                  : <><Save className="w-3.5 h-3.5" />حفظ</>}
+              {saved
+                ? <><Check className="w-3.5 h-3.5" />محفوظ</>
+                : saving
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />جاري الحفظ...</>
+                  : <><Save className="w-3.5 h-3.5" />حفظ</>
+              }
             </button>
           </div>
         </div>
@@ -201,7 +266,7 @@ export default function RolesBatchEditor() {
           </div>
         )}
 
-        {/* Body */}
+        {/* Modules grid */}
         {loading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground text-sm gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />جاري تحميل الأدوار...

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, CheckCircle, Clock, Search, X, Save, User } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import {
   getTasks,
   createTask,
@@ -9,7 +8,7 @@ import {
   deleteTask as deleteTaskApi,
 } from "@/api/tasksApi";
 import {
-getEmployees,
+  getEmployees,
 } from "@/api/departmentsApi";
 const PRIORITY_MAP = {
   "عالية": "high",
@@ -57,34 +56,34 @@ function TaskForm({ task, employees, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-const handleEmpSelect = (id) => {
-  const emp = employees.find(e => e.id === id);
+  const handleEmpSelect = (id) => {
+    const emp = employees.find(e => e.id === id);
 
-  if (emp) {
-    set("assigned_to_id", id);
-    set("assigned_to", emp.full_name_ar);
-    set("department", emp.department || "");
-  }
-};
+    if (emp) {
+      set("assigned_to_id", id);
+      set("assigned_to", emp.full_name_ar);
+      set("department", emp.department || "");
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
- const payload = {
-  title: form.title,
-  employee_id: form.assigned_to_id || null,
-  priority: PRIORITY_MAP[form.priority],
-  state: STATUS_MAP[form.status],
-  deadline: form.due_date
-    ? `${form.due_date} 18:00:00`
-    : null,
-  description: form.description,
-};
+    const payload = {
+      title: form.title,
+      employee_id: form.assigned_to_id || null,
+      priority: PRIORITY_MAP[form.priority],
+      state: STATUS_MAP[form.status],
+      deadline: form.due_date
+        ? `${form.due_date} 18:00:00`
+        : null,
+      description: form.description,
+    };
 
-if (task?.id) {
-  await updateTask(task.id, payload);
-} else {
-  await createTask(payload);
-}
+    if (task?.id) {
+      await updateTask(task.id, payload);
+    } else {
+      await createTask(payload);
+    }
     onSave();
   };
 
@@ -151,7 +150,7 @@ if (task?.id) {
 export default function Tasks() {
   const { user } = useRole();
   const canCreate = canDo(user, "tasks", "create");
-  const canEdit   = canDo(user, "tasks", "edit");
+  const canEdit = canDo(user, "tasks", "edit");
   const canDelete = canDo(user, "tasks", "delete");
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -161,71 +160,71 @@ export default function Tasks() {
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
 
-const load = async () => {
-  try {
-    setLoading(true);
+  const load = async () => {
+    try {
+      setLoading(true);
 
-    const [tasksRes, employeesRes] =
-      await Promise.all([
-        getTasks(),
-        getEmployees(),
-      ]);
+      const [tasksRes, employeesRes] =
+        await Promise.all([
+          getTasks(),
+          getEmployees(),
+        ]);
 
-    // TASKS
-    const normalized =
-      tasksRes?.data?.map((t) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        assigned_to: t.employee_name,
-        assigned_to_id: t.employee_id,
+      // TASKS
+      const normalized =
+        tasksRes?.data?.map((t) => ({
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          assigned_to: t.employee_name,
+          assigned_to_id: t.employee_id,
 
-        priority:
-          PRIORITY_MAP_REVERSE[
+          priority:
+            PRIORITY_MAP_REVERSE[
             t.priority
-          ] || "متوسطة",
+            ] || "متوسطة",
 
-        status:
-          STATUS_MAP_REVERSE[
+          status:
+            STATUS_MAP_REVERSE[
             t.state
-          ] || "قيد العمل",
+            ] || "قيد العمل",
 
-        due_date: t.deadline
-          ? t.deadline.split(" ")[0]
-          : "",
+          due_date: t.deadline
+            ? t.deadline.split(" ")[0]
+            : "",
 
-        active: t.active,
-      })) || [];
+          active: t.active,
+        })) || [];
 
-    // EMPLOYEES
-    const normalizedEmployees =
-      employeesRes?.data?.map(
-        (emp) => ({
-          id: emp.id,
+      // EMPLOYEES
+      const normalizedEmployees =
+        employeesRes?.data?.map(
+          (emp) => ({
+            id: emp.id,
 
-          full_name_ar:
-            emp.full_name_ar ||
-            emp.name ||
-            emp.full_name,
+            full_name_ar:
+              emp.full_name_ar ||
+              emp.name ||
+              emp.full_name,
 
-          department:
-            emp.department_name ||
-            emp.department ||
-            "",
-        })
-      ) || [];
+            department:
+              emp.department_name ||
+              emp.department ||
+              "",
+          })
+        ) || [];
 
-    setTasks(normalized);
+      setTasks(normalized);
 
-    setEmployees(
-      normalizedEmployees
-    );
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+      setEmployees(
+        normalizedEmployees
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -234,31 +233,31 @@ const load = async () => {
   };
 
   const toggleComplete = async (task) => {
-   const newStatus =
-  task.status === "مكتملة"
-    ? "قيد العمل"
-    : "مكتملة";
+    const newStatus =
+      task.status === "مكتملة"
+        ? "قيد العمل"
+        : "مكتملة";
 
-await updateTask(task.id, {
-  title: task.title,
-  employee_id:
-    task.assigned_to_id,
+    await updateTask(task.id, {
+      title: task.title,
+      employee_id:
+        task.assigned_to_id,
 
-  priority:
-    PRIORITY_MAP[task.priority],
+      priority:
+        PRIORITY_MAP[task.priority],
 
-  state:
-    STATUS_MAP[newStatus],
+      state:
+        STATUS_MAP[newStatus],
 
-  deadline: task.due_date
-    ? `${task.due_date} 18:00:00`
-    : null,
+      deadline: task.due_date
+        ? `${task.due_date} 18:00:00`
+        : null,
 
-  description:
-    task.description,
-});
+      description:
+        task.description,
+    });
 
-load();
+    load();
   };
 
   const filtered = tasks

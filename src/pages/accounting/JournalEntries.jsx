@@ -344,7 +344,7 @@ import {
   uploadDailyEntryAttachment,
   getAccounts,
 } from "@/api/accountingApi";
-
+import api from "@/api/axios";
 const STATE_LABELS = {
   draft: "مسودة",
   posted: "مرحل",
@@ -541,26 +541,47 @@ function JournalForm({ accounts, entry, onSave, onClose }) {
           </div>
 
           {/* Attachment */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">مرفق</label>
-            {entry?.attachment_url && !attachmentFile && (
-              <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 mb-2">
-                <span>📎 مرفق حالي: {entry.attachment_name || "ملف"}</span>
-                <a href={entry.attachment_url} target="_blank" rel="noopener noreferrer" className="underline mr-auto">عرض</a>
-              </div>
-            )}
-            {attachmentFile ? (
-              <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
-                <span>✅ {attachmentFile.name}</span>
-                <button onClick={() => setAttachmentFile(null)} className="mr-auto text-red-500 hover:text-red-700">✕</button>
-              </div>
-            ) : (
-              <label className="flex items-center gap-2 p-2.5 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 text-sm text-primary">
-                <Upload className="w-4 h-4" />{entry?.attachment_url ? "استبدال المرفق" : "اختيار ملف (هيتم رفعه بعد الحفظ)"}
-                <input type="file" className="hidden" onChange={e => setAttachmentFile(e.target.files[0] || null)} />
-              </label>
-            )}
-          </div>
+         <div className="space-y-1.5">
+  <label className="text-sm font-medium">مرفق</label>
+
+  {entry?.attachment_url && !attachmentFile && (
+    <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 mb-2">
+      <span>📎 مرفق حالي: {entry.attachment_name || "ملف"}</span>
+
+      <a
+        href={`${api.defaults.assetURL}${entry.attachment_url}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline mr-auto"
+      >
+        عرض
+      </a>
+    </div>
+  )}
+
+  {attachmentFile ? (
+    <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
+      <span>✅ {attachmentFile.name}</span>
+      <button
+        onClick={() => setAttachmentFile(null)}
+        className="mr-auto text-red-500 hover:text-red-700"
+      >
+        ✕
+      </button>
+    </div>
+  ) : (
+    <label className="flex items-center gap-2 p-2.5 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 text-sm text-primary">
+      <Upload className="w-4 h-4" />
+      {entry?.attachment_url ? "استبدال المرفق" : "اختيار ملف (هيتم رفعه بعد الحفظ)"}
+
+      <input
+        type="file"
+        className="hidden"
+        onChange={e => setAttachmentFile(e.target.files[0] || null)}
+      />
+    </label>
+  )}
+</div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
@@ -736,12 +757,17 @@ export default function JournalEntries() {
                           {actionLoadingId === e.id ? "..." : "عكس"}
                         </button>
                       )}
-                      {e.attachment_url && (
-                        <a href={e.attachment_url} target="_blank" rel="noopener noreferrer" onClick={ev => ev.stopPropagation()}
-                          className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100 font-medium">
-                          مرفق
-                        </a>
-                      )}
+                    {e.attachment_url && (
+  <a
+    href={`${api.defaults.baseURL}${e.attachment_url.replace(/^\/api\/v1/, "")}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={ev => ev.stopPropagation()}
+    className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100 font-medium"
+  >
+    مرفق
+  </a>
+)}
                     </div>
                   </td>
                 </tr>

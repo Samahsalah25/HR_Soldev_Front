@@ -284,6 +284,7 @@ import {
   getAccounts,
 } from "@/api/accountingApi";
 
+import  api  from "@/api/axios";
 const STATE_LABELS = {
   draft: "مسودة",
   posted: "مرحل",
@@ -582,11 +583,18 @@ export default function Vouchers() {
               <td className="px-4 py-3 text-xs text-muted-foreground">{PAYMENT_TYPES_REVERSE[v.payment_type] || v.payment_type}</td>
               <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATE_COLORS[v.state]}`}>{STATE_LABELS[v.state] || v.state}</span></td>
               <td className="px-4 py-3">{v.is_linked ? <span className="text-xs text-green-600">✓ {v.linked_entry_name}</span> : "—"}</td>
-              <td className="px-4 py-3">
-                {v.attachment_url ? (
-                  <a href={v.attachment_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">عرض</a>
-                ) : "—"}
-              </td>
+            <td className="px-4 py-3">
+  {v.attachment_url ? (
+    <a
+      href={`${api.defaults.baseURL}${v.attachment_url.replace(/^\/api\/v1/, "")}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs text-blue-600 hover:underline"
+    >
+      عرض
+    </a>
+  ) : "—"}
+</td>
               <td className="px-4 py-3">
                 <div className="flex gap-1">
                   {v.state === "draft" && (

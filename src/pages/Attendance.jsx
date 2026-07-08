@@ -22,8 +22,8 @@ const STATUS_STYLES = {
 };
 
 export default function Attendance() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "attendance", "create");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("attendance", "create");
   const [activeTab, setActiveTab] = useState("daily");
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);

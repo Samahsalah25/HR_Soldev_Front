@@ -217,9 +217,9 @@ function BonusForm({ employees, departments, onSave, onClose }) {
 }
 
 export default function Bonuses() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "bonuses", "create");
-  const canApprove = canDo(user, "bonuses", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("bonuses", "create");
+  const canApprove = canDo("bonuses", "approve");
   const [bonuses, setBonuses] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);

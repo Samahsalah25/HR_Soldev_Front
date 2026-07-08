@@ -148,10 +148,10 @@ function TaskForm({ task, employees, onSave, onClose }) {
 }
 
 export default function Tasks() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "tasks", "create");
-  const canEdit = canDo(user, "tasks", "edit");
-  const canDelete = canDo(user, "tasks", "delete");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("tasks", "create");
+  const canEdit = canDo("tasks", "edit");
+  const canDelete = canDo("tasks", "delete");
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);

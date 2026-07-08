@@ -422,9 +422,9 @@ function TransferForm({ employees, branches, departments, onSave, onClose }) {
 //   );
 // }
 export default function Transfers() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "transfers", "create");
-  const canApprove = canDo(user, "transfers", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("transfers", "create");
+  const canApprove = canDo("transfers", "approve");
 
   const [transfers, setTransfers] = useState([]);
   const [employees, setEmployees] = useState([]);

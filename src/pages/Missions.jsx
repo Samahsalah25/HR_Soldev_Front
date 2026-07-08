@@ -32,9 +32,9 @@ const STATUS_LABELS = {
   cancelled: "ملغاة",
 };
 export default function Missions() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "missions", "create");
-  const canApprove = canDo(user, "missions", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("missions", "create");
+  const canApprove = canDo("missions", "approve");
   const [missions, setMissions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);

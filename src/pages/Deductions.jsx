@@ -154,9 +154,9 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
 }
 
 export default function Deductions() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "deductions", "create");
-  const canApprove = canDo(user, "deductions", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("deductions", "create");
+  const canApprove = canDo("deductions", "approve");
   const [deductions, setDeductions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [violations, setViolations] = useState([]);

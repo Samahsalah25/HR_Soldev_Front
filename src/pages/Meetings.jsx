@@ -270,8 +270,8 @@ function MeetingForm({ meeting, employees, onSave, onClose }) {
                       }
                     }}
                     className={`p-3 rounded-xl border transition-all text-center ${selected
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:bg-muted"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted"
                       }`}
                   >
                     <div className="w-14 h-14 mx-auto rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold mb-2">
@@ -357,10 +357,10 @@ function MiniCalendar({ meetings, onSelectDate, selectedDate }) {
 }
 
 export default function Meetings() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "meetings", "create");
-  const canEdit = canDo(user, "meetings", "edit");
-  const canDelete = canDo(user, "meetings", "delete");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("meetings", "create");
+  const canEdit = canDo("meetings", "edit");
+  const canDelete = canDo("meetings", "delete");
   const [meetings, setMeetings] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -268,9 +268,9 @@ function ContractForm({ onSave, onClose }) {
 }
 
 export default function Legal() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "legal", "create");
-  const canDelete = canDo(user, "legal", "delete");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("legal", "create");
+  const canDelete = canDo("legal", "delete");
   const [cases, setCases] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [employees, setEmployees] = useState([]);

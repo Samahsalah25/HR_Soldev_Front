@@ -583,9 +583,9 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
 }
 
 export default function Recruitment() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "recruitment", "create");
-  const canApprove = canDo(user, "recruitment", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("recruitment", "create");
+  const canApprove = canDo("recruitment", "approve");
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [departments, setDepartments] = useState([]);

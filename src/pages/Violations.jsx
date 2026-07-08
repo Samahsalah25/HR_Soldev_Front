@@ -249,9 +249,9 @@ function ViolationForm({ employees, onSave, onClose }) {
 }
 
 export default function Violations() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "violations", "create");
-  const canApprove = canDo(user, "violations", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("violations", "create");
+  const canApprove = canDo("violations", "approve");
 
   const [violations, setViolations] = useState([]);
   const [employees, setEmployees] = useState([]);

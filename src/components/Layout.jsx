@@ -156,26 +156,34 @@ export default function Layout() {
 
       {/* Bottom */}
       <div className="px-2 py-3 border-t border-sidebar-border space-y-0.5">
-        <Link to="/home" onClick={() => setMobileSidebarOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/home" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
-          <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
-          {sidebarOpen && <span className="text-sm">لوحتي الشخصية</span>}
-        </Link>
-        <Link to="/ess" onClick={() => setMobileSidebarOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/ess" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
-          <UserCircle className="w-4 h-4 flex-shrink-0" />
-          {sidebarOpen && <span className="text-sm">بوابتي</span>}
-        </Link>
-        <Link to="/recruitment#my-interviews" onClick={() => setMobileSidebarOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground`}>
-          <Calendar className="w-4 h-4 flex-shrink-0" />
-          {sidebarOpen && <span className="text-sm">مقابلاتي</span>}
-        </Link>
-        <Link to="/settings" onClick={() => setMobileSidebarOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/settings" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
-          <Settings className="w-4 h-4 flex-shrink-0" />
-          {sidebarOpen && <span className="text-sm">الإعدادات</span>}
-        </Link>
+        {canSee("home") && (
+          <Link to="/home" onClick={() => setMobileSidebarOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/home" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+            <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+            {sidebarOpen && <span className="text-sm">لوحتي الشخصية</span>}
+          </Link>
+        )}
+        {canSee("ess") && (
+          <Link to="/ess" onClick={() => setMobileSidebarOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/ess" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+            <UserCircle className="w-4 h-4 flex-shrink-0" />
+            {sidebarOpen && <span className="text-sm">بوابتي</span>}
+          </Link>
+        )}
+        {canSee("recruitment") && (
+          <Link to="/recruitment#my-interviews" onClick={() => setMobileSidebarOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground`}>
+            <Calendar className="w-4 h-4 flex-shrink-0" />
+            {sidebarOpen && <span className="text-sm">مقابلاتي</span>}
+          </Link>
+        )}
+        {canSee("settings") && (
+          <Link to="/settings" onClick={() => setMobileSidebarOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/settings" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+            <Settings className="w-4 h-4 flex-shrink-0" />
+            {sidebarOpen && <span className="text-sm">الإعدادات</span>}
+          </Link>
+        )}
         <button onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2 rounded-lg w-full text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all">
           <LogOut className="w-4 h-4 flex-shrink-0" />

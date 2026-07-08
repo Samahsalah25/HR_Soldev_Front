@@ -2,12 +2,11 @@ import { useState, useEffect } from "react";
 import { Download, CheckCircle, FileText, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import { calcPayslip, calcGOSI_Saudi, calcGOSI_NonSaudi, formatCurrency, EXPAT_LEVY } from "../lib/hrUtils";
 
 export default function Payroll() {
-  const { user } = useRole();
-  const canApprove = canDo(user, "payroll", "approve");
+  const { user, canDo } = useRole();
+  const canApprove = canDo("payroll", "approve");
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -76,8 +75,8 @@ export default function Payroll() {
             const user = await base44.auth.me();
             const netTotal = payslips.reduce((s, p) => s + p.netSalary, 0);
             await base44.entities.JournalEntry.create({
-              entry_number: `JE-SAL-${month.replace("-","")}`,
-              entry_date: new Date().toISOString().slice(0,10),
+              entry_number: `JE-SAL-${month.replace("-", "")}`,
+              entry_date: new Date().toISOString().slice(0, 10),
               description: `قيد رواتب شهر ${month} — ${employees.length} موظف`,
               lines: [
                 { account_id: salaryAcc.id, account_code: salaryAcc.account_code, account_name: salaryAcc.account_name, debit: netTotal, credit: 0, description: `رواتب ${month}` },
@@ -86,7 +85,7 @@ export default function Payroll() {
               total_debit: netTotal, total_credit: netTotal,
               status: "مرحل", source: "رواتب",
               posted_by: user.full_name || user.email,
-              posted_date: new Date().toISOString().slice(0,10),
+              posted_date: new Date().toISOString().slice(0, 10),
             });
             alert(`✅ تم ترحيل قيد الرواتب بمبلغ ${netTotal.toLocaleString("ar-SA")} ريال`);
           }} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">

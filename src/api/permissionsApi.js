@@ -22,41 +22,65 @@ async function apiFetch(path, options = {}) {
 }
 
 // =============================
-// الأقسام المتاحة في الصلاحيات (تطابق ما يرجعه الـ API)
+// الأقسام المتاحة في الصلاحيات (بنفس ترتيب الـ Sidebar)
 // =============================
 export const PERMISSION_MODULES = [
-    { key: "dashboard", label: "لوحة التحكم" },
-    { key: "employees", label: "الموظفون" },
-    { key: "recruitment", label: "التوظيف" },
-    { key: "leaves", label: "الإجازات" },
-    { key: "attendance", label: "الحضور" },
-    { key: "transfers", label: "حركة النقل" },
-    { key: "end_of_service", label: "نهاية الخدمة" },
-    { key: "violations", label: "المخالفات" },
-    { key: "deductions", label: "الخصومات" },
-    { key: "rewards", label: "المكافآت" },
-    { key: "missions", label: "المهمات والسفر" },
-    { key: "tasks", label: "المهام" },
-    { key: "requests", label: "الطلبات" },
-    { key: "assets", label: "إدارة الأصول" },
-    { key: "meetings", label: "الاجتماعات" },
-    { key: "salaries", label: "الرواتب" },
-    { key: "financial_reports", label: "التقارير المالية" },
-    { key: "company_records", label: "سجلات الشركة" },
-    { key: "reports", label: "التقارير" },
-    { key: "permissions", label: "الصلاحيات" },
-    { key: "legal_affairs", label: "الشؤون القانونية" },
-    { key: "policies", label: "السياسات" },
-    { key: "branches", label: "الفروع والأقسام" },
-    { key: "settings", label: "الإعدادات" },
-    { key: "my_portal", label: "بوابتي" },
+    // الرئيسية
+    { key: "dashboard", label: "لوحة التحكم", group: "الرئيسية" },
+    { key: "home", label: "لوحتي الشخصية", group: "الرئيسية" },
+
+    // الموارد البشرية
+    { key: "employees", label: "الموظفون", group: "الموارد البشرية" },
+    { key: "recruitment", label: "التوظيف", group: "الموارد البشرية" },
+    { key: "leaves", label: "الإجازات والتذاكر", group: "الموارد البشرية" },
+    { key: "attendance", label: "الحضور والانصراف", group: "الموارد البشرية" },
+    { key: "missions", label: "المهمات والسفر", group: "الموارد البشرية" },
+    { key: "transfers", label: "حركة النقل", group: "الموارد البشرية" },
+    { key: "violations", label: "المخالفات", group: "الموارد البشرية" },
+    { key: "deductions", label: "الخصومات", group: "الموارد البشرية" },
+    { key: "rewards", label: "المكافآت", group: "الموارد البشرية" },
+    { key: "loan_management", label: "السلف والقروض", group: "الموارد البشرية" },
+    { key: "end_of_service", label: "إنهاء الخدمة", group: "الموارد البشرية" },
+
+    // المالية
+    { key: "salaries", label: "الرواتب والتأمينات", group: "المالية" },
+    { key: "accounting", label: "نظام الحسابات", group: "المالية" },
+    { key: "financial_reports", label: "التقارير المالية", group: "المالية" },
+
+    // التشغيل
+    { key: "tasks", label: "المهام", group: "التشغيل" },
+    { key: "requests", label: "طلبات الموظفين", group: "التشغيل" },
+    { key: "assets", label: "إدارة الأصول", group: "التشغيل" },
+    { key: "meetings", label: "الاجتماعات", group: "التشغيل" },
+
+    // وحدات التخزين
+    { key: "storage_dashboard", label: "لوحة التخزين", group: "وحدات التخزين" },
+    { key: "storage_units", label: "الوحدات", group: "وحدات التخزين" },
+    { key: "storage_bookings", label: "الحجوزات", group: "وحدات التخزين" },
+    { key: "storage_contracts", label: "العقود والفواتير", group: "وحدات التخزين" },
+    { key: "storage_crm", label: "CRM العملاء", group: "وحدات التخزين" },
+
+    // الإدارة
+    { key: "branches", label: "الفروع والأقسام", group: "الإدارة" },
+    { key: "company_records", label: "سجلات الشركة", group: "الإدارة" },
+    { key: "policies", label: "سياسات الشركة", group: "الإدارة" },
+    { key: "legal_affairs", label: "الشؤون القانونية", group: "الإدارة" },
+    { key: "reports", label: "التقارير", group: "الإدارة" },
+    { key: "permissions", label: "الصلاحيات", group: "الإدارة" },
+    { key: "user_management", label: "إدارة المستخدمين", group: "الإدارة" },
+
+    // أخرى
+    { key: "settings", label: "الإعدادات", group: "أخرى" },
+    { key: "my_portal", label: "بوابتي", group: "أخرى" },
 ];
 
 // =============================
 // GET PERMISSION ROLES
 // =============================
 export const getPermissionRoles = async () => {
-    return apiFetch("/permissions/roles");
+    const result = await apiFetch("/permissions/roles");
+    console.log("🌐 RAW getPermissionRoles response:", JSON.stringify(result));
+    return result;
 };
 
 // =============================

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Plane, CheckCircle, XCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import {
   getAllVacationRequests,
   createVacationRequest,
@@ -42,9 +41,9 @@ const STATUS_COLORS = {
 };
 
 export default function Leaves() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "leaves", "create");
-  const canApprove = canDo(user, "leaves", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("leaves", "create");
+  const canApprove = canDo("leaves", "approve");
   const [leaves, setLeaves] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);

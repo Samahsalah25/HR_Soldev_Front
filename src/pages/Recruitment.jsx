@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { UserPlus, Plus, X, Save, Search, CheckCircle, XCircle, Eye, ChevronRight, Calendar, Star, ExternalLink } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 import {
   getJobs,
   createJob,
@@ -584,9 +583,9 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
 }
 
 export default function Recruitment() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "recruitment", "create");
-  const canApprove = canDo(user, "recruitment", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("recruitment", "create");
+  const canApprove = canDo("recruitment", "approve");
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [departments, setDepartments] = useState([]);

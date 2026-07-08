@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, MapPin, CheckCircle, LogIn, LogOut, AlertCircle, Clock, Users } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 
 import {
   getAttendance,
@@ -23,8 +22,8 @@ const STATUS_STYLES = {
 };
 
 export default function Attendance() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "attendance", "create");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("attendance", "create");
   const [activeTab, setActiveTab] = useState("daily");
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -37,76 +36,76 @@ export default function Attendance() {
   const [checkInOut, setCheckInOut] = useState({ loading: false, status: null, message: "" });
   const [selectedBranch, setSelectedBranch] = useState(null);
 
-const load = async () => {
-  try {
-    setLoading(true);
+  const load = async () => {
+    try {
+      setLoading(true);
 
-    const [recs, emps, brs] = await Promise.all([
-      getAttendance(date),
-      getEmployees(),
-      getBranches(),
-    ]);
+      const [recs, emps, brs] = await Promise.all([
+        getAttendance(date),
+        getEmployees(),
+        getBranches(),
+      ]);
 
-    const attendanceData = recs?.data ?? [];
+      const attendanceData = recs?.data ?? [];
 
-    const normalized = attendanceData.map((r) => ({
-      id: r.id,
+      const normalized = attendanceData.map((r) => ({
+        id: r.id,
 
-      employee_name:
-        r.employee_name ||
-        r.employee?.full_name_ar ||
-        r.employee?.name ||
-        "—",
+        employee_name:
+          r.employee_name ||
+          r.employee?.full_name_ar ||
+          r.employee?.name ||
+          "—",
 
-      employee_id:
-        r.employee_id ||
-        r.employee?.id,
+        employee_id:
+          r.employee_id ||
+          r.employee?.id,
 
-      department:
-        r.department_name ||
-        r.employee?.department?.name ||
-        "—",
+        department:
+          r.department_name ||
+          r.employee?.department?.name ||
+          "—",
 
-      check_in: r.time_of_arrival
-        ? r.time_of_arrival.slice(11, 16)
-        : "",
+        check_in: r.time_of_arrival
+          ? r.time_of_arrival.slice(11, 16)
+          : "",
 
-      check_out: r.time_of_leave
-        ? r.time_of_leave.slice(11, 16)
-        : "",
+        check_out: r.time_of_leave
+          ? r.time_of_leave.slice(11, 16)
+          : "",
 
-      status:
-        r.state_arabic ||
-        STATUS_AR[r.state] ||
-        "—",
+        status:
+          r.state_arabic ||
+          STATUS_AR[r.state] ||
+          "—",
 
-      raw_status: r.state,
+        raw_status: r.state,
 
-      late_minutes: r.late_minutes || 0,
+        late_minutes: r.late_minutes || 0,
 
-      overtime_hours: r.extra_hours || 0,
+        overtime_hours: r.extra_hours || 0,
 
-      notes: r.notes || "",
-    }));
+        notes: r.notes || "",
+      }));
 
-    setRecords(normalized);
+      setRecords(normalized);
 
-    setEmployees(emps?.data ?? []);
+      setEmployees(emps?.data ?? []);
 
-    setBranches(brs?.data ?? []);
-  } catch (err) {
-    console.error("LOAD ERROR:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+      setBranches(brs?.data ?? []);
+    } catch (err) {
+      console.error("LOAD ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
   const handleLocationCheckIn = (type) => {
@@ -121,22 +120,22 @@ const load = async () => {
           setCheckInOut({ loading: false, status: "error", message: `أنت خارج نطاق الفرع (${Math.round(dist)}م من ${radius}م المسموحة)` });
           return;
         }
-       const payload = {
-  branch_id: selectedBranch.id,
-  latitude: pos.coords.latitude,
-  longitude: pos.coords.longitude,
-};
+        const payload = {
+          branch_id: selectedBranch.id,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
 
-if (type === "in") {
-  await checkInAttendance(payload);
-} else {
-  await checkOutAttendance(payload);
-}
-      setCheckInOut({
-  loading: false,
-  status: "success",
-  message: `تم تسجيل ${type === "in" ? "الحضور" : "الانصراف"} بنجاح ✔️`
-});
+        if (type === "in") {
+          await checkInAttendance(payload);
+        } else {
+          await checkOutAttendance(payload);
+        }
+        setCheckInOut({
+          loading: false,
+          status: "success",
+          message: `تم تسجيل ${type === "in" ? "الحضور" : "الانصراف"} بنجاح ✔️`
+        });
         load();
       },
       () => setCheckInOut({ loading: false, status: "error", message: "تعذّر الحصول على موقعك. تأكد من تفعيل خاصية الموقع" })
@@ -145,60 +144,60 @@ if (type === "in") {
 
   useEffect(() => { load(); }, [date]);
 
-const handleEmpSelect = (id) => {
-  const emp = employees.find((e) => e.id === id);
+  const handleEmpSelect = (id) => {
+    const emp = employees.find((e) => e.id === id);
 
-  if (!emp) return;
+    if (!emp) return;
 
-  setForm((f) => ({
-    ...f,
-    employee_id: id,
+    setForm((f) => ({
+      ...f,
+      employee_id: id,
 
-    employee_name:
-      emp.full_name_ar ||
-      emp.name ||
-      emp.employee_name ||
-      "",
+      employee_name:
+        emp.full_name_ar ||
+        emp.name ||
+        emp.employee_name ||
+        "",
 
-    department:
-      emp.department?.name ||
-      emp.department ||
-      emp.department_name ||
-      "",
-  }));
-};
+      department:
+        emp.department?.name ||
+        emp.department ||
+        emp.department_name ||
+        "",
+    }));
+  };
 
- const handleSubmit = async () => {
-  try {
-    setSaving(true);
+  const handleSubmit = async () => {
+    try {
+      setSaving(true);
 
-    await createAttendance({
-      employee: form.employee_id,
+      await createAttendance({
+        employee: form.employee_id,
 
-      time_of_arrival: `${form.date}T${form.check_in}:00`,
+        time_of_arrival: `${form.date}T${form.check_in}:00`,
 
-      time_of_leave: form.check_out
-        ? `${form.date}T${form.check_out}:00`
-        : null,
+        time_of_leave: form.check_out
+          ? `${form.date}T${form.check_out}:00`
+          : null,
 
-      state:  form.status,
+        state: form.status,
 
-      late_minutes: Number(form.late_minutes),
+        late_minutes: Number(form.late_minutes),
 
-      extra_hours: Number(form.overtime_hours),
+        extra_hours: Number(form.overtime_hours),
 
-      notes: form.notes || "",
-    });
+        notes: form.notes || "",
+      });
 
-    setShowForm(false);
+      setShowForm(false);
 
-    load();
-  } catch (err) {
-    console.error("CREATE ERROR:", err);
-  } finally {
-    setSaving(false);
-  }
-};
+      load();
+    } catch (err) {
+      console.error("CREATE ERROR:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const stats = {
     present: records.filter(r => r.status === "حاضر").length,
@@ -323,23 +322,23 @@ const handleEmpSelect = (id) => {
               <MapPin className="w-4 h-4 text-primary" />تسجيل حضور/انصراف بالموقع الجغرافي
             </p>
             <div className="space-y-3">
-             <select
-  value={selectedBranch?.id || ""}
-  onChange={(e) => {
-    const id = Number(e.target.value);
-    const branch = branches.find((b) => Number(b.id) === id) || null;
-    setSelectedBranch(branch);
-  }}
-  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
->
-  <option value="">اختر الفرع...</option>
+              <select
+                value={selectedBranch?.id || ""}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  const branch = branches.find((b) => Number(b.id) === id) || null;
+                  setSelectedBranch(branch);
+                }}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+              >
+                <option value="">اختر الفرع...</option>
 
-  {branches.map((b) => (
-    <option key={b.id} value={b.id}>
-      {b.name} ({b.city})
-    </option>
-  ))}
-</select>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.city})
+                  </option>
+                ))}
+              </select>
               <div className="flex gap-3">
                 <button onClick={() => handleLocationCheckIn("in")} disabled={checkInOut.loading}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50">
@@ -376,11 +375,11 @@ const handleEmpSelect = (id) => {
                 <select value={form.employee_id} onChange={(e) => handleEmpSelect(Number(e.target.value))}
                   className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
                   <option value="">اختر الموظف...</option>
-               {employees.map((e) => (
-  <option key={e.id} value={e.id}>
-    {e.full_name_ar || e.name}
-  </option>
-))}
+                  {employees.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.full_name_ar || e.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">

@@ -195,6 +195,7 @@ export default function Permissions() {
                                 <CrudPermissionsEditor
                                   key={`crud-${empId}`}
                                   employeeId={empId}
+                                  employeeRole={empRole}
                                 />
                               </div>
                             </td>

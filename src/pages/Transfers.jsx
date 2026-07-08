@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { ArrowLeftRight, Plus, X, Save, CheckCircle, XCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 
 import {
   getEmployeeTransfers,
@@ -9,15 +8,15 @@ import {
   updateEmployeeTransfer,
 } from "@/api/employeeTransfersApi";
 import {
-getEmployees,getDepartments
+  getEmployees, getDepartments
 } from "@/api/departmentsApi";
 import {
-getBranches,
+  getBranches,
 } from "@/api/branchesApi";
 
 const STATUS_COLORS = {
-  "قيد الاعتماد":"bg-amber-100 text-amber-700","معتمد":"bg-green-100 text-green-700",
-  "مرفوض":"bg-red-100 text-red-600","مُلغى":"bg-gray-100 text-gray-500"
+  "قيد الاعتماد": "bg-amber-100 text-amber-700", "معتمد": "bg-green-100 text-green-700",
+  "مرفوض": "bg-red-100 text-red-600", "مُلغى": "bg-gray-100 text-gray-500"
 };
 
 // function TransferForm({ employees, branches, departments, onSave, onClose }) {
@@ -139,49 +138,49 @@ function TransferForm({ employees, branches, departments, onSave, onClose }) {
   // =========================
   // حفظ النقل (API جديد)
   // =========================
-const handleSave = async () => {
-  try {
-    setSaving(true);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
 
-   const payload = {
-  employee_id: form.employee_id,
+      const payload = {
+        employee_id: form.employee_id,
 
-  current_department_id:
-    departments.find(
-      (d) => d.name === form.from_department
-    )?.id || null,
+        current_department_id:
+          departments.find(
+            (d) => d.name === form.from_department
+          )?.id || null,
 
-  current_branch_id:
-    branches.find(
-      (b) => b.name === form.from_branch
-    )?.id || null,
+        current_branch_id:
+          branches.find(
+            (b) => b.name === form.from_branch
+          )?.id || null,
 
-  new_department_id:
-    departments.find(
-      (d) => d.name === form.to_department
-    )?.id || null,
+        new_department_id:
+          departments.find(
+            (d) => d.name === form.to_department
+          )?.id || null,
 
-  new_branch_id:
-    branches.find(
-      (b) => b.name === form.to_branch
-    )?.id || null,
+        new_branch_id:
+          branches.find(
+            (b) => b.name === form.to_branch
+          )?.id || null,
 
-  transfer_date: form.transfer_date,
-  reason: form.reason,
+        transfer_date: form.transfer_date,
+        reason: form.reason,
 
-  
-  state: "submitted",
-};
 
-    await createEmployeeTransfer(payload);
+        state: "submitted",
+      };
 
-    onSave();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setSaving(false);
-  }
-};
+      await createEmployeeTransfer(payload);
+
+      onSave();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
@@ -423,9 +422,9 @@ const handleSave = async () => {
 //   );
 // }
 export default function Transfers() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "transfers", "create");
-  const canApprove = canDo(user, "transfers", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("transfers", "create");
+  const canApprove = canDo("transfers", "approve");
 
   const [transfers, setTransfers] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -469,10 +468,10 @@ export default function Transfers() {
         t.state === "approved"
           ? "معتمد"
           : t.state === "submitted"
-          ? "قيد الاعتماد"
-          : t.state === "draft"
-          ? "مسودة"
-          : "مرفوض",
+            ? "قيد الاعتماد"
+            : t.state === "draft"
+              ? "مسودة"
+              : "مرفوض",
     }));
 
     setTransfers(formatted);
@@ -490,31 +489,31 @@ export default function Transfers() {
   // APPROVE
   // =========================
   const approve = async (id) => {
-  try {
-    await updateEmployeeTransfer(id, {
-      state: "approved",
-    });
+    try {
+      await updateEmployeeTransfer(id, {
+        state: "approved",
+      });
 
-    load();
-  } catch (error) {
-    console.error(error);
-  }
-};
+      load();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   // =========================
   // REJECT
   // =========================
- const reject = async (id) => {
-  try {
-    await updateEmployeeTransfer(id, {
-      state: "refused",
-    });
+  const reject = async (id) => {
+    try {
+      await updateEmployeeTransfer(id, {
+        state: "refused",
+      });
 
-    load();
-  } catch (error) {
-    console.error(error);
-  }
-};
+      load();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -631,15 +630,14 @@ export default function Transfers() {
                     {t.reason || "—"}
                   </td>
 
-                 <td className="px-4 py-3">
-  <span
-    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-      STATUS_COLORS[t.status] || "bg-gray-100 text-gray-500"
-    }`}
-  >
-    {t.status}
-  </span>
-</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || "bg-gray-100 text-gray-500"
+                        }`}
+                    >
+                      {t.status}
+                    </span>
+                  </td>
 
                   <td className="px-4 py-3">
                     {t.status === "قيد الاعتماد" && canApprove && (

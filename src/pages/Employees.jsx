@@ -7,7 +7,6 @@ import EmployeeDetail from "../components/EmployeeDetail";
 import EmployeeImportExport from "../components/employees/EmployeeImportExport";
 import AddEmployeeDropdown from "../components/employees/AddEmployeeDropdown";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 
 const STATUS_COLORS = {
   "نشط": "bg-green-100 text-green-700",

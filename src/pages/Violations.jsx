@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, Plus, X, CheckCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
 
 import {
   getViolations,
@@ -250,9 +249,9 @@ function ViolationForm({ employees, onSave, onClose }) {
 }
 
 export default function Violations() {
-  const { user } = useRole();
-  const canCreate = canDo(user, "violations", "create");
-  const canApprove = canDo(user, "violations", "approve");
+  const { user, canDo } = useRole();
+  const canCreate = canDo("violations", "create");
+  const canApprove = canDo("violations", "approve");
 
   const [violations, setViolations] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -322,11 +321,11 @@ export default function Violations() {
       console.error("Cancel error:", err);
     }
   };
-    const getViolationLabel = (value) =>
-  VIOLATION_TYPES.find((t) => t.value === value)?.label || value;
+  const getViolationLabel = (value) =>
+    VIOLATION_TYPES.find((t) => t.value === value)?.label || value;
 
-const getPenaltyLabel = (value) =>
-  PENALTY_TYPES.find((p) => p.value === value)?.label || value;
+  const getPenaltyLabel = (value) =>
+    PENALTY_TYPES.find((p) => p.value === value)?.label || value;
 
   // ================= FILTER =================
   const filtered = violations
@@ -459,13 +458,13 @@ const getPenaltyLabel = (value) =>
                   <td className="p-3 text-xs">
                     {v.date
                       ? new Date(v.date).toLocaleDateString(
-                          "ar-SA"
-                        )
+                        "ar-SA"
+                      )
                       : "—"}
                   </td>
 
                   <td className="p-3">
-                     
+
                     <div>{getPenaltyLabel(v.custom_penalty_type)}</div>
 
                     {v.deduction_amount > 0 && (
@@ -482,9 +481,9 @@ const getPenaltyLabel = (value) =>
                   </td>
 
                   <td className="p-3">
-                   <span className={`px-2 py-1 text-xs rounded ${STATUS_COLORS[v.state]}`}>
-  {STATUS_LABELS[v.state] || v.state}
-</span>
+                    <span className={`px-2 py-1 text-xs rounded ${STATUS_COLORS[v.state]}`}>
+                      {STATUS_LABELS[v.state] || v.state}
+                    </span>
                   </td>
 
                   <td className="p-3">

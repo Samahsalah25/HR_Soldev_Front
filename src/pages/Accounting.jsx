@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Plus, DollarSign, FileText, TrendingUp, TrendingDown, X, Save, Search, CheckCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatCurrency } from "../lib/hrUtils";
-
+import { getAccounts } from "@/api/accountingApi";
 const ENTRY_TYPES = ["قيد يومي", "راتب", "عهدة موظف", "تصفية عهدة", "مصروف", "إيراد", "سلفة"];
 const STATUS_COLORS = { "مسودة": "bg-amber-100 text-amber-700", "معتمد": "bg-green-100 text-green-700", "ملغى": "bg-gray-100 text-gray-500" };
 const TYPE_COLORS = {

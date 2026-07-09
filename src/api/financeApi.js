@@ -91,3 +91,25 @@ export async function getFinancialReports({
 
   return res.data || {};
 }
+/**
+ * POST /salary/post-entry
+ */
+export async function postSalaryEntry(month) {
+    const res = await financeApi.post("/salary/post-entry", null, {
+        params: { month },
+    });
+
+    return res.data;
+}
+
+/**
+ * GET /salary/wps-export
+ */
+export async function downloadWPS(month) {
+    const res = await financeApi.get("/salary/wps-export", {
+        params: { month },
+        responseType: "blob",
+    });
+
+    return res.data;
+}

@@ -9,6 +9,8 @@ import {
   getInsuranceDashboard,
   getGosiInsurance,
   getCostSummary,
+    postSalaryEntry,
+  downloadWPS,
 } from "@/api/financeApi";
 export default function Payroll() {
   const { user } = useRole();
@@ -64,33 +66,68 @@ useEffect(() => {
         <div className="flex items-center gap-3">
           <input type="month" value={month} onChange={e => setMonth(e.target.value)}
             className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20" />
-          <button className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 text-sm font-medium">
-            <Download className="w-4 h-4" />WPS
-          </button>
-          {canApprove && <button onClick={async () => {
-            const accounts = await base44.entities.AccountChart.list();
-            const salaryAcc = accounts.find(a => (a.account_name?.includes("رواتب") || a.account_name?.includes("أجور")) && !a.is_parent);
-            const bankAcc = accounts.find(a => (a.account_name?.includes("بنك") || a.account_name?.includes("صندوق")) && !a.is_parent);
-            if (!salaryAcc || !bankAcc) { alert("يرجى إنشاء حسابات الرواتب والبنك في دليل الحسابات أولاً"); return; }
-            const user = await base44.auth.me();
-            const netTotal = payslips.reduce((s, p) => s + p.netSalary, 0);
-            await base44.entities.JournalEntry.create({
-              entry_number: `JE-SAL-${month.replace("-","")}`,
-              entry_date: new Date().toISOString().slice(0,10),
-              description: `قيد رواتب شهر ${month} — ${employees.length} موظف`,
-              lines: [
-                { account_id: salaryAcc.id, account_code: salaryAcc.account_code, account_name: salaryAcc.account_name, debit: netTotal, credit: 0, description: `رواتب ${month}` },
-                { account_id: bankAcc.id, account_code: bankAcc.account_code, account_name: bankAcc.account_name, debit: 0, credit: netTotal, description: `صرف رواتب ${month}` },
-              ],
-              total_debit: netTotal, total_credit: netTotal,
-              status: "مرحل", source: "رواتب",
-              posted_by: user.full_name || user.email,
-              posted_date: new Date().toISOString().slice(0,10),
-            });
-            alert(`✅ تم ترحيل قيد الرواتب بمبلغ ${netTotal.toLocaleString("ar-SA")} ريال`);
-          }} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
-            <CheckCircle className="w-4 h-4" />ترحيل قيد الرواتب
-          </button>}
+        <button
+  onClick={async () => {
+    try {
+      const blob = await downloadWPS(month);
+
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `WPS-${month}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("فشل تحميل ملف WPS");
+    }
+  }}
+  className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 text-sm font-medium"
+>
+  <Download className="w-4 h-4" />
+  WPS
+</button>
+{canApprove && (
+  <button
+    onClick={async () => {
+      try {
+        const res = await postSalaryEntry(month);
+
+        alert(
+          `✅ تم ترحيل قيد الرواتب بنجاح\n\n` +
+          `رقم القيد: ${res.data.name}\n` +
+          `إجمالي القيد: ${res.data.total_debit.toLocaleString("ar-SA")} ريال`
+        );
+
+        // إعادة تحميل البيانات بعد الترحيل
+        loadPayroll();
+      } catch (err) {
+        console.error(err);
+
+        const error =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "حدث خطأ أثناء ترحيل قيد الرواتب.";
+
+        if (error.includes("already been posted")) {
+          alert("ℹ️ تم ترحيل رواتب هذا الشهر مسبقًا.");
+          return;
+        }
+
+        alert(error);
+      }
+    }}
+    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+  >
+    <CheckCircle className="w-4 h-4" />
+    ترحيل قيد الرواتب
+  </button>
+)}
         </div>
       </div>
 

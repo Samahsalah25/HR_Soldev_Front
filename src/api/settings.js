@@ -17,6 +17,8 @@ export async function getGosiRates() {
 }
 
 
+
+
 /**
  * UPDATE GOSI Rates
  * PUT /salary/accounting/settings/gosi-rates
@@ -105,6 +107,69 @@ export async function getLaborLawSettings() {
 export async function updateLaborLawSettings(data) {
     const res = await salarySettingsApi.put(
         "/salary/accounting/settings/labor-law",
+        data
+    );
+
+    return res.data;
+}
+
+
+
+// ===============================
+// WPS Settings
+// ===============================
+
+/**
+ * GET WPS Settings
+ * GET /salary/accounting/settings/wps
+ *
+ * Response:
+ * {
+ *   success: true,
+ *   payment_day_limit: 15
+ * }
+ */
+export async function getWpsSettings() {
+    const res = await salarySettingsApi.get(
+        "/salary/accounting/settings/wps"
+    );
+
+    return res.data;
+}
+
+/**
+ * UPDATE WPS Settings
+ * PUT /salary/accounting/settings/wps
+ *
+ * Body:
+ * {
+ *   payment_day_limit: 15
+ * }
+ */
+export async function updateWpsSettings(data) {
+    const res = await salarySettingsApi.put(
+        "/salary/accounting/settings/wps",
+        data
+    );
+
+    return res.data;
+}
+
+
+
+
+/**
+ * RUN Sandbox Test
+ * POST /salary/accounting/settings/test-environment/run
+ *
+ * Body:
+ * {
+ *   scenario: "gosi_resident"
+ * }
+ */
+export async function runSandboxTest(data) {
+    const res = await salarySettingsApi.post(
+        "/salary/accounting/settings/test-environment/run",
         data
     );
 

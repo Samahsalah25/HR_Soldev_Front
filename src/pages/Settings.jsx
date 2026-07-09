@@ -5,7 +5,10 @@ import {
   getGosiRates,
   updateGosiRates,
   getLaborLawSettings,
-  updateLaborLawSettings
+  updateLaborLawSettings ,
+    getWpsSettings,
+  updateWpsSettings,
+  runSandboxTest
 } from "@/api/settings";
 import { useEffect } from "react";
 
@@ -37,36 +40,26 @@ const SANDBOX_TESTS = [
     id: "gosi_saudi",
     label: "GOSI — موظف سعودي",
     desc: "أساسي 10,000 + سكن 2,500",
-    run: () => calcGOSI_Saudi(10000, 2500),
-    expected: { employeeDeduction: "1,125.00 ريال (9% من 12,500)", employerContribution: "1,468.75 ريال (11.75% من 12,500)" }
   },
   {
-    id: "gosi_nonsaudi",
+    id: "gosi_resident",
     label: "GOSI — موظف مقيم",
     desc: "أساسي 8,000",
-    run: () => calcGOSI_NonSaudi(8000),
-    expected: { employeeDeduction: "160.00 ريال (2% من 8,000)", employerContribution: "160.00 ريال (2%)" }
   },
   {
-    id: "eos_employer_6yrs",
+    id: "eos_termination",
     label: "نهاية الخدمة — فصل بعد 6 سنوات",
     desc: "أساسي 10,000 — 6 سنوات — فصل من صاحب العمل",
-    run: () => calcEndOfService(10000, 6, "إنهاء من صاحب العمل", "غير محدد المدة"),
-    expected: { finalReward: "60,000 ريال (شهر كامل × 6)" }
   },
   {
-    id: "eos_resign_4yrs",
+    id: "eos_resignation",
     label: "نهاية الخدمة — استقالة بعد 4 سنوات",
     desc: "أساسي 8,000 — 4 سنوات — استقالة",
-    run: () => calcEndOfService(8000, 4, "استقالة", "غير محدد المدة"),
-    expected: { finalReward: "10,666.67 ريال (ثلث المكافأة)" }
   },
   {
-    id: "leave_encash",
+    id: "vacation_settlement",
     label: "تصفية الإجازات",
     desc: "أساسي 6,000 + سكن 1,500 — 15 يوم",
-    run: () => ({ amount: calcLeaveEncashment(6000, 1500, 15) }),
-    expected: { amount: "3,750 ريال ((6000+1500)÷30×15)" }
   },
 ];
 
@@ -87,7 +80,9 @@ const [gosiSaved, setGosiSaved] = useState(false);
 const [laborLaw, setLaborLaw] = useState(null);
 const [laborLoading, setLaborLoading] = useState(false);
 const [laborSaved, setLaborSaved] = useState(false);
-
+const [wpsSettings, setWpsSettings] = useState(null);
+const [wpsLoading, setWpsLoading] = useState(false);
+const [wpsSaved, setWpsSaved] = useState(false);
 const [activeTab, setActiveTab] = useState("gosi");
 const [sandboxResults, setSandboxResults] = useState({});
 const [saved, setSaved] = useState(false);
@@ -158,6 +153,45 @@ const updateLaborField = (
   }));
 
 };
+
+const loadWpsSettings = async () => {
+  try {
+    setWpsLoading(true);
+
+    const res = await getWpsSettings();
+
+    setWpsSettings({
+      payment_day_limit: res.payment_day_limit,
+    });
+
+  } catch (error) {
+    console.error("Failed to load WPS settings", error);
+  } finally {
+    setWpsLoading(false);
+  }
+};
+const updateWpsField = (value) => {
+  setWpsSettings((prev) => ({
+    ...prev,
+    payment_day_limit: Number(value),
+  }));
+};
+const saveWpsSettings = async () => {
+  if (!wpsSettings) return;
+
+  try {
+    await updateWpsSettings(wpsSettings);
+
+    setWpsSaved(true);
+
+    setTimeout(() => {
+      setWpsSaved(false);
+    }, 2500);
+
+  } catch (error) {
+    console.error("Failed to update WPS settings", error);
+  }
+};
 const saveLaborLaw = async()=>{
 
   if(!laborLaw) return;
@@ -189,10 +223,9 @@ const saveLaborLaw = async()=>{
 
 };
 useEffect(() => {
-
   loadGosiRates();
   loadLaborLaw();
-
+  loadWpsSettings();
 }, []);
 const loadGosiRates = async () => {
   try {
@@ -263,32 +296,49 @@ const handleSave = () => {
   }, 2500);
 };
 
+// ===============================
+// Sandbox
+// ===============================
 
 // ===============================
 // Sandbox
 // ===============================
 
-const runTest = (test) => {
-  const result = test.run();
+const runTest = async (test) => {
+  try {
+    const res = await runSandboxTest({
+      scenario: test.id,
+    });
 
-  setSandboxResults(prev => ({
-    ...prev,
-    [test.id]: result
-  }));
+    setSandboxResults(prev => ({
+      ...prev,
+      [test.id]: res,
+    }));
+
+  } catch (error) {
+    console.error("Failed to run sandbox test", error);
+  }
 };
 
 
-const runAllTests = () => {
-  const results = {};
+const runAllTests = async () => {
+  try {
+    const results = {};
 
-  SANDBOX_TESTS.forEach(t => {
-    results[t.id] = t.run();
-  });
+    for (const test of SANDBOX_TESTS) {
+      const res = await runSandboxTest({
+        scenario: test.id,
+      });
 
-  setSandboxResults(results);
+      results[test.id] = res;
+    }
+
+    setSandboxResults(results);
+
+  } catch (error) {
+    console.error("Failed to run all sandbox tests", error);
+  }
 };
-
-
 // ===============================
 // GOSI Calculations Display
 // ===============================
@@ -308,21 +358,23 @@ const gosiEmployerTotal = gosiRates
           <p className="text-sm text-muted-foreground mt-0.5">تحديث المعدلات والنسب وفق أحدث اللوائح الرسمية</p>
         </div>
 
-   <button 
+<button 
   onClick={
     activeTab === "gosi"
       ? saveGosiRates
       : activeTab === "labor"
       ? saveLaborLaw
+      : activeTab === "wps"
+      ? saveWpsSettings
       : handleSave
   }
   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-    (saved || gosiSaved || laborSaved)
+    (saved || gosiSaved || laborSaved || wpsSaved)
       ? "bg-green-500 text-white"
       : "bg-primary text-primary-foreground hover:bg-primary/90"
   }`}
 >
-  {(saved || gosiSaved || laborSaved) ? (
+  {(saved || gosiSaved || laborSaved || wpsSaved) ? (
     <>
       <CheckCircle className="w-4 h-4" />
       تم الحفظ
@@ -765,118 +817,250 @@ const gosiEmployerTotal = gosiRates
   </div>
 )}
 
-      {activeTab === "wps" && (
-        <div className="space-y-5">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-            <p className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />نظام حماية الأجور (WPS)</p>
-            <p className="mt-1">يجب دفع الرواتب عبر نظام WPS بنك التسهيلات في موعد أقصاه اليوم {rates.wps_deadline_day} من كل شهر.</p>
-          </div>
-          <div className="bg-card rounded-xl border border-border p-5 space-y-4">
-            <h3 className="font-semibold">إعدادات WPS</h3>
-            <Field label="الحد الأقصى للدفع (يوم من الشهر)" note="وفق لوائح وزارة الموارد البشرية">
-              <div className="flex items-center gap-2">
-                <input type="number" min={1} max={28} value={rates.wps_deadline_day}
-                  onChange={e => set("wps_deadline_day", +e.target.value)}
-                  className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-                <span className="text-sm text-muted-foreground">من كل شهر</span>
-              </div>
-            </Field>
-          </div>
+     {activeTab === "wps" && (
+  <div className="space-y-5">
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+      <p className="font-semibold flex items-center gap-2">
+        <AlertTriangle className="w-4 h-4" />
+        نظام حماية الأجور (WPS)
+      </p>
 
-          {/* WPS File Format Info */}
-          <div className="bg-card rounded-xl border border-border p-5 space-y-3">
-            <h3 className="font-semibold text-sm">بنية ملف WPS</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-muted/40">
-                    {["الحقل", "النوع", "الوصف"].map(h => (
-                      <th key={h} className="text-right px-3 py-2 border border-border font-medium">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ["رقم الهوية", "رقمي 10 خانات", "رقم هوية/إقامة الموظف"],
-                    ["رقم IBAN", "SA + 22 خانة", "رقم الحساب البنكي"],
-                    ["صافي الراتب", "رقمي عشري", "المبلغ المحوّل بالريال"],
-                    ["شهر الراتب", "YYYY-MM", "الشهر المراد صرفه"],
-                    ["رقم المنشأة", "رقمي", "رقم المنشأة في GOSI"],
-                  ].map(([f, t, d]) => (
-                    <tr key={f} className="border-b border-border">
-                      <td className="px-3 py-2 border border-border font-medium">{f}</td>
-                      <td className="px-3 py-2 border border-border text-muted-foreground font-mono">{t}</td>
-                      <td className="px-3 py-2 border border-border text-muted-foreground">{d}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      <p className="mt-1">
+        يجب دفع الرواتب عبر نظام WPS بنك التسهيلات في موعد أقصاه اليوم{" "}
+        {wpsSettings?.payment_day_limit} من كل شهر.
+      </p>
+    </div>
+
+    <div className="bg-card rounded-xl border border-border p-5 space-y-4">
+      <h3 className="font-semibold">إعدادات WPS</h3>
+
+      <Field 
+        label="الحد الأقصى للدفع (يوم من الشهر)" 
+        note="وفق لوائح وزارة الموارد البشرية"
+      >
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={28}
+            value={wpsSettings?.payment_day_limit ?? ""}
+            onChange={(e) =>
+              setWpsSettings(prev => ({
+                ...prev,
+                payment_day_limit: Number(e.target.value)
+              }))
+            }
+            className="w-24 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+          />
+
+          <span className="text-sm text-muted-foreground">
+            من كل شهر
+          </span>
         </div>
-      )}
+      </Field>
+    </div>
 
-      {activeTab === "sandbox" && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex-1 ml-4">
-              <p className="font-semibold flex items-center gap-2"><Calculator className="w-4 h-4" />بيئة اختبار الحسابات (Sandbox)</p>
-              <p className="mt-1">تحقق من صحة حسابات GOSI ونهاية الخدمة والإجازات قبل تطبيقها على كشف الرواتب الفعلي.</p>
+
+    {/* WPS File Format Info */}
+    <div className="bg-card rounded-xl border border-border p-5 space-y-3">
+      <h3 className="font-semibold text-sm">بنية ملف WPS</h3>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-muted/40">
+              {["الحقل", "النوع", "الوصف"].map(h => (
+                <th 
+                  key={h} 
+                  className="text-right px-3 py-2 border border-border font-medium"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {[
+              ["رقم الهوية", "رقمي 10 خانات", "رقم هوية/إقامة الموظف"],
+              ["رقم IBAN", "SA + 22 خانة", "رقم الحساب البنكي"],
+              ["صافي الراتب", "رقمي عشري", "المبلغ المحوّل بالريال"],
+              ["شهر الراتب", "YYYY-MM", "الشهر المراد صرفه"],
+              ["رقم المنشأة", "رقمي", "رقم المنشأة في GOSI"],
+            ].map(([f, t, d]) => (
+              <tr key={f} className="border-b border-border">
+                <td className="px-3 py-2 border border-border font-medium">
+                  {f}
+                </td>
+
+                <td className="px-3 py-2 border border-border text-muted-foreground font-mono">
+                  {t}
+                </td>
+
+                <td className="px-3 py-2 border border-border text-muted-foreground">
+                  {d}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
+
+   {activeTab === "sandbox" && (
+  <div className="space-y-5">
+    <div className="flex items-center justify-between">
+      <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800 flex-1 ml-4">
+        <p className="font-semibold flex items-center gap-2">
+          <Calculator className="w-4 h-4" />
+          بيئة اختبار الحسابات (Sandbox)
+        </p>
+
+        <p className="mt-1">
+          تحقق من صحة حسابات GOSI ونهاية الخدمة والإجازات قبل تطبيقها على كشف الرواتب الفعلي.
+        </p>
+      </div>
+
+      <button
+        onClick={runAllTests}
+        className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium whitespace-nowrap"
+      >
+        <RefreshCw className="w-4 h-4" />
+        تشغيل الكل
+      </button>
+    </div>
+
+
+    <div className="space-y-3">
+      {SANDBOX_TESTS.map(test => {
+
+        const result = sandboxResults[test.id];
+
+        return (
+          <div
+            key={test.id}
+            className="bg-card rounded-xl border border-border overflow-hidden"
+          >
+
+            <div className="flex items-center justify-between px-5 py-3 bg-muted/20 border-b border-border">
+
+              <div>
+                <p className="font-semibold text-sm text-foreground">
+                  {test.label}
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  {test.desc}
+                </p>
+              </div>
+
+
+              <button
+                onClick={() => runTest(test)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90"
+              >
+                <Calculator className="w-3.5 h-3.5" />
+                تشغيل
+              </button>
+
             </div>
-            <button onClick={runAllTests}
-              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium whitespace-nowrap">
-              <RefreshCw className="w-4 h-4" />تشغيل الكل
-            </button>
-          </div>
 
-          <div className="space-y-3">
-            {SANDBOX_TESTS.map(test => {
-              const result = sandboxResults[test.id];
-              return (
-                <div key={test.id} className="bg-card rounded-xl border border-border overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-3 bg-muted/20 border-b border-border">
-                    <div>
-                      <p className="font-semibold text-sm text-foreground">{test.label}</p>
-                      <p className="text-xs text-muted-foreground">{test.desc}</p>
-                    </div>
-                    <button onClick={() => runTest(test)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90">
-                      <Calculator className="w-3.5 h-3.5" />تشغيل
-                    </button>
+
+            {result && (
+              <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+
+
+                {/* Actual Result */}
+                <div>
+
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    📊 النتيجة الفعلية
+                  </p>
+
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
+
+                    {Object.entries(result.data || {}).map(([k, v]) => (
+
+                      <div
+                        key={k}
+                        className="flex justify-between gap-3"
+                      >
+
+                        <span className="text-xs text-muted-foreground">
+                          {k}
+                        </span>
+
+
+                        <span className="text-xs font-bold text-green-700 text-left">
+
+                          {typeof v === "object"
+                            ? JSON.stringify(v)
+                            : typeof v === "number"
+                            ? formatCurrency(v)
+                            : v
+                          }
+
+                        </span>
+
+                      </div>
+
+                    ))}
+
                   </div>
 
-                  {result && (
-                    <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">📊 النتيجة الفعلية</p>
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
-                          {Object.entries(result).map(([k, v]) => (
-                            <div key={k} className="flex justify-between">
-                              <span className="text-xs text-muted-foreground">{k}</span>
-                              <span className="text-xs font-bold text-green-700">{typeof v === "number" ? formatCurrency(v) : JSON.stringify(v)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">✅ النتيجة المتوقعة</p>
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
-                          {Object.entries(test.expected).map(([k, v]) => (
-                            <div key={k} className="flex flex-col gap-0.5">
-                              <span className="text-xs text-muted-foreground">{k}</span>
-                              <span className="text-xs font-bold text-blue-700">{v}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              );
-            })}
+
+
+
+                {/* Expected Result */}
+                <div>
+
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    ✅ النتيجة المتوقعة
+                  </p>
+
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+
+                    {Object.entries(result.expected || {}).map(([k, v]) => (
+
+                      <div
+                        key={k}
+                        className="flex flex-col gap-0.5"
+                      >
+
+                        <span className="text-xs text-muted-foreground">
+                          {k}
+                        </span>
+
+
+                        <span className="text-xs font-bold text-blue-700">
+                          {v}
+                        </span>
+
+                      </div>
+
+                    ))}
+
+                  </div>
+
+                </div>
+
+
+              </div>
+            )}
+
           </div>
-        </div>
-      )}
+        );
+
+      })}
+    </div>
+
+  </div>
+)}
     </div>
   );
 }

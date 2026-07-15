@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { MapPin, X, Warehouse, Phone, Mail, Shield, Camera, Zap, User, LogIn } from "lucide-react";
 import { getCustomerSession, clearCustomerSession } from "../lib/customerAuth";
+import { getAvailableUnits } from "@/api/storageRentalsApi";
+import { fromApiUnit } from "@/api/storageUnitsApi";
 
 const DISCOUNT_OPTIONS = [
-  { months: 1,  label: "شهري (بدون خصم)",   discount: 0 },
-  { months: 3,  label: "3 أشهر (خصم 5%)",   discount: 0.05 },
-  { months: 6,  label: "6 أشهر (خصم 15%)",  discount: 0.15 },
-  { months: 12, label: "سنوي (خصم 35%)",    discount: 0.35 },
+  { months: 1, label: "شهري (بدون خصم)", discount: 0 },
+  { months: 3, label: "3 أشهر (خصم 5%)", discount: 0.05 },
+  { months: 6, label: "6 أشهر (خصم 15%)", discount: 0.15 },
+  { months: 12, label: "سنوي (خصم 35%)", discount: 0.35 },
 ];
 
 // ── Booking Modal ─────────────────────────────────────────────────────────────
@@ -187,12 +188,9 @@ export default function PublicStorageRental() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
-    base44.entities.StorageUnit.list()
-      .then(allUnits => {
-        const u = allUnits.filter(x => x.status === "متاحة");
-        setUnits(u);
-      })
-      .catch(() => {})
+    getAvailableUnits()                         // GET /storage/rentals/available-units
+      .then(list => setUnits(list.map(fromApiUnit)))
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -274,7 +272,7 @@ export default function PublicStorageRental() {
             استمتع بحرية مساحة خالية من الفوضى. حلول التخزين الآمنة والمريحة في متناول يدك.
           </p>
           <div className="flex flex-wrap justify-center gap-6 mt-6 text-sm">
-            {[["🔒","أمان 24/7"],["❄️","وحدات مكيفة"],["🚪","وصول سهل"],["📋","عقد فوري"]].map(([icon, label]) => (
+            {[["🔒", "أمان 24/7"], ["❄️", "وحدات مكيفة"], ["🚪", "وصول سهل"], ["📋", "عقد فوري"]].map(([icon, label]) => (
               <div key={label} className="flex items-center gap-2 bg-white/15 backdrop-blur rounded-xl px-4 py-2">
                 <span>{icon}</span><span className="font-medium">{label}</span>
               </div>

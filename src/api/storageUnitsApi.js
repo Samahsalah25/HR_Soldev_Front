@@ -208,3 +208,12 @@ export async function importStorageUnitsCsv(csvFile) {
     });
     return res.data;
 }
+
+/**
+ * GET /storage/dashboard
+ * يرجع: { stats, units, expiration_alerts, contracts_summary }
+ */
+export async function getStorageDashboard() {
+    const res = await api.get("/storage/dashboard");
+    return res.data?.data ?? res.data;
+}

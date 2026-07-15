@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { FileText, CreditCard, Eye, Warehouse, CheckCircle, AlertCircle, LogOut } from "lucide-react";
 import ContractView from "../components/storage/ContractView";
 import InvoiceView from "../components/storage/InvoiceView";
 import PaymentModal from "../components/storage/PaymentModal";
+import { getCustomerSession, clearCustomerSession } from "../lib/customerAuth";
+import { getRentals, updateRental, buildUpdateRentalFormData, RENTAL_STATE_API } from "@/api/storageRentalsApi";
 
 export default function CustomerPortal() {
   const [user, setUser] = useState(null);
@@ -18,16 +19,20 @@ export default function CustomerPortal() {
   useEffect(() => {
     const init = async () => {
       try {
-        const me = await base44.auth.me();
-        setUser(me);
-        const [c, inv] = await Promise.all([
-          base44.entities.StorageContract.filter({ customer_email: me.email }),
-          base44.entities.StorageInvoice.filter({ customer_email: me.email }),
-        ]);
-        setContracts(c);
-        setInvoices(inv.sort((a, b) => new Date(b.invoice_date) - new Date(a.invoice_date)));
+        const session = getCustomerSession();
+        if (!session) {
+          window.location.href = "/customer-login";
+          return;
+        }
+        setUser(session);
+        // الـ contracts = rentals بـ state approved للعميل الحالي
+        const rentals = await getRentals({ state: RENTAL_STATE_API.APPROVED });
+        const myContracts = rentals.filter(r =>
+          r.customer_email === session.email
+        );
+        setContracts(myContracts);
       } catch {
-        base44.auth.redirectToLogin(window.location.pathname);
+        window.location.href = "/customer-login";
       } finally {
         setLoading(false);
       }
@@ -38,15 +43,19 @@ export default function CustomerPortal() {
   const unpaidCount = invoices.filter(i => i.status === "غير مدفوعة").length;
 
   const handlePaymentDone = async (invoice, method, ref) => {
-    await base44.entities.StorageInvoice.update(invoice.id, {
-      status: "مدفوعة",
-      payment_method: method,
-      payment_ref: ref,
-      paid_at: new Date().toISOString(),
+    // نحدّث الـ rental بـ payment info
+    const fd = buildUpdateRentalFormData({
+      payment_type: method,
+      state: RENTAL_STATE_API.APPROVED,
     });
+    await updateRental(invoice.id, fd);
     setPayingInvoice(null);
-    const inv = await base44.entities.StorageInvoice.filter({ customer_email: user.email });
-    setInvoices(inv.sort((a, b) => new Date(b.invoice_date) - new Date(a.invoice_date)));
+    // refresh contracts
+    const session = getCustomerSession();
+    if (session) {
+      const rentals = await getRentals({ state: RENTAL_STATE_API.APPROVED });
+      setContracts(rentals.filter(r => r.customer_email === session.email));
+    }
   };
 
   if (loading) return (
@@ -76,7 +85,8 @@ export default function CustomerPortal() {
               </span>
             )}
             <span className="text-sm text-gray-600 hidden sm:block">{user?.full_name || user?.email}</span>
-            <button onClick={() => base44.auth.logout()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50">
+            <button onClick={() => { clearCustomerSession(); window.location.href = "/customer-login"; }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50">
               <LogOut className="w-3.5 h-3.5" />خروج
             </button>
           </div>

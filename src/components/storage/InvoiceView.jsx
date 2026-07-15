@@ -69,7 +69,7 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
               <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-2">
 
                 <span className="text-white font-black text-xl">
-                  ت
+                
                 </span>
 
               </div>
@@ -100,10 +100,6 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
 
 
             </div>
-
-
-
-
 
             <div className="text-left space-y-1">
 
@@ -138,9 +134,6 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
                 {" "}
                 {invoice.issue_date}
               </p>
-
-
-
               <p className="text-xs text-gray-500">
                 تاريخ الاستحقاق:
                 {" "}
@@ -154,19 +147,8 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
                 {" "}
                 {invoice.invoice_type_label}
               </p>
-
-
-
             </div>
-
-
           </div>
-
-
-
-
-
-
           {/* Customer */}
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-1">
@@ -198,16 +180,7 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
               {invoice.customer_email || "—"}
 
             </p>
-
-
           </div>
-
-
-
-
-
-
-
           {/* Items */}
 
           <table className="w-full border rounded-xl overflow-hidden text-sm">
@@ -394,15 +367,7 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
 
             </div>
 
-
           </div>
-
-
-
-
-
-
-
           {/* Pay Button */}
 
 
@@ -426,14 +391,8 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
 
           )}
 
-
-
         </div>
-
-
       </div>
-
-
     </div>
   );
 }

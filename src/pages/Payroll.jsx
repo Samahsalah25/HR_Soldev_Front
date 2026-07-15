@@ -2,57 +2,59 @@ import { useState, useEffect } from "react";
 import { Download, CheckCircle, FileText, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
+import { canDo } from "../lib/crudPermissions";
 import { calcPayslip, calcGOSI_Saudi, calcGOSI_NonSaudi, formatCurrency, EXPAT_LEVY } from "../lib/hrUtils";
-
+import {
+  getInsuranceKPIs,
+  getInsuranceDashboard,
+  getGosiInsurance,
+  getCostSummary,
+    postSalaryEntry,
+  downloadWPS,
+} from "@/api/financeApi";
 export default function Payroll() {
-  const { user, canDo } = useRole();
-  const canApprove = canDo("payroll", "approve");
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useRole();
+  const canApprove = canDo(user, "payroll", "approve");
+
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [payslips, setPayslips] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+const [kpis, setKpis] = useState({});
+const [payslips, setPayslips] = useState([]);
+const [gosiInsurance, setGosiInsurance] = useState({});
+const [costSummary, setCostSummary] = useState({});
+
   const [selected, setSelected] = useState(null);
   const [activeTab, setActiveTab] = useState("payroll");
 
-  const loadPayroll = async () => {
+const loadPayroll = async () => {
+  try {
     setLoading(true);
-    const [emps, lns, deductions, bonuses] = await Promise.all([
-      base44.entities.Employee.filter({ status: "نشط" }),
-      base44.entities.Loan.filter({ status: "نشطة" }),
-      base44.entities.Deduction.filter({ month }),
-      base44.entities.Bonus.filter({ period: month }),
+
+    const [
+      kpisData,
+      dashboardData,
+      gosiData,
+      costData,
+    ] = await Promise.all([
+      getInsuranceKPIs(month),
+      getInsuranceDashboard(month),
+      getGosiInsurance(month),
+      getCostSummary(month),
     ]);
-    setEmployees(emps);
-    generatePayslips(emps, lns, deductions, bonuses);
+
+    setKpis(kpisData);
+    setPayslips(dashboardData);
+    setGosiInsurance(gosiData);
+    setCostSummary(costData);
+
+  } finally {
     setLoading(false);
-  };
-
-  useEffect(() => { loadPayroll(); }, [month]);
-
-  const generatePayslips = (emps, activeLoans = [], deductions = [], bonuses = []) => {
-    const slips = emps.map(emp => {
-      const empLoan = activeLoans.find(l => l.employee_id === emp.id);
-      const loanDeduction = empLoan ? (empLoan.monthly_deduction || 0) : 0;
-      const empDeductions = deductions.filter(d => d.employee_id === emp.id && d.status === "معتمد");
-      const extraDeduction = empDeductions.reduce((s, d) => s + (d.amount || 0), 0);
-      const empBonuses = bonuses.filter(b => b.employee_id === emp.id && b.status === "معتمدة");
-      const bonusTotal = empBonuses.reduce((s, b) => s + (b.amount || 0), 0);
-      return { emp, loanDeduction, empLoan, extraDeduction, bonusTotal, empDeductions, empBonuses, ...calcPayslip(emp, 0, 0, 0, loanDeduction + extraDeduction) };
-    });
-    setPayslips(slips);
-  };
-
-  const totals = payslips.reduce((acc, p) => ({
-    earnings: acc.earnings + p.totalEarnings,
-    gosiEmp: acc.gosiEmp + p.gosiEmployee,
-    gosiEmployer: acc.gosiEmployer + p.gosiEmployer,
-    net: acc.net + p.netSalary,
-  }), { earnings: 0, gosiEmp: 0, gosiEmployer: 0, net: 0 });
-
-  const saudis = employees.filter(e => e.is_saudi);
-  const nonSaudis = employees.filter(e => !e.is_saudi);
-  const totalExpatLevy = nonSaudis.length * EXPAT_LEVY;
-
+  }
+};
+useEffect(() => {
+  loadPayroll();
+}, [month]);
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       {/* Header */}
@@ -64,33 +66,68 @@ export default function Payroll() {
         <div className="flex items-center gap-3">
           <input type="month" value={month} onChange={e => setMonth(e.target.value)}
             className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20" />
-          <button className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 text-sm font-medium">
-            <Download className="w-4 h-4" />WPS
-          </button>
-          {canApprove && <button onClick={async () => {
-            const accounts = await base44.entities.AccountChart.list();
-            const salaryAcc = accounts.find(a => (a.account_name?.includes("رواتب") || a.account_name?.includes("أجور")) && !a.is_parent);
-            const bankAcc = accounts.find(a => (a.account_name?.includes("بنك") || a.account_name?.includes("صندوق")) && !a.is_parent);
-            if (!salaryAcc || !bankAcc) { alert("يرجى إنشاء حسابات الرواتب والبنك في دليل الحسابات أولاً"); return; }
-            const user = await base44.auth.me();
-            const netTotal = payslips.reduce((s, p) => s + p.netSalary, 0);
-            await base44.entities.JournalEntry.create({
-              entry_number: `JE-SAL-${month.replace("-", "")}`,
-              entry_date: new Date().toISOString().slice(0, 10),
-              description: `قيد رواتب شهر ${month} — ${employees.length} موظف`,
-              lines: [
-                { account_id: salaryAcc.id, account_code: salaryAcc.account_code, account_name: salaryAcc.account_name, debit: netTotal, credit: 0, description: `رواتب ${month}` },
-                { account_id: bankAcc.id, account_code: bankAcc.account_code, account_name: bankAcc.account_name, debit: 0, credit: netTotal, description: `صرف رواتب ${month}` },
-              ],
-              total_debit: netTotal, total_credit: netTotal,
-              status: "مرحل", source: "رواتب",
-              posted_by: user.full_name || user.email,
-              posted_date: new Date().toISOString().slice(0, 10),
-            });
-            alert(`✅ تم ترحيل قيد الرواتب بمبلغ ${netTotal.toLocaleString("ar-SA")} ريال`);
-          }} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
-            <CheckCircle className="w-4 h-4" />ترحيل قيد الرواتب
-          </button>}
+        <button
+  onClick={async () => {
+    try {
+      const blob = await downloadWPS(month);
+
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `WPS-${month}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("فشل تحميل ملف WPS");
+    }
+  }}
+  className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 text-sm font-medium"
+>
+  <Download className="w-4 h-4" />
+  WPS
+</button>
+{canApprove && (
+  <button
+    onClick={async () => {
+      try {
+        const res = await postSalaryEntry(month);
+
+        alert(
+          `✅ تم ترحيل قيد الرواتب بنجاح\n\n` +
+          `رقم القيد: ${res.data.name}\n` +
+          `إجمالي القيد: ${res.data.total_debit.toLocaleString("ar-SA")} ريال`
+        );
+
+        // إعادة تحميل البيانات بعد الترحيل
+        loadPayroll();
+      } catch (err) {
+        console.error(err);
+
+        const error =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          "حدث خطأ أثناء ترحيل قيد الرواتب.";
+
+        if (error.includes("already been posted")) {
+          alert("ℹ️ تم ترحيل رواتب هذا الشهر مسبقًا.");
+          return;
+        }
+
+        alert(error);
+      }
+    }}
+    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+  >
+    <CheckCircle className="w-4 h-4" />
+    ترحيل قيد الرواتب
+  </button>
+)}
         </div>
       </div>
 
@@ -109,200 +146,376 @@ export default function Payroll() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "إجمالي الاستحقاقات", value: formatCurrency(totals.earnings), color: "text-primary" },
-          { label: "خصومات GOSI (موظفون)", value: formatCurrency(totals.gosiEmp), color: "text-amber-600" },
-          { label: "اشتراك GOSI (صاحب العمل)", value: formatCurrency(totals.gosiEmployer), color: "text-orange-600" },
-          { label: "صافي الرواتب", value: formatCurrency(totals.net), color: "text-secondary" },
-        ].map(card => (
-          <div key={card.label} className="bg-card rounded-xl border border-border p-4">
-            <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
+  {/* Summary Cards */}
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  {[
+    {
+      label: "إجمالي الاستحقاقات",
+      value: formatCurrency(kpis?.total_entitlements || 0),
+      color: "text-primary",
+    },
+    {
+      label: "خصومات GOSI (موظفون)",
+      value: formatCurrency(kpis?.gosi_employee_deductions || 0),
+      color: "text-amber-600",
+    },
+    {
+      label: "اشتراك GOSI (صاحب العمل)",
+      value: formatCurrency(kpis?.gosi_employer_subscriptions || 0),
+      color: "text-orange-600",
+    },
+    {
+      label: "صافي الرواتب",
+      value: formatCurrency(kpis?.total_net_salaries || 0),
+      color: "text-secondary",
+    },
+  ].map((card) => (
+    <div key={card.label} className="bg-card rounded-xl border border-border p-4">
+      <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
+    </div>
+  ))}
+</div>
+
+     {activeTab === "payroll" && (
+  <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-muted/20">
+      <h3 className="font-semibold text-foreground flex items-center gap-2">
+        <FileText className="w-4 h-4 text-primary" />
+        كشف رواتب شهر {month}
+      </h3>
+    </div>
+
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/30">
+            {[
+              "الموظف",
+              "الجنسية",
+              "الأساسي",
+              "البدلات",
+              "الإجمالي",
+              "GOSI موظف",
+              "الخصومات",
+              "الصافي",
+              "مخصص ن.خدمة",
+            ].map((h) => (
+              <th
+                key={h}
+                className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {loading ? (
+            <tr>
+              <td colSpan={9} className="text-center py-10 text-muted-foreground">
+                جاري التحميل...
+              </td>
+            </tr>
+          ) : (
+            payslips.map((item) => (
+              <tr
+                key={item.employee.id}
+                className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer"
+                onClick={() => setSelected(item)}
+              >
+                <td className="px-4 py-3">
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {item.employee.name_ar || item.employee.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.employee.job_title}
+                    </p>
+                  </div>
+                </td>
+
+                <td className="px-4 py-3">
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      item.category === "مواطن"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-blue-100 text-blue-700"
+                    }`}
+                  >
+                    {item.category}
+                  </span>
+                </td>
+
+                <td className="px-4 py-3 font-medium">
+                  {formatCurrency(item.wage)}
+                </td>
+
+                <td className="px-4 py-3 text-muted-foreground">
+                  {formatCurrency(item.total_allowances)}
+                </td>
+
+                <td className="px-4 py-3 font-semibold text-foreground">
+                  {formatCurrency(item.total)}
+                </td>
+
+                <td className="px-4 py-3 text-amber-600">
+                  ({formatCurrency(item.gosi_employee)})
+                </td>
+
+                <td className="px-4 py-3 text-red-600">
+                  {item.deduction_amount > 0 ? (
+                    <>
+                      ({formatCurrency(item.deduction_amount)})
+                      <p className="text-xs text-orange-500">
+                        {item.deduction}
+                      </p>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+
+                <td className="px-4 py-3 font-bold text-secondary">
+                  {formatCurrency(item.net)}
+                </td>
+
+                <td className="px-4 py-3 text-purple-600">
+                  {formatCurrency(item.eos_provision)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+
+        <tfoot>
+          <tr className="bg-primary/5 border-t-2 border-primary/20">
+            <td colSpan={4} className="px-4 py-3 font-bold text-foreground">
+              الإجمالي
+            </td>
+
+            <td className="px-4 py-3 font-bold text-foreground">
+              {formatCurrency(kpis?.total_entitlements || 0)}
+            </td>
+
+            <td className="px-4 py-3 font-bold text-amber-600">
+              ({formatCurrency(kpis?.gosi_employee_deductions || 0)})
+            </td>
+
+            <td className="px-4 py-3 font-bold text-red-600">
+              —
+            </td>
+
+            <td className="px-4 py-3 font-bold text-secondary">
+              {formatCurrency(kpis?.total_net_salaries || 0)}
+            </td>
+
+            <td />
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+)}
+
+     {activeTab === "gosi" && (
+  <div className="space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* السعوديين */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
+          🇸🇦 الموظفون السعوديون ({gosiInsurance?.saudi?.count || 0})
+        </h3>
+
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between text-muted-foreground">
+            <span>الموظف (GOSI)</span>
+            <span className="font-medium text-foreground">
+              {formatCurrency(gosiInsurance?.saudi?.employee_gosi || 0)}
+            </span>
           </div>
-        ))}
+
+          <div className="flex justify-between text-muted-foreground">
+            <span>صاحب العمل (GOSI)</span>
+            <span className="font-medium text-foreground">
+              {formatCurrency(gosiInsurance?.saudi?.employer_gosi || 0)}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {activeTab === "payroll" && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-muted/20">
-            <h3 className="font-semibold text-foreground flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              كشف رواتب شهر {month}
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  {["الموظف", "الجنسية", "الأساسي", "البدلات", "الإجمالي", "GOSI موظف", "الخصومات", "الصافي", "مخصص ن.خدمة"].map(h => (
-                    <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={9} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-                ) : payslips.map(({ emp, loanDeduction, extraDeduction, bonusTotal, empDeductions, empBonuses, totalEarnings, gosiEmployee, gosiEmployer, absenceDeduction, lateDeduction, totalDeductions, netSalary, eosMonthlyProvision }) => {
-                  const allowances = totalEarnings - (emp.basic_salary || 0);
-                  return (
-                    <tr key={emp.id} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer"
-                      onClick={() => setSelected({ emp, loanDeduction, extraDeduction, bonusTotal, empDeductions, empBonuses, totalEarnings, gosiEmployee, gosiEmployer, absenceDeduction, lateDeduction, totalDeductions, netSalary, eosMonthlyProvision })}>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium text-foreground">{emp.full_name_ar}</p>
-                          <p className="text-xs text-muted-foreground">{emp.job_title}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${emp.is_saudi ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
-                          {emp.is_saudi ? "سعودي" : "مقيم"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium">{formatCurrency(emp.basic_salary)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatCurrency(allowances)}</td>
-                      <td className="px-4 py-3 font-semibold text-foreground">{formatCurrency(totalEarnings)}</td>
-                      <td className="px-4 py-3 text-amber-600">({formatCurrency(gosiEmployee)})</td>
-                      <td className="px-4 py-3 text-red-600">
-                        ({formatCurrency(totalDeductions)})
-                        {loanDeduction > 0 && <p className="text-xs text-orange-500">سلفة: {formatCurrency(loanDeduction)}</p>}
-                        {extraDeduction > 0 && <p className="text-xs text-red-400">خصومات: {formatCurrency(extraDeduction)}</p>}
-                        {bonusTotal > 0 && <p className="text-xs text-green-500">+ مكافأة: {formatCurrency(bonusTotal)}</p>}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-secondary">{formatCurrency(netSalary)}</td>
-                      <td className="px-4 py-3 text-purple-600">{formatCurrency(eosMonthlyProvision)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-primary/5 border-t-2 border-primary/20">
-                  <td colSpan={4} className="px-4 py-3 font-bold text-foreground">الإجمالي</td>
-                  <td className="px-4 py-3 font-bold text-foreground">{formatCurrency(totals.earnings)}</td>
-                  <td className="px-4 py-3 font-bold text-amber-600">({formatCurrency(totals.gosiEmp)})</td>
-                  <td className="px-4 py-3 font-bold text-red-600">—</td>
-                  <td className="px-4 py-3 font-bold text-secondary">{formatCurrency(totals.net)}</td>
-                  <td className="px-4 py-3" />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* المقيمين */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
+          🌍 الموظفون المقيمون ({gosiInsurance?.resident?.count || 0})
+        </h3>
 
-      {activeTab === "gosi" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-card rounded-xl border border-border p-5">
-              <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-                🇸🇦 الموظفون السعوديون ({saudis.length})
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>الموظف (9% أساسي + سكن)</span>
-                  <span className="font-medium text-foreground">
-                    {formatCurrency(saudis.reduce((s, e) => s + calcGOSI_Saudi(e.basic_salary || 0, e.housing_allowance || 0).employeeDeduction, 0))}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>صاحب العمل (11.75%)</span>
-                  <span className="font-medium text-foreground">
-                    {formatCurrency(saudis.reduce((s, e) => s + calcGOSI_Saudi(e.basic_salary || 0, e.housing_allowance || 0).employerContribution, 0))}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="bg-card rounded-xl border border-border p-5">
-              <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2 text-sm">
-                🌍 الموظفون المقيمون ({nonSaudis.length})
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>الموظف (2% أخطار مهنية)</span>
-                  <span className="font-medium text-foreground">
-                    {formatCurrency(nonSaudis.reduce((s, e) => s + calcGOSI_NonSaudi(e.basic_salary || 0).employeeDeduction, 0))}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>صاحب العمل (2%)</span>
-                  <span className="font-medium text-foreground">
-                    {formatCurrency(nonSaudis.reduce((s, e) => s + calcGOSI_NonSaudi(e.basic_salary || 0).employerContribution, 0))}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground border-t border-border pt-2 mt-2">
-                  <span>رسوم العمالة الوافدة (400×{nonSaudis.length})</span>
-                  <span className="font-bold text-orange-600">{formatCurrency(totalExpatLevy)}</span>
-                </div>
-              </div>
-            </div>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between text-muted-foreground">
+            <span>الموظف (أخطار مهنية)</span>
+            <span className="font-medium text-foreground">
+              {formatCurrency(gosiInsurance?.resident?.employee_ohs || 0)}
+            </span>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-            <p className="font-semibold mb-1 flex items-center gap-2"><Info className="w-4 h-4" />ملاحظة نظامية</p>
-            <p>وعاء اشتراك GOSI للسعودي: الراتب الأساسي + بدل السكن. للمقيم: الراتب الأساسي فقط. المرجع: لوائح GOSI المحدّثة 2024.</p>
-          </div>
-        </div>
-      )}
 
-      {activeTab === "summary" && (
-        <div className="bg-card rounded-xl border border-border p-5 space-y-4">
-          <h3 className="font-semibold text-foreground">ملخص التكاليف الشاملة للشهر</h3>
-          <div className="space-y-3">
-            {[
-              { label: "إجمالي الرواتب", value: totals.earnings, color: "text-foreground" },
-              { label: "اشتراكات GOSI على صاحب العمل", value: totals.gosiEmployer, color: "text-orange-600" },
-              { label: "رسوم العمالة الوافدة", value: totalExpatLevy, color: "text-red-600" },
-              { label: "إجمالي التكلفة الفعلية", value: totals.earnings + totals.gosiEmployer + totalExpatLevy, color: "text-primary font-bold" },
-            ].map(item => (
-              <div key={item.label} className="flex justify-between items-center py-2 border-b border-border last:border-0">
-                <span className="text-sm text-muted-foreground">{item.label}</span>
-                <span className={`text-sm ${item.color}`}>{formatCurrency(item.value)}</span>
-              </div>
-            ))}
+          <div className="flex justify-between text-muted-foreground">
+            <span>صاحب العمل (أخطار مهنية)</span>
+            <span className="font-medium text-foreground">
+              {formatCurrency(gosiInsurance?.resident?.employer_ohs || 0)}
+            </span>
+          </div>
+
+          <div className="flex justify-between text-muted-foreground border-t border-border pt-2 mt-2">
+            <span>رسوم العمالة الوافدة</span>
+            <span className="font-bold text-orange-600">
+              {formatCurrency(gosiInsurance?.resident?.expatriate_fees || 0)}
+            </span>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+
+    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+      <p className="font-semibold mb-1 flex items-center gap-2">
+        <Info className="w-4 h-4" />
+        ملاحظة نظامية
+      </p>
+      <p>
+        البيانات المعروضة تم احتسابها تلقائياً بواسطة نظام الرواتب وفق
+        قواعد التأمينات الاجتماعية (GOSI).
+      </p>
+    </div>
+  </div>
+)}
+
+     {activeTab === "summary" && (
+  <div className="bg-card rounded-xl border border-border p-5 space-y-4">
+    <h3 className="font-semibold text-foreground">
+      ملخص التكاليف الشاملة للشهر
+    </h3>
+
+    <div className="space-y-3">
+      {[
+        {
+          label: "إجمالي الرواتب",
+          value: costSummary?.total_salaries || 0,
+          color: "text-foreground",
+        },
+        {
+          label: "اشتراكات GOSI على صاحب العمل",
+          value: costSummary?.employer_gosi || 0,
+          color: "text-orange-600",
+        },
+        {
+          label: "رسوم العمالة الوافدة",
+          value: costSummary?.expatriate_fees || 0,
+          color: "text-red-600",
+        },
+        {
+          label: "إجمالي التكلفة الفعلية",
+          value: costSummary?.total_actual_cost || 0,
+          color: "text-primary font-bold",
+        },
+      ].map((item) => (
+        <div
+          key={item.label}
+          className="flex justify-between items-center py-2 border-b border-border last:border-0"
+        >
+          <span className="text-sm text-muted-foreground">
+            {item.label}
+          </span>
+
+          <span className={`text-sm ${item.color}`}>
+            {formatCurrency(item.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
       {/* Payslip Modal */}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
-          <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h3 className="font-bold text-foreground">قسيمة راتب — {selected.emp.full_name_ar}</h3>
-              <button onClick={() => setSelected(null)} className="p-2 rounded-lg hover:bg-muted">✕</button>
-            </div>
-            <div className="p-6 space-y-1">
-              <p className="text-xs text-muted-foreground mb-3">شهر: {month} | {selected.emp.job_title}</p>
-              <Row label="الراتب الأساسي" val={formatCurrency(selected.emp.basic_salary)} />
-              <Row label="بدل السكن" val={formatCurrency(selected.emp.housing_allowance)} />
-              <Row label="بدل النقل" val={formatCurrency(selected.emp.transport_allowance)} />
-              <Row label="بدل الغذاء" val={formatCurrency(selected.emp.food_allowance)} />
-              <Row label="بدل الاتصالات" val={formatCurrency(selected.emp.communication_allowance)} />
-              <Row label="بدلات أخرى" val={formatCurrency(selected.emp.other_allowances)} />
-              {selected.bonusTotal > 0 && <Row label="مكافآت الشهر" val={`+${formatCurrency(selected.bonusTotal)}`} green />}
-              <div className="border-t border-border pt-2 mt-2">
-                <Row label="إجمالي الاستحقاقات" val={formatCurrency(selected.totalEarnings + (selected.bonusTotal || 0))} bold />
-              </div>
-              <div className="border-t border-border pt-2 mt-2">
-                <div className="flex justify-between py-1.5 text-xs text-green-700 bg-green-50 rounded px-2 mb-1">
-                  <span>GOSI — تتحملها الشركة كاملاً</span>
-                  <span className="font-medium">{formatCurrency(selected.gosiEmployer)}</span>
-                </div>
-                <Row label="خصم الغياب" val={`(${formatCurrency(selected.absenceDeduction)})`} red />
-                <Row label="خصم التأخير" val={`(${formatCurrency(selected.lateDeduction)})`} red />
-                {selected.loanDeduction > 0 && <Row label="خصم قسط السلفة" val={`(${formatCurrency(selected.loanDeduction)})`} red />}
-                {selected.empDeductions?.map(d => (
-                  <Row key={d.id} label={`${d.deduction_type} — ${d.reason?.slice(0, 20) || ""}`} val={`(${formatCurrency(d.amount)})`} red />
-                ))}
-                <Row label="إجمالي الخصومات" val={`(${formatCurrency(selected.totalDeductions)})`} bold red />
-              </div>
-              <div className="border-t-2 border-primary/30 pt-3 mt-3 bg-primary/5 rounded-lg px-3 py-2">
-                <Row label="صافي الراتب" val={formatCurrency(selected.netSalary + (selected.bonusTotal || 0))} bold green />
-              </div>
-              <p className="text-xs text-muted-foreground pt-2">مخصص نهاية الخدمة: {formatCurrency(selected.eosMonthlyProvision)} / شهر</p>
-            </div>
-          </div>
+    {selected && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
+    <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl">
+
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <h3 className="font-bold text-foreground">
+          قسيمة راتب — {selected.employee.name_ar || selected.employee.name}
+        </h3>
+
+        <button
+          onClick={() => setSelected(null)}
+          className="p-2 rounded-lg hover:bg-muted"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="p-6 space-y-2">
+
+        <p className="text-xs text-muted-foreground mb-3">
+          شهر: {month} | {selected.employee.job_title}
+        </p>
+
+        <Row
+          label="الراتب الأساسي"
+          val={formatCurrency(selected.wage)}
+        />
+
+        <Row
+          label="إجمالي البدلات"
+          val={formatCurrency(selected.total_allowances)}
+        />
+
+        <Row
+          label="إجمالي الاستحقاقات"
+          val={formatCurrency(selected.total)}
+          bold
+        />
+
+        <Row
+          label="GOSI الموظف"
+          val={formatCurrency(selected.gosi_employee)}
+          red
+        />
+
+        <Row
+          label="GOSI صاحب العمل"
+          val={formatCurrency(selected.gosi_employer)}
+        />
+
+        <Row
+          label="الخصومات"
+          val={selected.deduction || "—"}
+          red
+        />
+
+        <Row
+          label="قيمة الخصومات"
+          val={formatCurrency(selected.deduction_amount)}
+          red
+        />
+
+        <div className="border-t-2 border-primary/30 pt-3 mt-3 bg-primary/5 rounded-lg px-3 py-2">
+          <Row
+            label="صافي الراتب"
+            val={formatCurrency(selected.net)}
+            bold
+            green
+          />
         </div>
-      )}
+
+        <p className="text-xs text-muted-foreground pt-2">
+          مخصص نهاية الخدمة: {formatCurrency(selected.eos_provision)}
+        </p>
+
+      </div>
+
+    </div>
+  </div>
+)}
     </div>
   );
 }

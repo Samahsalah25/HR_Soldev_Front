@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { getUsers, inviteEmployee, changeUserRole } from "@/api/usersApi";
 import { UserPlus, Shield, Search, Edit2, Check, X, Mail } from "lucide-react";
 
 const ROLES = [
@@ -38,9 +38,16 @@ export default function UserManagement() {
 
   const load = async () => {
     setLoading(true);
-    const data = await base44.entities.User.list();
-    setUsers(data);
-    setLoading(false);
+    try {
+      const res = await getUsers();
+      // Response: { success: true, data: [{ id, name, email, role }, ...] }
+      setUsers(Array.isArray(res) ? res : (res?.data ?? []));
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -50,41 +57,39 @@ export default function UserManagement() {
     setInviting(true);
     setInviteMsg(null);
     try {
-      // Invite with "user" base role first (platform limitation), then update role
-      await base44.users.inviteUser(inviteEmail, "user");
-
-      // Wait briefly for user to be created, then update role
-      await new Promise(r => setTimeout(r, 1500));
-      await load();
-
-      // Find newly created user and update role
-      const allUsers = await base44.entities.User.list();
-      const newUser = allUsers.find(u => u.email === inviteEmail);
-      if (newUser && inviteRole !== "employee") {
-        await base44.auth.updateMe && null; // can't update other users from frontend
-        // We update using entities SDK
-        await base44.entities.User.update(newUser.id, { role: inviteRole });
+      // POST /employees/invite — body: { email, job_grade }
+      const res = await inviteEmployee(inviteEmail, inviteRole);
+      if (res?.success || res?.message) {
+        setInviteMsg({
+          type: "success",
+          text: `تم إرسال الدعوة إلى ${inviteEmail} بدور: ${ROLES.find(r => r.value === inviteRole)?.label}`,
+        });
+        setInviteEmail("");
+        setInviteRole("employee");
         await load();
+      } else {
+        setInviteMsg({ type: "error", text: res?.error || "تعذّر إرسال الدعوة" });
       }
-
-      setInviteMsg({ type: "success", text: `تم إرسال الدعوة إلى ${inviteEmail} بدور: ${ROLES.find(r => r.value === inviteRole)?.label}` });
-      setInviteEmail("");
-      setInviteRole("employee");
     } catch (err) {
-      setInviteMsg({ type: "error", text: "حدث خطأ: " + (err?.message || err?.error || "تعذّر إرسال الدعوة") });
+      setInviteMsg({ type: "error", text: "حدث خطأ: " + (err?.response?.data?.error || err?.message || "تعذّر إرسال الدعوة") });
     }
     setInviting(false);
   };
 
   const saveRole = async (userId) => {
-    await base44.entities.User.update(userId, { role: editingRole });
-    setEditingId(null);
-    load();
+    try {
+      // POST /auth/users/:id/role — body: { role }
+      await changeUserRole(userId, editingRole);
+      setEditingId(null);
+      await load();
+    } catch (err) {
+      console.error("Failed to change role:", err);
+    }
   };
 
   const filtered = users.filter(u =>
     !search ||
-    u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -190,9 +195,9 @@ export default function UserManagement() {
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-primary">{u.full_name?.charAt(0) || "?"}</span>
+                        <span className="text-sm font-bold text-primary">{u.name?.charAt(0) || "?"}</span>
                       </div>
-                      <span className="font-medium text-foreground">{u.full_name || "—"}</span>
+                      <span className="font-medium text-foreground">{u.name || "—"}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>

@@ -15,6 +15,7 @@ import {
   fromApiRental,
 } from "@/api/storageRentalsApi";
 import { fromApiUnit } from "@/api/storageUnitsApi";
+import UnitPhoto from "@/components/storage/UnitPhoto";
 
 const STEPS = [
   { id: 1, label: "اختيار الوحدة", icon: Warehouse },
@@ -118,11 +119,11 @@ function StepSelectUnit({ onSelect }) {
               {filtered.map(u => (
                 <div key={u.id} onClick={() => onSelect(u, durations)}
                   className="bg-card rounded-xl border-2 border-border hover:border-primary cursor-pointer transition-all hover:shadow-md group">
-                  {u.image_url
-                    ? <img src={u.image_url} alt="" className="w-full h-36 object-cover rounded-t-xl" />
-                    : <div className="w-full h-36 bg-muted/50 flex items-center justify-center rounded-t-xl">
-                      <Warehouse className="w-10 h-10 text-muted-foreground/30" />
-                    </div>}
+                  <UnitPhoto
+                    unit={u}
+                    className="w-full h-36 object-cover rounded-t-xl"
+                    placeholderClassName="w-full h-36 bg-muted/50 flex items-center justify-center rounded-t-xl"
+                  />
                   <div className="p-4 space-y-2">
                     <div className="flex items-start justify-between">
                       <div>
@@ -279,6 +280,7 @@ function StepTermsAndSign({ data, unit, onChange, onNext, onBack }) {
       sigBlob = await getSignatureBlob();
     } else if (signMode === "text" && signText.trim().length > 2) {
       const canvas = canvasRef.current;
+      if (!canvas) return;
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = "italic 36px serif";
@@ -286,14 +288,17 @@ function StepTermsAndSign({ data, unit, onChange, onNext, onBack }) {
       ctx.fillText(signText, 20, 60);
       sigBlob = await getSignatureBlob();
     }
-    // sigBlob → signature_image في buildUpdateRentalFormData
-    onChange({
+    if (!sigBlob) return;
+
+    const signatureFile = new File([sigBlob], "signature.png", { type: "image/png" });
+    const updated = {
       ...data,
-      is_terms_agreed: true,           // is_terms_agreed
-      signature_name: data.customer_name || data.company_rep_name || "",  // signature_name
-      signature_image: sigBlob,        // signature_image (Blob → File)
-    });
-    onNext();
+      is_terms_agreed: true,
+      signature_name: data.customer_name || data.company_rep_name || "",
+      signature_image: signatureFile,
+    };
+    onChange(updated);
+    onNext(updated);
   };
 
   const canConfirm = data.is_terms_agreed && (signMode === "draw" ? hasSignature : signText.trim().length > 2);
@@ -328,23 +333,27 @@ function StepTermsAndSign({ data, unit, onChange, onNext, onBack }) {
 
       {/* التوقيع: signature_name + signature_image */}
       <div className={`space-y-3 transition-opacity ${data.is_terms_agreed ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
-        <h3 className="font-semibold text-foreground">التوقيع الإلكتروني (signature_image)</h3>
+        <h3 className="font-semibold text-foreground">التوقيع الإلكتروني</h3>
         <div className="flex gap-2">
           {[["draw", "رسم"], ["text", "كتابة"]].map(([m, l]) => (
             <button key={m} onClick={() => setSignMode(m)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${signMode === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>{l}</button>
           ))}
         </div>
+        <canvas ref={canvasRef} width={500} height={120} aria-hidden={signMode !== "draw"}
+          onMouseDown={signMode === "draw" ? startDraw : undefined}
+          onMouseMove={signMode === "draw" ? draw : undefined}
+          onMouseUp={signMode === "draw" ? stopDraw : undefined}
+          onMouseLeave={signMode === "draw" ? stopDraw : undefined}
+          onTouchStart={signMode === "draw" ? startDraw : undefined}
+          onTouchMove={signMode === "draw" ? draw : undefined}
+          onTouchEnd={signMode === "draw" ? stopDraw : undefined}
+          className={`w-full border-2 border-dashed border-border rounded-xl bg-white touch-none ${signMode === "draw" ? "cursor-crosshair" : "hidden"}`}
+          style={{ height: 120 }} />
         {signMode === "draw" ? (
-          <div className="space-y-2">
-            <canvas ref={canvasRef} width={500} height={120}
-              onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
-              onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
-              className="w-full border-2 border-dashed border-border rounded-xl bg-white cursor-crosshair touch-none" style={{ height: 120 }} />
-            <button onClick={clearCanvas} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-              <X className="w-3 h-3" />مسح
-            </button>
-          </div>
+          <button onClick={clearCanvas} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+            <X className="w-3 h-3" />مسح
+          </button>
         ) : (
           <input value={signText} onChange={e => setSignText(e.target.value)}
             placeholder="اكتب اسمك كتوقيع..."
@@ -692,7 +701,7 @@ export default function StorageBookingFlow() {
             <StepTermsAndSign
               data={customerData}
               unit={unit}
-              onChange={d => { }}
+              onChange={setCustomerData}
               onNext={submitSignature}
               onBack={() => setStep(2)}
             />

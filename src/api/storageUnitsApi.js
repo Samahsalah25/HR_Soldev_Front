@@ -1,6 +1,28 @@
 // src/api/storageUnitsApi.js
 import api from "./axios";
 
+function isAbsoluteUrl(value) {
+    return typeof value === "string" && /^https?:\/\//i.test(value);
+}
+
+function getApiOrigin() {
+    return new URL(api.defaults.baseURL).origin;
+}
+
+/** رابط صورة الوحدة في Odoo */
+export function getStorageUnitPhotoUrl(id, cacheKey = "") {
+    const suffix = cacheKey ? `?unique=${encodeURIComponent(String(cacheKey))}` : "";
+    return `${getApiOrigin()}/web/image/storage.unit/${id}/unit_photo${suffix}`;
+}
+
+function resolveUnitPhotoUrl(u) {
+    const photo = u.unit_photo;
+    if (!photo || !u.id) return isAbsoluteUrl(u.image_url) ? u.image_url : "";
+    if (isAbsoluteUrl(photo)) return photo;
+    if (isAbsoluteUrl(u.image_url)) return u.image_url;
+    return getStorageUnitPhotoUrl(u.id, photo);
+}
+
 // ─── Value Maps ──────────────────────────────────────────────────────────────
 
 const UNIT_TYPE_TO_API = {
@@ -48,6 +70,19 @@ export function toApiPayload(form) {
     };
 }
 
+/** بناء FormData لإنشاء/تحديث وحدة مع صورة */
+export function buildStorageUnitFormData(form) {
+    const fd = new FormData();
+    const payload = toApiPayload(form);
+    Object.entries(payload).forEach(([key, val]) => {
+        fd.append(key, val);
+    });
+    if (form.imageFile instanceof File) {
+        fd.append("unit_photo", form.imageFile);
+    }
+    return fd;
+}
+
 /** تحويل بيانات الـ API → صيغة الـ UI
  *  الـ API بيرجع:
  *  { id, unit_number, name, location, floor,
@@ -58,6 +93,8 @@ export function toApiPayload(form) {
  *    has_easy_arrival, unit_photo }
  */
 export function fromApiUnit(u) {
+    const photo = u.unit_photo;
+
     return {
         id: u.id,
         unit_number: u.unit_number,
@@ -76,8 +113,8 @@ export function fromApiUnit(u) {
         has_security: u.has_security,
         has_cameras: u.has_cameras,
         easy_access: u.has_easy_arrival,
-        // unit_photo هو اسم الحقل في الـ API
-        image_url: u.unit_photo || u.image_url || "",
+        has_photo: !!photo,
+        image_url: resolveUnitPhotoUrl(u),
     };
 }
 
@@ -104,13 +141,21 @@ export async function getStorageUnit(id) {
 
 /** POST /storage/units */
 export async function createStorageUnit(form) {
-    const res = await api.post("/storage/units", toApiPayload(form));
+    const res = form.imageFile instanceof File
+        ? await api.post("/storage/units", buildStorageUnitFormData(form), {
+            headers: { "Content-Type": "multipart/form-data" },
+        })
+        : await api.post("/storage/units", toApiPayload(form));
     return res.data;
 }
 
 /** PUT /storage/units/:id */
 export async function updateStorageUnit(id, form) {
-    const res = await api.put(`/storage/units/${id}`, toApiPayload(form));
+    const res = form.imageFile instanceof File
+        ? await api.put(`/storage/units/${id}`, buildStorageUnitFormData(form), {
+            headers: { "Content-Type": "multipart/form-data" },
+        })
+        : await api.put(`/storage/units/${id}`, toApiPayload(form));
     return res.data;
 }
 

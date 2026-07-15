@@ -8,7 +8,7 @@ import {
   exportStorageUnitsCsv,
   importStorageUnitsCsv,
 } from "@/api/storageUnitsApi";
-import { base44 } from "@/api/base44Client";
+import UnitPhoto from "@/components/storage/UnitPhoto";
 
 const STATUS_COLORS = {
   "متاحة": "bg-green-100 text-green-700",
@@ -38,22 +38,25 @@ function UnitForm({ unit, onSave, onClose }) {
     floor: "", image_url: "",
   };
   const [form, setForm] = useState(unit || blank);
+  const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleImage = async (file) => {
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      set("image_url", file_url);
-    } catch {
-      setError("فشل رفع الصورة");
-    } finally {
-      setUploading(false);
+  useEffect(() => {
+    if (unit?.image_url) {
+      setPreviewUrl(unit.image_url);
     }
+  }, [unit?.image_url]);
+
+  const handleImage = (file) => {
+    setUploading(true);
+    setImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setUploading(false);
   };
 
   const handleSave = async () => {
@@ -64,10 +67,11 @@ function UnitForm({ unit, onSave, onClose }) {
     setSaving(true);
     setError("");
     try {
+      const payload = imageFile ? { ...form, imageFile } : form;
       if (unit?.id) {
-        await updateStorageUnit(unit.id, form);
+        await updateStorageUnit(unit.id, payload);
       } else {
-        await createStorageUnit(form);
+        await createStorageUnit(payload);
       }
       onSave();
     } catch (e) {
@@ -157,8 +161,8 @@ function UnitForm({ unit, onSave, onClose }) {
           {/* الصورة */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium">صورة الوحدة</label>
-            {form.image_url && (
-              <img src={form.image_url} alt="" className="w-full h-32 object-cover rounded-lg border border-border" />
+            {previewUrl && (
+              <img src={previewUrl} alt="" className="w-full h-32 object-cover rounded-lg border border-border" />
             )}
             <input type="file" accept="image/*"
               onChange={e => e.target.files[0] && handleImage(e.target.files[0])}
@@ -366,13 +370,7 @@ export default function StorageUnits() {
           {filtered.map(u => (
             <div key={u.id}
               className="bg-card rounded-xl border border-border overflow-hidden hover:shadow-md transition-shadow">
-              {u.image_url
-                ? <img src={u.image_url} alt="" className="w-full h-36 object-cover" />
-                : (
-                  <div className="w-full h-36 bg-muted/50 flex items-center justify-center">
-                    <Warehouse className="w-10 h-10 text-muted-foreground/30" />
-                  </div>
-                )}
+              <UnitPhoto unit={u} />
               <div className="p-4 space-y-2">
                 <div className="flex items-start justify-between">
                   <div>

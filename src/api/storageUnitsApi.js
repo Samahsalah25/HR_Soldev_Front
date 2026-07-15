@@ -17,9 +17,15 @@ export function getStorageUnitPhotoUrl(id, cacheKey = "") {
 
 function resolveUnitPhotoUrl(u) {
     const photo = u.unit_photo;
-    if (!photo || !u.id) return isAbsoluteUrl(u.image_url) ? u.image_url : "";
+    // unit_photo = false or null → no photo
+    if (!photo || photo === false || !u.id) return "";
+    // Already an absolute URL → use as-is
     if (isAbsoluteUrl(photo)) return photo;
-    if (isAbsoluteUrl(u.image_url)) return u.image_url;
+    // Relative path from API like "/api/v1/storage/units/15/photo" → prepend origin
+    if (typeof photo === "string" && photo.startsWith("/")) {
+        return `${getApiOrigin()}${photo}`;
+    }
+    // Fallback: build Odoo-style URL
     return getStorageUnitPhotoUrl(u.id, photo);
 }
 
@@ -207,4 +213,13 @@ export async function importStorageUnitsCsv(csvFile) {
         },
     });
     return res.data;
+}
+
+/**
+ * GET /storage/dashboard
+ * يرجع: { stats, units, expiration_alerts, contracts_summary }
+ */
+export async function getStorageDashboard() {
+    const res = await api.get("/storage/dashboard");
+    return res.data?.data ?? res.data;
 }

@@ -132,6 +132,7 @@ export default function Leaves() {
 
   const updateStatus = async (id, action) => {
     try {
+      console.log("Updating leave request", id, "to action", action);
       await vacationAction(id, action);
       load();
     } catch (err) {
@@ -142,6 +143,7 @@ export default function Leaves() {
 
   const sendToManager = async (id) => {
     try {
+         console.log("Updating leave request", id);
       await apiSendToManager(id);
       load();
     } catch (err) {
@@ -275,13 +277,13 @@ export default function Leaves() {
                           {leave.state === "waiting_manager_approval" ? (
                             <>
                               <button
-                                onClick={() => managerApprove(leave.id)}
+                                onClick={() => managerApprove(leave.request_id)}
                                 className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200"
                               >
                                 ✓ اعتماد المدير
                               </button>
                               <button
-                                onClick={() => updateStatus(leave.id, "refuse")}
+                                onClick={() => updateStatus(leave.request_id, "refuse")}
                                 title="رفض"
                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded"
                               >
@@ -291,14 +293,14 @@ export default function Leaves() {
                           ) : !["validate", "refuse"].includes(leave.state) ? (
                             <>
                               <button
-                                onClick={() => updateStatus(leave.id, "refuse")}
+                                onClick={() => updateStatus(leave.request_id, "refuse")}
                                 title="رفض"
                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded"
                               >
                                 <XCircle className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => updateStatus(leave.id, "accept")}
+                                onClick={() => updateStatus(leave.request_id, "accept")}
                                 title="قبول"
                                 className="p-1.5 hover:bg-green-50 text-green-600 rounded"
                               >
@@ -306,7 +308,7 @@ export default function Leaves() {
                               </button>
                               {leave.state === "confirm" && (
                                 <button
-                                  onClick={() => sendToManager(leave.id)}
+                                  onClick={() => sendToManager(leave.request_id)}
                                   className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200"
                                 >
                                   ⟳ أحل للمدير

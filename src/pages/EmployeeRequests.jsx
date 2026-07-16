@@ -108,30 +108,62 @@ setLoans(loanRes?.data || []);
     }
   };
 
-  const managerApprove = async (id) => {
-    try {
-      await apiManagerApprove(id);
-      load();
-    } catch (err) {
-      console.error(err?.response?.data || err);
-      alert("حصل خطأ");
+const managerApprove = async (id) => {
+  try {
+    await apiManagerApprove(id);
+    load();
+  } catch (err) {
+    console.error("Manager approve error:", err);
+
+    let message =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      "حدث خطأ أثناء اعتماد الطلب";
+
+    if (
+      message.toLowerCase().includes("allocation") ||
+      message.toLowerCase().includes("time off type")
+    ) {
+      message =
+        "لا يمكن اعتماد طلب الإجازة لأن الموظف لا يملك رصيدًا من هذا النوع من الإجازات.";
     }
-  };
 
-  const updateStatus = async (id, status) => {
-    try {
-      const action = status === "مقبولة" ? "accept" : "reject";
+    alert(message);
+  }
+};
 
-      await requestAction(id, action);
+const updateStatus = async (id, status) => {
+  try {
+    console.log("Updating request", id, "to status", status);
 
-      // optional: refresh data
-      load();
-    } catch (err) {
-      console.error(err);
-      alert("حصل خطأ في تحديث الحالة");
+    const action = status === "مقبولة" ? "accept" : "reject";
+
+    const res = await requestAction(id, action);
+
+    console.log("Request updated:", res);
+
+    load();
+  } catch (err) {
+    console.error("Update status error:", err);
+
+    let message =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      "حدث خطأ في تحديث حالة الطلب";
+
+    if (
+      message.toLowerCase().includes("allocation") ||
+      message.toLowerCase().includes("time off type")
+    ) {
+      message =
+        "لا يمكن اعتماد طلب الإجازة لأن الموظف لا يملك رصيدًا من هذا النوع من الإجازات.";
     }
-  };
 
+    alert(message);
+  }
+};
   const settleCustody = async (custodyId) => {
     await base44.entities.Custody.update(custodyId, {
       status: "مُرجَعة",

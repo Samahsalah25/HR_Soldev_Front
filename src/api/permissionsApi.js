@@ -79,7 +79,7 @@ export const PERMISSION_MODULES = [
 // =============================
 export const getPermissionRoles = async () => {
     const result = await apiFetch("/permissions/roles");
-    console.log("🌐 RAW getPermissionRoles response:", JSON.stringify(result));
+  
     return result;
 };
 

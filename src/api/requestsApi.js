@@ -143,7 +143,7 @@ export const requestAction = async (id, action) => {
 // =============================
 export const vacationAction = async (id, action) => {
   // action: "accept" | "refuse"
-  const res = await api.post(`/requests/vacation/${id}/action`, { action });
+  const res = await api.post(`/requests/${id}/action`, { action });
   return res.data;
 };
 

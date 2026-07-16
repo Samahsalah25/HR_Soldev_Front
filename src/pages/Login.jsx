@@ -73,7 +73,7 @@ const handleGoogleSuccess = async (credentialResponse) => {
     const id_token = credentialResponse.credential;
 
     const res = await googleLoginUser(id_token);
-console.log('res is' ,res)
+
     if (res.success) {
       localStorage.setItem("user", JSON.stringify(res));
 

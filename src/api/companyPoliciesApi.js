@@ -52,7 +52,7 @@ export const downloadCompanyPolicy = async (
       }
     );
 
-    console.log("📦 DOWNLOAD RESPONSE:", res);
+
 
     // 👇 نعرف نوع الفايل
     const contentType = res.headers["content-type"];

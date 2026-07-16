@@ -14,8 +14,10 @@ import { getEmployeesList } from "@/api/employeesApi";
 
 
 const STATUS_MAP = {
+  draft:"قيد الانتظار" ,
   confirm: "قيد الانتظار",
   validate: "معتمدة",
+  validate1:"قيد مراجعة HR" ,
   refuse: "مرفوضة",
   waiting_manager_approval: "انتظار موافقة المدير",
   hr_under_review: "قيد مراجعة HR",
@@ -38,6 +40,7 @@ const STATUS_COLORS = {
   refuse: "bg-red-100 text-red-600",
   waiting_manager_approval: "bg-purple-100 text-purple-700",
   hr_under_review: "bg-blue-100 text-blue-700",
+  draft:"bg-amber-100 text-amber-700",
 };
 
 export default function Leaves() {
@@ -132,7 +135,7 @@ export default function Leaves() {
 
   const updateStatus = async (id, action) => {
     try {
-      console.log("Updating leave request", id, "to action", action);
+      
       await vacationAction(id, action);
       load();
     } catch (err) {
@@ -143,7 +146,7 @@ export default function Leaves() {
 
   const sendToManager = async (id) => {
     try {
-         console.log("Updating leave request", id);
+       
       await apiSendToManager(id);
       load();
     } catch (err) {

@@ -121,7 +121,7 @@ const handleSave = async () => {
       formData.append("policy_pdf", file);
     }
 
-    console.log("FORMDATA =>", formData);
+  
 
     if (policy?.id) {
       await updateCompanyPolicy(policy.id, formData);
@@ -398,9 +398,7 @@ export default function Policies() {
     const data = await getCompanyPolicies();
 
     const list = data?.data || data || [];
-    console.log("data is",list)
-console.log("RAW API RESPONSE:", data);
-console.log("LIST:", list);
+
     // 🔥 IMPORTANT: normalize API -> UI shape (WITHOUT changing UI)
    const normalized = list.map((p) => ({
   id: p.id,
@@ -418,9 +416,9 @@ console.log("LIST:", list);
 file_name: p.policy_pdf_filename,
 file_url: p.policy_pdf || p.file_url || null
 }));
-console.log("NORMALIZED:", normalized);
+
     setPolicies(normalized);
-    console.log("POLICIES STATE:", policies);
+   
   } catch (err) {
     console.error(err);
   } finally {

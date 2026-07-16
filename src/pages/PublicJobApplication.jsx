@@ -133,7 +133,7 @@ export default function PublicJobApplication() {
       setLoading(false);
     })
     .catch((err) => {
-      console.log("Jobs API error:", err);
+     
       setJobs([]);
       setLoading(false);
     });

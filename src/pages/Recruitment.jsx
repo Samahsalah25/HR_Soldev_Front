@@ -308,7 +308,7 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
   }, [app]);
 
   useEffect(() => {
-    console.log("currentUser", currentUser);
+  
   }, [currentUser]);
 
   const matchesMe = (iv) =>
@@ -319,7 +319,7 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
   const isHR =
     currentUser?.data?.role === "Admin" ||
     currentUser?.data?.role === "hr";
-  console.log('isHr', isHR);
+  
   const addInterview = () => {
     if (!newInterview.interview_date || !newInterview.interviewer_name) return;
     setInterviews(prev => [...prev, { ...newInterview, score: +newInterview.score || 0 }]);

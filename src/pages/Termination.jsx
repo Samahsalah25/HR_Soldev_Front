@@ -244,7 +244,7 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
     setSaving(true);
     try {
       const res = await eosAction(req.id, actionType, notes);
-      console.log("🔍 eosAction response:", res);
+   
       onUpdate();
     } catch (err) {
       console.error("EOS action error:", err?.response?.data || err);

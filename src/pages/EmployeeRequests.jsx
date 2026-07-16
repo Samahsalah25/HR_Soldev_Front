@@ -89,7 +89,7 @@ export default function EmployeeRequests() {
 
 setRequests(reqs?.data || []);
 setEmployees(emps?.data || emps?.employees || emps || []);
-console.log("custodyRes full:", custodyRes);
+
 setCustodies(custodyRes || custodyRes?.data || []);
 setLoans(loanRes?.data || []);
 
@@ -135,13 +135,13 @@ const managerApprove = async (id) => {
 
 const updateStatus = async (id, status) => {
   try {
-    console.log("Updating request", id, "to status", status);
+  
 
     const action = status === "مقبولة" ? "accept" : "reject";
 
     const res = await requestAction(id, action);
 
-    console.log("Request updated:", res);
+
 
     load();
   } catch (err) {
@@ -190,7 +190,7 @@ const updateStatus = async (id, status) => {
 const activeCustodies = custodies.filter(
   c => c.state !== "rejected"
 );
- console.log("  العهد" ,activeCustodies)
+
 const activeLoans = loans;
 
   return (

@@ -80,7 +80,7 @@ function BonusForm({ employees, departments, onSave, onClose }) {
         state: "under_approval",
       };
 
-      console.log("PAYLOAD =>", payload);
+      
 
       await createAddition(payload);
 
@@ -380,13 +380,7 @@ export default function Bonuses() {
         !filterMonth ||
         b.period === filterMonth
     );
-  console.log(
-    bonuses.map(b => ({
-      id: b.id,
-      raw_state: b.raw_state,
-      amount: b.amount,
-    }))
-  );
+ 
   const totals = {
     pending: pending.length,
 

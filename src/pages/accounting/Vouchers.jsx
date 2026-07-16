@@ -346,7 +346,7 @@ function VoucherForm({ type, accounts, voucher, onSave, onClose }) {
         description: form.description,
         action: post ? "post" : "draft",
       };
-console.log("Payload:", payload);
+
       let result;
       if (isEdit) {
         result = await updateVoucher(voucher.id, payload);

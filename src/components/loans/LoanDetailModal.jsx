@@ -24,7 +24,7 @@ useEffect(() => {
       const response = await getSalaryAdvanceHistory(
         loan.id
       );
-console.log("History Response", response);
+
       setAuditLog(response.data || []);
     } catch (error) {
       console.error(

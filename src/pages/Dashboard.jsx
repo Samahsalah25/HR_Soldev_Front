@@ -21,7 +21,7 @@ useEffect(() => {
 
       const data = await getDashboardStats();
 
-      console.log("Dashboard:", data);
+     
 
       // هنخزن الداتا كلها
       setDashboard(data);

@@ -20,7 +20,7 @@ import { getPermissionRoles, updateRolePermissions } from '@/api/permissionsApi'
  */
 export async function fixHomePermissionForAllRoles() {
     try {
-        console.log("🔧 جاري إصلاح صلاحية 'home' لكل الأدوار...");
+      
 
         // 1. جيب كل الأدوار الحالية
         const data = await getPermissionRoles();
@@ -40,7 +40,7 @@ export async function fixHomePermissionForAllRoles() {
 
             // لو home مش موجودة أو false → ضيفها/فعّلها
             if (!permissions.home) {
-                console.log(`✅ تفعيل 'home' لدور: ${roleName}`);
+              
                 const updatedPerms = { ...permissions, home: true };
 
                 try {
@@ -55,10 +55,10 @@ export async function fixHomePermissionForAllRoles() {
         }
 
         if (updates.length > 0) {
-            console.log(`✅ تم تحديث ${updates.length} دور بنجاح:`, updates);
+           
             return { success: true, updated: updates };
         } else {
-            console.log("✓ جميع الأدوار تحتوي على 'home' بالفعل");
+           
             return { success: true, updated: [] };
         }
 
@@ -73,7 +73,7 @@ export async function fixHomePermissionForAllRoles() {
  */
 export async function fixHomePermissionForRole(roleName) {
     try {
-        console.log(`🔧 جاري التحقق من 'home' لدور: ${roleName}...`);
+       
 
         const data = await getPermissionRoles();
         const rolesData = data?.data ?? data;
@@ -86,12 +86,12 @@ export async function fixHomePermissionForRole(roleName) {
         const permissions = rolesData[roleName];
 
         if (!permissions.home) {
-            console.log(`✅ تفعيل 'home' لدور: ${roleName}`);
+           
             const updatedPerms = { ...permissions, home: true };
             await updateRolePermissions(roleName, updatedPerms);
             return { success: true, updated: true };
         } else {
-            console.log(`✓ 'home' مفعّلة بالفعل لدور: ${roleName}`);
+         
             return { success: true, updated: false };
         }
 

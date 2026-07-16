@@ -217,7 +217,7 @@ const totalPaid = paid.reduce((s, r) => s + Number(r.amount || 0), 0);
                       <div className="flex gap-1">
                       <button
   onClick={() => {
-    console.log("rep clicked:", rep);
+
     if (!rep?.id) {
       console.error("Missing installment id", rep);
       return;

@@ -23,9 +23,7 @@ export default function ContractView({ contract, onClose }) {
   const [companySignature, setCompanySignature] = useState(null);
 useEffect(() => {
 
- console.log("CONTRACT:", contract);
- console.log("CUSTOMER SIGN:", contract?.customer_signature);
- console.log("COMPANY SIGN:", contract?.company_signature);
+
 
 }, [contract]);
 
@@ -81,22 +79,7 @@ useEffect(() => {
   );
 
 
-  console.log(
-    "COMPANY STATUS",
-    res.status
-  );
-
-
-  console.log(
-    "COMPANY TYPE",
-    res.headers["content-type"]
-  );
-
-
-  console.log(
-    "COMPANY SIZE",
-    res.data.size
-  );
+ 
 
 
   companyUrl = URL.createObjectURL(res.data);

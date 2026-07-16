@@ -514,7 +514,7 @@ const [apiErrors, setApiErrors] = useState([]);
     try {
       const res = await getEmployees();
 
-      console.log("Employees API:", res);
+      
 
       setEmployees(res.data || []);
     } catch (error) {

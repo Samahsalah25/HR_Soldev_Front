@@ -581,7 +581,7 @@ const getActions = (app) => {
               {filteredApps.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد طلبات</td></tr>
               ) : filteredApps.map(app => {
-                  console.log("APP DEBUG:", app.status, app.apiState, app);
+                
                 const actions = getActions(app);
                 return (
                   <tr key={app.id} className="border-b border-border last:border-0 hover:bg-muted/20">

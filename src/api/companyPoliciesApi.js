@@ -1,5 +1,5 @@
 import api from "./axios";
-
+import { toast } from "sonner";
 // GET ALL
 export const getCompanyPolicies = async () => {
   const res = await api.get("/company_policies");

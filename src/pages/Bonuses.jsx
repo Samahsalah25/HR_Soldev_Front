@@ -227,7 +227,8 @@ export default function Bonuses() {
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState("");
-
+const [showPayConfirm, setShowPayConfirm] = useState(false);
+const [selectedBonus, setSelectedBonus] = useState(null);
   const load = async () => {
     try {
       setLoading(true);
@@ -361,12 +362,16 @@ export default function Bonuses() {
       state: "rejected",
     });; load();
   };
-  const pay = async (id) => {
-    await updateAddition(id, {
-      state: "paid",
-    }); load();
-  };
 
+  const pay = async () => {
+  await updateAddition(selectedBonus.id, {
+    state: "paid",
+  });
+
+  setShowPayConfirm(false);
+  setSelectedBonus(null);
+  load();
+};
   const pending = bonuses.filter(
     b => b.raw_state === "under_approval"
   );
@@ -478,9 +483,18 @@ export default function Bonuses() {
                           <button onClick={() => approve(b.id)} className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 font-medium">اعتماد</button>
                           <button onClick={() => reject(b.id)} className="px-2 py-1 bg-red-100 text-red-600 rounded text-xs hover:bg-red-200 font-medium">رفض</button>
                         </>}
-                        {b.status === "معتمدة" && canApprove && (
-                          <button onClick={() => pay(b.id)} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium flex items-center gap-1"><DollarSign className="w-3 h-3" />صرف</button>
-                        )}
+                       {b.status === "معتمدة" && canApprove && (
+  <button
+    onClick={() => {
+      setSelectedBonus(b);
+      setShowPayConfirm(true);
+    }}
+    className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium flex items-center gap-1"
+  >
+    <DollarSign className="w-3 h-3" />
+    صرف
+  </button>
+)}
                       </div>
                     </td>
                   </tr>
@@ -488,7 +502,101 @@ export default function Bonuses() {
           </tbody>
         </table>
       </div>
+{showPayConfirm && (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+    dir="rtl"
+  >
+    <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl">
 
+      {/* Header */}
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+          <DollarSign className="w-5 h-5 text-blue-600" />
+        </div>
+
+        <div>
+          <h3 className="font-bold text-foreground">
+            تأكيد صرف المكافأة
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            مراجعة العملية قبل التنفيذ
+          </p>
+        </div>
+      </div>
+
+
+      {/* Body */}
+      <div className="px-6 py-5 space-y-3">
+
+        <p className="text-sm text-muted-foreground">
+          هل أنت متأكد من صرف المكافأة التالية؟
+        </p>
+
+        <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-2">
+
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">
+              الموظف
+            </span>
+            <span className="font-medium text-foreground">
+              {selectedBonus?.employee_name || "—"}
+            </span>
+          </div>
+
+
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">
+              نوع المكافأة
+            </span>
+            <span className="font-medium text-foreground">
+              {selectedBonus?.bonus_type || "—"}
+            </span>
+          </div>
+
+
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">
+              المبلغ
+            </span>
+
+            <span className="font-bold text-green-600">
+              {selectedBonus?.amount?.toLocaleString("ar-SA")} ر.س
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* Footer */}
+      <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+
+        <button
+          onClick={() => {
+            setShowPayConfirm(false);
+            setSelectedBonus(null);
+          }}
+          className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+        >
+          إلغاء
+        </button>
+
+
+        <button
+          onClick={pay}
+          className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+        >
+          <DollarSign className="w-4 h-4" />
+          تأكيد الصرف
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
       {showForm && <BonusForm employees={employees} departments={departments} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
     </div>
   );

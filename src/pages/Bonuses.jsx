@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Gift, Plus, X, Save, DollarSign } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import {
   getAdditions,
@@ -10,6 +9,7 @@ import {
 import {
   getEmployees, getDepartments
 } from "@/api/departmentsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_COLORS = {
   "قيد الاعتماد": "bg-amber-100 text-amber-700",
@@ -217,6 +217,7 @@ function BonusForm({ employees, departments, onSave, onClose }) {
 }
 
 export default function Bonuses() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("bonuses", "create");
   const canApprove = canDo("bonuses", "approve");
@@ -350,21 +351,42 @@ export default function Bonuses() {
   useEffect(() => { load(); }, []);
 
   const approve = async (id) => {
-    const u = await base44.auth.me();
+    const ok = await confirmDialog({
+      title: "اعتماد المكافأة",
+      message: "هل أنت متأكد من اعتماد هذه المكافأة؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     await updateAddition(id, {
       state: "approved",
     });
     load();
   };
   const reject = async (id) => {
-    await await updateAddition(id, {
+    const ok = await confirmDialog({
+      title: "رفض المكافأة",
+      message: "هل أنت متأكد من رفض هذه المكافأة؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    await updateAddition(id, {
       state: "rejected",
-    });; load();
+    });
+    load();
   };
   const pay = async (id) => {
+    const ok = await confirmDialog({
+      title: "صرف المكافأة",
+      message: "هل أنت متأكد من صرف هذه المكافأة؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "صرف",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await updateAddition(id, {
       state: "paid",
-    }); load();
+    });
+    load();
   };
 
   const pending = bonuses.filter(

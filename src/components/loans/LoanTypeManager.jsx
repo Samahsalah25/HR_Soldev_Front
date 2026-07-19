@@ -6,6 +6,7 @@ import {
   updateSalaryAdvanceType,
   deleteSalaryAdvanceType,
 } from "@/api/salaryAdvanceTypesApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const defaultType = {
   name: "", name_en: "", description: "",
@@ -19,6 +20,7 @@ const defaultType = {
 };
 
 export default function LoanTypeManager({ onClose }) {
+  const confirmDialog = useConfirm();
   const [types, setTypes] = useState([]);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -61,7 +63,13 @@ export default function LoanTypeManager({ onClose }) {
 };
 
 const handleDelete = async (id) => {
-  if (!confirm("حذف نوع السلفة؟")) return;
+  const ok = await confirmDialog({
+    title: "حذف نوع السلفة",
+    message: "هل أنت متأكد من حذف نوع السلفة ده؟ لا يمكن التراجع عن هذا الإجراء.",
+    confirmText: "حذف",
+    variant: "destructive",
+  });
+  if (!ok) return;
 
   await deleteSalaryAdvanceType(id);
 

@@ -10,7 +10,8 @@ import ExpenseModal from "../components/requests/ExpenseModal";
 import { getEmployees } from "@/api/departmentsApi";
 import { getAllRequests, requestAction, sendToManager as apiSendToManager, managerApprove as apiManagerApprove } from "@/api/requestsApi"
 import {getSalaryAdvances} from "@/api/salaryAdvancesApi";
-import {getCustodyRequests} from "@/api/assetsApi"; 
+import {getCustodyRequests} from "@/api/assetsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
@@ -69,6 +70,7 @@ const STATUS_COLORS = {
 };
 
 export default function EmployeeRequests() {
+  const confirmDialog = useConfirm();
   const [requests, setRequests] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [custodies, setCustodies] = useState([]);
@@ -109,6 +111,12 @@ setLoans(loanRes?.data || []);
   };
 
   const managerApprove = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد المدير",
+      message: "هل أنت متأكد من اعتماد هذا الطلب؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     try {
       await apiManagerApprove(id);
       load();
@@ -130,6 +138,25 @@ setLoans(loanRes?.data || []);
       console.error(err);
       alert("حصل خطأ في تحديث الحالة");
     }
+  };
+
+  const handleAcceptRequest = async (id) => {
+    const ok = await confirmDialog({
+      title: "قبول الطلب",
+      message: "هل أنت متأكد من قبول هذا الطلب؟",
+      confirmText: "قبول",
+    });
+    if (ok) await updateStatus(id, "مقبولة");
+  };
+
+  const handleRejectRequest = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض الطلب",
+      message: "هل أنت متأكد من رفض هذا الطلب؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (ok) await updateStatus(id, "مرفوضة");
   };
 
   const settleCustody = async (custodyId) => {
@@ -290,7 +317,7 @@ const activeLoans = loans;
         </button>
 
         <button
-          onClick={() => updateStatus(req.id, "مرفوضة")}
+          onClick={() => handleRejectRequest(req.id)}
           title="رفض"
           className="p-1.5 hover:bg-red-50 text-red-500 rounded"
         >
@@ -301,7 +328,7 @@ const activeLoans = loans;
       <>
         {/* رفض */}
         <button
-          onClick={() => updateStatus(req.id, "مرفوضة")}
+          onClick={() => handleRejectRequest(req.id)}
           title="رفض"
           className="p-1.5 hover:bg-red-50 text-red-500 rounded"
         >
@@ -310,7 +337,7 @@ const activeLoans = loans;
 
         {/* قبول */}
         <button
-          onClick={() => updateStatus(req.id, "مقبولة")}
+          onClick={() => handleAcceptRequest(req.id)}
           title="قبول"
           className="p-1.5 hover:bg-green-50 text-green-600 rounded"
         >

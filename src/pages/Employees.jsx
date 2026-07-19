@@ -7,6 +7,7 @@ import EmployeeDetail from "../components/EmployeeDetail";
 import EmployeeImportExport from "../components/employees/EmployeeImportExport";
 import AddEmployeeDropdown from "../components/employees/AddEmployeeDropdown";
 import { useRole } from "../lib/useRole";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_COLORS = {
   "نشط": "bg-green-100 text-green-700",
@@ -16,6 +17,7 @@ const STATUS_COLORS = {
 };
 
 export default function Employees() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canAdd = canDo("employees", "create");
   const canEdit = canDo("employees", "edit");
@@ -59,7 +61,13 @@ export default function Employees() {
   });
 
   const handleDelete = async (id) => {
-    if (confirm("هل أنت متأكد من حذف هذا الموظف؟")) {
+    const ok = await confirmDialog({
+      title: "حذف الموظف",
+      message: "هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) {
       try {
         await deleteEmployee(id);
         load();

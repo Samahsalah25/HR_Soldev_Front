@@ -9,6 +9,7 @@ import {
 } from "@/api/violationApi";
 
 import { getEmployees } from "@/api/departmentsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_LABELS = {
   draft: "قيد المراجعة",
@@ -249,6 +250,7 @@ function ViolationForm({ employees, onSave, onClose }) {
 }
 
 export default function Violations() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("violations", "create");
   const canApprove = canDo("violations", "approve");
@@ -285,6 +287,12 @@ export default function Violations() {
 
   // ================= CONFIRM =================
   const confirm_ = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد المخالفة",
+      message: "هل أنت متأكد من اعتماد هذه المخالفة؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     try {
       const v = violations.find((x) => x.id === id);
 
@@ -311,6 +319,13 @@ export default function Violations() {
 
   // ================= CANCEL =================
   const cancel_ = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض المخالفة",
+      message: "هل أنت متأكد من رفض هذه المخالفة؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await updateViolation(id, {
         state: "rejected",

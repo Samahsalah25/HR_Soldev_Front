@@ -6,6 +6,7 @@ import {
   getCases,
   createCase,
 } from "../api/casesApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 const CASE_STATUS_COLORS = {
   new: "bg-blue-100 text-blue-700",
   in_progress: "bg-amber-100 text-amber-700",
@@ -268,6 +269,7 @@ function ContractForm({ onSave, onClose }) {
 }
 
 export default function Legal() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("legal", "create");
   const canDelete = canDo("legal", "delete");
@@ -297,12 +299,26 @@ export default function Legal() {
   useEffect(() => { load(); }, []);
 
   const deleteCase = async (id) => {
-    if (confirm("حذف القضية؟")) {
-      await deleteCase(id);
+    const ok = await confirmDialog({
+      title: "حذف القضية",
+      message: "هل أنت متأكد من حذف هذه القضية؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) {
+      await base44.entities.LegalCase.delete(id);
       load();
     }
   };
-  const deleteContract = async (id) => { if (confirm("حذف العقد؟")) { await base44.entities.LegalContract.delete(id); load(); } };
+  const deleteContract = async (id) => {
+    const ok = await confirmDialog({
+      title: "حذف العقد",
+      message: "هل أنت متأكد من حذف هذا العقد؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) { await base44.entities.LegalContract.delete(id); load(); }
+  };
 
   const filteredCases = cases.filter(
     c =>

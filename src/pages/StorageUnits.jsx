@@ -9,6 +9,7 @@ import {
   importStorageUnitsCsv,
 } from "@/api/storageUnitsApi";
 import UnitPhoto from "@/components/storage/UnitPhoto";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_COLORS = {
   "متاحة": "bg-green-100 text-green-700",
@@ -196,6 +197,7 @@ function UnitForm({ unit, onSave, onClose }) {
 // ─── Main Page ─────────────────────────────────────────────────────────────
 
 export default function StorageUnits() {
+  const confirmDialog = useConfirm();
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -223,7 +225,13 @@ export default function StorageUnits() {
   // ─── Delete ───────────────────────────────────────────────────────────────
 
   const handleDelete = async (id) => {
-    if (!confirm("هل أنت متأكد من حذف الوحدة؟")) return;
+    const ok = await confirmDialog({
+      title: "حذف الوحدة",
+      message: "هل أنت متأكد من حذف الوحدة؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await deleteStorageUnit(id);
       load();

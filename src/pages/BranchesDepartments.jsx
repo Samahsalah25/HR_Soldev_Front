@@ -391,6 +391,7 @@ import {
 } from "@/api/departmentsApi";
 
 import { getEmployees } from "@/api/departmentsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const Field = ({ label, children }) => (
   <div className="space-y-1.5">
@@ -888,6 +889,7 @@ function DeptForm({
 }
 
 export default function BranchesDepartments() {
+  const confirmDialog = useConfirm();
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -928,14 +930,26 @@ export default function BranchesDepartments() {
   }, []);
 
  const handleDeleteBranch = async (id) => {
-  if (confirm("هل أنت متأكد من حذف الفرع؟")) {
+  const ok = await confirmDialog({
+    title: "حذف الفرع",
+    message: "هل أنت متأكد من حذف الفرع؟ لا يمكن التراجع عن هذا الإجراء.",
+    confirmText: "حذف",
+    variant: "destructive",
+  });
+  if (ok) {
     await deleteBranchApi(id);
     load();
   }
 };
 
   const deleteDept = async (id) => {
-    if (confirm("هل أنت متأكد من حذف القسم؟")) {
+    const ok = await confirmDialog({
+      title: "حذف القسم",
+      message: "هل أنت متأكد من حذف القسم؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) {
       await deleteDepartmentApi(id);
       load();
     }

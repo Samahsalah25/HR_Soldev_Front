@@ -7,6 +7,7 @@ import {
   createDeduction,
   updateDeduction,
 } from "@/api/deductionsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 // const STATUS_COLORS = {
 //   "قيد الاعتماد": "bg-amber-100 text-amber-700",
 //   "معتمد": "bg-blue-100 text-blue-700",
@@ -154,6 +155,7 @@ function DeductionForm({ employees, violations, onSave, onClose }) {
 }
 
 export default function Deductions() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("deductions", "create");
   const canApprove = canDo("deductions", "approve");
@@ -216,18 +218,38 @@ export default function Deductions() {
   useEffect(() => { load(); }, []);
 
   const approve = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد الخصم",
+      message: "هل أنت متأكد من اعتماد هذا الخصم؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     await updateDeduction(id, {
       state: "approved",
     });
     load();
   };
   const reject = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض الخصم",
+      message: "هل أنت متأكد من رفض هذا الخصم؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await updateDeduction(id, {
       state: "rejected",
     });
     load();
   };
   const apply = async (id) => {
+    const ok = await confirmDialog({
+      title: "تطبيق الخصم",
+      message: "هل أنت متأكد من تطبيق هذا الخصم؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "تطبيق",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await updateDeduction(id, {
       state: "paid",
     });

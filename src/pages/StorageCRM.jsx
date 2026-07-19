@@ -14,6 +14,7 @@ import {
   getLostReasons,
   markOpportunityLost,
 } from "@/api/crmOpportunitiesApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STAGE_COLOR_PALETTE = [
   "bg-gray-100 text-gray-600",
@@ -498,6 +499,7 @@ function InfoRow({ label, value }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function StorageCRM() {
+  const confirmDialog = useConfirm();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(null);
@@ -552,6 +554,12 @@ export default function StorageCRM() {
   }, []);
 
   const handleMarkWon = async (opp) => {
+    const ok = await confirmDialog({
+      title: "تسجيل الفرصة كمكسوبة",
+      message: "هل أنت متأكد من تسجيل هذه الفرصة كمكسوبة (Won)؟",
+      confirmText: "تأكيد",
+    });
+    if (!ok) return;
     try {
       await markOpportunityWon(opp.id);
       loadOpportunities();

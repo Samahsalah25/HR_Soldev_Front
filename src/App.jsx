@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { PermissionsProvider } from '@/lib/PermissionsContext';
+import { ConfirmDialogProvider } from '@/components/ui/confirm-dialog';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { base44 } from '@/api/base44Client';
 // Add page imports here
@@ -218,10 +219,12 @@ function App() {
     <AuthProvider>
       <PermissionsProvider>
         <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <AuthenticatedApp />
-          </Router>
-          <Toaster />
+          <ConfirmDialogProvider>
+            <Router>
+              <AuthenticatedApp />
+            </Router>
+            <Toaster />
+          </ConfirmDialogProvider>
         </QueryClientProvider>
       </PermissionsProvider>
     </AuthProvider>

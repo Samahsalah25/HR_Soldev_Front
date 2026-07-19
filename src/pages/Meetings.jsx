@@ -10,6 +10,7 @@ import {
 } from "@/api/meetingsApi";
 
 import { getEmployees } from "@/api/departmentsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 function MeetingForm({ meeting, employees, onSave, onClose }) {
   const [form, setForm] = useState({
     title: "", type: "داخلي", date: new Date().toISOString().slice(0, 10),
@@ -357,6 +358,7 @@ function MiniCalendar({ meetings, onSelectDate, selectedDate }) {
 }
 
 export default function Meetings() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("meetings", "create");
   const canEdit = canDo("meetings", "edit");
@@ -411,7 +413,13 @@ export default function Meetings() {
   useEffect(() => { load(); }, []);
 
   const deleteMeeting = async (id) => {
-    if (confirm("حذف هذا الاجتماع؟")) { await apiDeleteMeeting(id); load(); }
+    const ok = await confirmDialog({
+      title: "حذف الاجتماع",
+      message: "هل أنت متأكد من حذف هذا الاجتماع؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) { await apiDeleteMeeting(id); load(); }
   };
 
   const today = new Date().toISOString().slice(0, 10);

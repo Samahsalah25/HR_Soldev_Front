@@ -10,7 +10,9 @@ import {
   getSalaryAdvanceInstallments,
     getSalaryAdvanceHistory,
 } from "@/api/salaryAdvancesApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 export default function LoanDetailModal({ loan, repayments: initialRepayments, onClose, onUpdate }) {
+  const confirmDialog = useConfirm();
   const [repayments, setRepayments] = useState(initialRepayments || []);
   const [auditLog, setAuditLog] = useState([]);
   const [activeTab, setActiveTab] = useState("schedule");
@@ -107,13 +109,13 @@ const confirmDefer = async () => {
 };
 
  const earlySettle = async () => {
-  if (
-    !window.confirm(
-      `هل تريد السداد المبكر الكامل للمبلغ المتبقي (${remainingAmount.toLocaleString(
-        "ar-SA"
-      )} ر.س)؟`
-    )
-  ) {
+  const ok = await confirmDialog({
+    title: "السداد المبكر",
+    message: `هل تريد السداد المبكر الكامل للمبلغ المتبقي (${remainingAmount.toLocaleString("ar-SA")} ر.س)؟ لا يمكن التراجع عن هذا الإجراء.`,
+    confirmText: "سداد",
+    variant: "destructive",
+  });
+  if (!ok) {
     return;
   }
 

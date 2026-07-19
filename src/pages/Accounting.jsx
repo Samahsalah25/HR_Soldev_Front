@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Plus, DollarSign, FileText, TrendingUp, TrendingDown, X, Save, Search, CheckCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatCurrency } from "../lib/hrUtils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const ENTRY_TYPES = ["قيد يومي", "راتب", "عهدة موظف", "تصفية عهدة", "مصروف", "إيراد", "سلفة"];
 const STATUS_COLORS = { "مسودة": "bg-amber-100 text-amber-700", "معتمد": "bg-green-100 text-green-700", "ملغى": "bg-gray-100 text-gray-500" };
@@ -134,6 +135,7 @@ function EntryForm({ entry, employees, onSave, onClose }) {
 }
 
 export default function Accounting() {
+  const confirmDialog = useConfirm();
   const [entries, setEntries] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +156,13 @@ export default function Accounting() {
   useEffect(() => { load(); }, []);
 
   const deleteEntry = async (id) => {
-    if (confirm("حذف هذا القيد؟")) { await base44.entities.AccountingEntry.delete(id); load(); }
+    const ok = await confirmDialog({
+      title: "حذف القيد",
+      message: "هل أنت متأكد من حذف هذا القيد المحاسبي؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) { await base44.entities.AccountingEntry.delete(id); load(); }
   };
 
   const approve = async (id) => {

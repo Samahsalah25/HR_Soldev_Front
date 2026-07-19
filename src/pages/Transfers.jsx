@@ -13,6 +13,7 @@ import {
 import {
   getBranches,
 } from "@/api/branchesApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_COLORS = {
   "قيد الاعتماد": "bg-amber-100 text-amber-700", "معتمد": "bg-green-100 text-green-700",
@@ -422,6 +423,7 @@ function TransferForm({ employees, branches, departments, onSave, onClose }) {
 //   );
 // }
 export default function Transfers() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("transfers", "create");
   const canApprove = canDo("transfers", "approve");
@@ -489,6 +491,12 @@ export default function Transfers() {
   // APPROVE
   // =========================
   const approve = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد النقل",
+      message: "هل أنت متأكد من اعتماد طلب النقل؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     try {
       await updateEmployeeTransfer(id, {
         state: "approved",
@@ -504,6 +512,13 @@ export default function Transfers() {
   // REJECT
   // =========================
   const reject = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض النقل",
+      message: "هل أنت متأكد من رفض طلب النقل؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await updateEmployeeTransfer(id, {
         state: "refused",

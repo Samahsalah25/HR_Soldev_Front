@@ -10,6 +10,7 @@ import {
 } from "@/api/missionApi";
 
 import { getEmployees } from "@/api/departmentsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 // const STATUS_STYLES = {
 //   "قيد الانتظار": "bg-amber-100 text-amber-700",
 //   "موافق عليها": "bg-blue-100 text-blue-700",
@@ -32,6 +33,7 @@ const STATUS_LABELS = {
   cancelled: "ملغاة",
 };
 export default function Missions() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("missions", "create");
   const canApprove = canDo("missions", "approve");
@@ -164,6 +166,25 @@ export default function Missions() {
     } catch (error) {
       console.error("Error updating mission:", error);
     }
+  };
+
+  const handleApproveMission = async (id) => {
+    const ok = await confirmDialog({
+      title: "قبول المهمة",
+      message: "هل أنت متأكد من قبول هذه المهمة؟",
+      confirmText: "قبول",
+    });
+    if (ok) await updateStatus(id, "approved");
+  };
+
+  const handleRejectMission = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض المهمة",
+      message: "هل أنت متأكد من رفض هذه المهمة؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (ok) await updateStatus(id, "cancelled");
   };
 
   const stats = {
@@ -361,7 +382,7 @@ export default function Missions() {
                           <div className="flex gap-1">
                             <button
                               onClick={() =>
-                                updateStatus(m.id, "approved")
+                                handleApproveMission(m.id)
                               }
                               title="قبول"
                               className="p-1 rounded hover:bg-green-50 text-green-600"
@@ -371,7 +392,7 @@ export default function Missions() {
 
                             <button
                               onClick={() =>
-                                updateStatus(m.id, "cancelled")
+                                handleRejectMission(m.id)
                               }
                               title="رفض"
                               className="p-1 rounded hover:bg-red-50 text-red-600"

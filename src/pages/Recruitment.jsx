@@ -12,6 +12,7 @@ import { getBranches } from "@/api/branchesApi";
 import { getDepartments, getEmployees } from "@/api/departmentsApi";
 import { getCurrentUser } from "@/api/authApi";
 import { deleteMeeting as deleteMeetingApi, updateMeeting } from "@/api/meetingsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 // تحويل نوع المقابلة من عربي لـ English key
 const INTERVIEW_TYPE_TO_KEY = {
   "مقابلة HR": "hr_meeting",
@@ -583,6 +584,7 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
 }
 
 export default function Recruitment() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("recruitment", "create");
   const canApprove = canDo("recruitment", "approve");
@@ -649,11 +651,24 @@ export default function Recruitment() {
   useEffect(() => { load(); }, []);
 
   const approveJob = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد الوظيفة",
+      message: "هل أنت متأكد من اعتماد هذه الوظيفة؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     await acceptJob(id);
     load();
   };
 
   const rejectJob = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض الوظيفة",
+      message: "هل أنت متأكد من رفض هذه الوظيفة؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await rejectJobApi(id);
     load();
   };

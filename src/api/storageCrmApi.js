@@ -69,7 +69,7 @@ export function fromApiCustomer(c) {
  *          website, street, city, zip, vat, comment, active
  */
 export function toApiCustomerPayload(form) {
-    const isCompany = form.company_type === "company" || form.is_company === true;
+    const isCompany = form.company_type === "company";
 
     const payload = {
         name: form.name || form.full_name || "",

@@ -144,9 +144,21 @@ export async function createCustomer(form) {
 
 /**
  * PUT /customers/:id
+ * يستخدم form-data (نفس أسامي الحقول المستخدمة في createCustomer)
  */
 export async function updateCustomer(id, form) {
-    const res = await api.put(`/customers/${id}`, toApiCustomerPayload(form));
+    const fd = new FormData();
+
+    const payload = toApiCustomerPayload(form);
+    Object.entries(payload).forEach(([k, v]) => {
+        if (v !== null && v !== undefined) {
+            fd.append(k, String(v));
+        }
+    });
+
+    const res = await api.put(`/customers/${id}`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
     return res.data;
 }
 

@@ -1,21 +1,48 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, X, Search, Phone, Mail, Eye, User, Edit2, Building2, Loader2 } from "lucide-react";
+import { Plus, X, Search, Eye, User, Edit2, Building2, Loader2, Trophy, XCircle, Briefcase } from "lucide-react";
 import {
   getCustomers,
   createCustomer,
   updateCustomer,
 } from "@/api/storageCrmApi";
+import {
+  getStages,
+  getOpportunities,
+  createOpportunity,
+  updateOpportunity,
+  markOpportunityWon,
+  getLostReasons,
+  markOpportunityLost,
+} from "@/api/crmOpportunitiesApi";
 
-const PIPELINE_STAGES = ["جديد", "تواصل أولي", "في المفاوضة", "عرض مقدم", "محتمل إغلاق", "تم الإغلاق", "خسارة"];
-const STAGE_COLORS = {
-  "جديد": "bg-gray-100 text-gray-600",
-  "تواصل أولي": "bg-blue-100 text-blue-700",
-  "في المفاوضة": "bg-yellow-100 text-yellow-700",
-  "عرض مقدم": "bg-purple-100 text-purple-700",
-  "محتمل إغلاق": "bg-orange-100 text-orange-700",
-  "تم الإغلاق": "bg-green-100 text-green-700",
-  "خسارة": "bg-red-100 text-red-600",
+const STAGE_COLOR_PALETTE = [
+  "bg-gray-100 text-gray-600",
+  "bg-blue-100 text-blue-700",
+  "bg-yellow-100 text-yellow-700",
+  "bg-purple-100 text-purple-700",
+  "bg-orange-100 text-orange-700",
+  "bg-green-100 text-green-700",
+];
+const PRIORITY_LABELS = { "0": "عادي", "1": "متوسط", "2": "عالي", "3": "عاجل" };
+
+// ترجمة أسامي المراحل للعرض فقط — القيمة الفعلية المرسلة للسيرفر تفضل stage_id زي ما هو
+const STAGE_LABELS_AR = {
+  "new": "جديد",
+  "qualified": "مؤهل",
+  "proposition": "عرض مقدم",
+  "won": "تم الإغلاق",
 };
+
+function stageLabel(name) {
+  if (!name) return name;
+  return STAGE_LABELS_AR[name.toLowerCase()] || name;
+}
+
+function stageColor(stageId) {
+  if (stageId == null) return "bg-gray-100 text-gray-600";
+  const idx = Number(stageId) % STAGE_COLOR_PALETTE.length;
+  return STAGE_COLOR_PALETTE[idx];
+}
 
 function Field({ label, value, onChange, type = "text", placeholder = "" }) {
   return (
@@ -36,7 +63,6 @@ function CustomerForm({ customer, onSave, onClose }) {
     website: "", street: "", street2: "",
     city: "", zip: "", vat: "",
     job_title: "", comment: "",
-    pipeline_stage: "جديد", interested_in: "",
     active: true,
   };
 
@@ -141,19 +167,6 @@ function CustomerForm({ customer, onSave, onClose }) {
               </div>
             )}
 
-            {/* Pipeline — local only */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">مرحلة Pipeline</label>
-              <select value={form.pipeline_stage || "جديد"} onChange={e => set("pipeline_stage", e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary bg-white">
-                {PIPELINE_STAGES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <Field label="الوحدة المهتم بها"
-              value={form.interested_in} onChange={v => set("interested_in", v)}
-              placeholder="وحدة مكيفة في الرياض" />
-
             <div className="col-span-2">
               <label className="text-sm font-medium text-gray-700 block mb-1.5">ملاحظات (comment)</label>
               <textarea value={form.comment} onChange={e => set("comment", e.target.value)} rows={3}
@@ -176,8 +189,203 @@ function CustomerForm({ customer, onSave, onClose }) {
   );
 }
 
+// ─── OpportunityForm ──────────────────────────────────────────────────────────
+function OpportunityForm({ opportunity, customers, stages, defaultPartnerId, onSave, onClose }) {
+  const blank = {
+    name: "", partner_id: defaultPartnerId || "", stage_id: "",
+    expected_revenue: "", probability: "", priority: "1",
+    date_deadline: "", email_from: "", phone: "", description: "",
+  };
+
+  const [form, setForm] = useState(() => {
+    if (!opportunity) return blank;
+    return {
+      ...blank,
+      ...opportunity,
+      partner_id: opportunity.partner_id ?? "",
+      stage_id: opportunity.stage_id ?? "",
+      expected_revenue: opportunity.expected_revenue ?? "",
+      probability: opportunity.probability ?? "",
+      priority: String(opportunity.priority ?? "1"),
+      date_deadline: opportunity.date_deadline || "",
+      email_from: opportunity.email_from || "",
+      description: opportunity.description || "",
+    };
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name) { setError("اسم الفرصة مطلوب"); return; }
+    setSaving(true); setError("");
+    try {
+      const payload = {
+        name: form.name,
+        description: form.description || "",
+      };
+      if (form.partner_id) payload.partner_id = Number(form.partner_id);
+      if (form.stage_id) payload.stage_id = Number(form.stage_id);
+      if (form.expected_revenue !== "") payload.expected_revenue = Number(form.expected_revenue);
+      if (form.probability !== "") payload.probability = Number(form.probability);
+      if (form.priority) payload.priority = form.priority;
+      if (form.date_deadline) payload.date_deadline = form.date_deadline;
+      if (form.email_from) payload.email_from = form.email_from;
+      if (form.phone) payload.phone = form.phone;
+
+      if (opportunity?.id) await updateOpportunity(opportunity.id, payload);
+      else await createOpportunity(payload);
+      onSave();
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "حدث خطأ");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="font-bold">{opportunity ? "تعديل فرصة" : "إضافة فرصة جديدة"}</h3>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <Field label="اسم الفرصة *" value={form.name} onChange={v => set("name", v)} />
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">العميل</label>
+            <select value={form.partner_id} onChange={e => set("partner_id", e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary bg-white">
+              <option value="">— بدون عميل —</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>{c.name || c.full_name}</option>
+              ))}
+            </select>
+          </div>
+
+          {stages.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">المرحلة</label>
+              <select value={form.stage_id} onChange={e => set("stage_id", e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary bg-white">
+                <option value="">— افتراضي —</option>
+                {stages.map(s => (
+                  <option key={s.id} value={s.id}>{stageLabel(s.name)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="القيمة المتوقعة (expected_revenue)" type="number"
+              value={form.expected_revenue} onChange={v => set("expected_revenue", v)} />
+            <Field label="نسبة النجاح % (probability)" type="number"
+              value={form.probability} onChange={v => set("probability", v)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">الأولوية</label>
+              <select value={form.priority} onChange={e => set("priority", e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary bg-white">
+                {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <Field label="تاريخ الإغلاق المتوقع" type="date"
+              value={form.date_deadline} onChange={v => set("date_deadline", v)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="بريد التواصل (email_from)" type="email"
+              value={form.email_from} onChange={v => set("email_from", v)} />
+            <Field label="الهاتف" value={form.phone} onChange={v => set("phone", v)} />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">تفاصيل الفرصة</label>
+            <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={3}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary resize-none" />
+          </div>
+
+          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">إلغاء</button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-xl text-sm font-medium disabled:opacity-50">
+            {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />حفظ...</> : "حفظ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── LostReasonModal (أرشفة الفرصة كخسارة) ────────────────────────────────────
+function LostReasonModal({ lostReasons, onConfirm, onClose }) {
+  const [reasonId, setReasonId] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleConfirm = async () => {
+    if (!reasonId) { setError("اختر سبب الخسارة"); return; }
+    setSaving(true); setError("");
+    try {
+      await onConfirm({ lost_reason_id: Number(reasonId), lost_feedback: feedback });
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "حدث خطأ");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="font-bold">أرشفة الفرصة (خسارة)</h3>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">سبب الخسارة *</label>
+            <select value={reasonId} onChange={e => setReasonId(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary bg-white">
+              <option value="">— اختر —</option>
+              {lostReasons.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">ملاحظات إضافية</label>
+            <textarea value={feedback} onChange={e => setFeedback(e.target.value)} rows={3}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary resize-none" />
+          </div>
+          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">إلغاء</button>
+          <button onClick={handleConfirm} disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+            {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />جاري...</> : "تأكيد الخسارة والأرشفة"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CustomerDetailModal ──────────────────────────────────────────────────────
-function CustomerDetailModal({ customer, onClose }) {
+function CustomerDetailModal({ customer, opportunities, onAddOpportunity, onClose }) {
+  const related = opportunities.filter(o => String(o.partner_id) === String(customer.id));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
@@ -219,17 +427,6 @@ function CustomerDetailModal({ customer, onClose }) {
             </div>
           )}
 
-          {/* Pipeline */}
-          <div className="bg-gray-50 rounded-xl p-4">
-            <p className="text-xs font-bold text-gray-400 uppercase mb-2">Pipeline</p>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[customer.pipeline_stage || "جديد"] || "bg-gray-100 text-gray-600"}`}>
-              {customer.pipeline_stage || "جديد"}
-            </span>
-            {customer.interested_in && (
-              <p className="text-xs text-primary mt-2">مهتم بـ: {customer.interested_in}</p>
-            )}
-          </div>
-
           {/* ملاحظات */}
           {(customer.comment || customer.notes) && (
             <div className="bg-gray-50 rounded-xl p-4">
@@ -254,6 +451,36 @@ function CustomerDetailModal({ customer, onClose }) {
               </div>
             </div>
           )}
+
+          {/* الفرص المرتبطة */}
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-gray-400 uppercase">الفرص ({related.length})</p>
+              <button onClick={onAddOpportunity}
+                className="flex items-center gap-1 text-xs text-primary font-medium hover:underline">
+                <Plus className="w-3.5 h-3.5" />إضافة فرصة
+              </button>
+            </div>
+            {related.length === 0 ? (
+              <p className="text-xs text-muted-foreground">لا توجد فرص لهذا العميل</p>
+            ) : (
+              <div className="space-y-2">
+                {related.map(o => (
+                  <div key={o.id} className="flex items-center justify-between bg-white rounded-lg border border-gray-100 px-3 py-2">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{o.name}</p>
+                      {o.expected_revenue != null && (
+                        <p className="text-[11px] text-muted-foreground">{Number(o.expected_revenue).toLocaleString("ar-SA")} ر.س</p>
+                      )}
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${stageColor(o.stage_id)}`}>
+                      {stageLabel(o.stage_name)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -277,9 +504,16 @@ export default function StorageCRM() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");   // "" | "person" | "company"
-  const [filterStage, setFilterStage] = useState("");
   const [view, setView] = useState("list");
   const [error, setError] = useState("");
+
+  const [opportunities, setOpportunities] = useState([]);
+  const [oppLoading, setOppLoading] = useState(true);
+  const [stages, setStages] = useState([]);
+  const [oppForm, setOppForm] = useState(null);           // null=closed, {}=create, {..}=edit
+  const [oppDefaultPartnerId, setOppDefaultPartnerId] = useState(null);
+  const [lostReasons, setLostReasons] = useState([]);
+  const [lostFor, setLostFor] = useState(null);            // فرصة في انتظار اختيار سبب الخسارة
 
   // GET /customers
   const load = useCallback(async () => {
@@ -296,12 +530,41 @@ export default function StorageCRM() {
     }
   }, [filterType, search]);
 
-  useEffect(() => { load(); }, [load]);
+  // GET /crm/opportunities
+  const loadOpportunities = useCallback(async () => {
+    setOppLoading(true);
+    try {
+      setOpportunities(await getOpportunities({ limit: 200 }));
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "فشل تحميل الفرص");
+    } finally {
+      setOppLoading(false);
+    }
+  }, []);
 
-  // فلتر pipeline_stage يتم client-side
-  const filtered = leads.filter(l =>
-    !filterStage || (l.pipeline_stage || "جديد") === filterStage
-  );
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadOpportunities(); }, [loadOpportunities]);
+  useEffect(() => { getLostReasons().then(setLostReasons).catch(() => {}); }, []);
+  useEffect(() => {
+    getStages().then(list => {
+      setStages([...list].sort((a, b) => (a.sequence ?? a.id) - (b.sequence ?? b.id)));
+    }).catch(() => {});
+  }, []);
+
+  const handleMarkWon = async (opp) => {
+    try {
+      await markOpportunityWon(opp.id);
+      loadOpportunities();
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "فشل تسجيل الفرصة كمكسوبة");
+    }
+  };
+
+  const handleLostConfirm = async ({ lost_reason_id, lost_feedback }) => {
+    await markOpportunityLost(lostFor.id, { lost_reason_id, lost_feedback });
+    setLostFor(null);
+    loadOpportunities();
+  };
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -312,7 +575,7 @@ export default function StorageCRM() {
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <User className="w-6 h-6 text-primary" />CRM — العملاء
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">إدارة قاعدة عملاء التخزين</p>
+          <p className="text-sm text-muted-foreground mt-0.5">إدارة قاعدة عملاء التخزين والفرص</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {/* فلتر النوع: person | company */}
@@ -329,6 +592,10 @@ export default function StorageCRM() {
             className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-muted">
             {view === "list" ? "عرض Pipeline" : "عرض القائمة"}
           </button>
+          <button onClick={() => { setOppDefaultPartnerId(null); setOppForm({}); }}
+            className="flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5">
+            <Briefcase className="w-4 h-4" />إضافة فرصة
+          </button>
           <button onClick={() => setForm({})}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
             <Plus className="w-4 h-4" />إضافة عميل
@@ -338,17 +605,17 @@ export default function StorageCRM() {
 
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
 
-      {/* Pipeline Stage Stats */}
-      <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
-        {PIPELINE_STAGES.map(s => (
-          <button key={s} onClick={() => setFilterStage(filterStage === s ? "" : s)}
-            className={`rounded-xl border p-3 text-center cursor-pointer transition-all bg-card
-              ${filterStage === s ? "ring-2 ring-primary" : "hover:shadow-sm"}`}>
-            <p className="text-xl font-bold">{leads.filter(l => (l.pipeline_stage || "جديد") === s).length}</p>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${STAGE_COLORS[s]}`}>{s}</span>
-          </button>
-        ))}
-      </div>
+      {/* Pipeline Stage Stats — عدادات فقط، مش فلتر (كل الفرص دايمًا ظاهرة في الكانبان تحت) */}
+      {stages.length > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {stages.map(s => (
+            <div key={s.id} className="rounded-xl border p-3 text-center bg-card">
+              <p className="text-xl font-bold">{opportunities.filter(o => o.stage_id === s.id).length}</p>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${stageColor(s.id)}`}>{stageLabel(s.name)}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative max-w-xs">
@@ -358,61 +625,78 @@ export default function StorageCRM() {
           className="w-full pr-9 pl-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
       </div>
 
-      {/* Pipeline View */}
+      {/* Pipeline View — الفرص (Opportunities) الحقيقية */}
       {view === "pipeline" ? (
-        <div className="flex gap-3 overflow-x-auto pb-3">
-          {PIPELINE_STAGES.map(stage => {
-            const items = filtered.filter(l => (l.pipeline_stage || "جديد") === stage);
-            return (
-              <div key={stage} className="flex-shrink-0 w-52 bg-muted/30 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STAGE_COLORS[stage]}`}>{stage}</span>
-                  <span className="text-xs text-muted-foreground font-medium">{items.length}</span>
-                </div>
-                {items.map(l => (
-                  <div key={l.id} onClick={() => setSelected(l)}
-                    className="bg-card rounded-xl border border-border p-3 cursor-pointer hover:shadow-sm transition-shadow">
-                    <p className="font-semibold text-sm text-foreground">{l.name || l.full_name}</p>
-                    {l.mobile && (
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <Phone className="w-3 h-3" />{l.mobile}
-                      </p>
-                    )}
-                    {l.email && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Mail className="w-3 h-3" />{l.email}
-                      </p>
-                    )}
-                    {l.interested_in && (
-                      <p className="text-xs text-primary mt-1 truncate">{l.interested_in}</p>
-                    )}
+        oppLoading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />جاري تحميل الفرص...
+          </div>
+        ) : stages.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground text-sm">لا توجد فرص بعد — ابدأ بإضافة فرصة</div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-3">
+            {stages.map(stage => {
+              const items = opportunities.filter(o => o.stage_id === stage.id);
+              return (
+                <div key={stage.id} className="flex-shrink-0 w-64 bg-muted/30 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${stageColor(stage.id)}`}>{stageLabel(stage.name)}</span>
+                    <span className="text-xs text-muted-foreground font-medium">{items.length}</span>
                   </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+                  {items.map(o => (
+                    <div key={o.id}
+                      className="bg-card rounded-xl border border-border p-3 space-y-2 hover:shadow-sm transition-shadow">
+                      <div onClick={() => { setOppDefaultPartnerId(null); setOppForm(o); }} className="cursor-pointer">
+                        <p className="font-semibold text-sm text-foreground">{o.name}</p>
+                        {o.partner_name && (
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3" />{o.partner_name}
+                          </p>
+                        )}
+                        {o.expected_revenue != null && (
+                          <p className="text-xs text-primary mt-1">{Number(o.expected_revenue).toLocaleString("ar-SA")} ر.س</p>
+                        )}
+                      </div>
+                      {!stage.is_won && (
+                        <div className="flex gap-1 pt-1 border-t border-gray-100">
+                          <button onClick={() => handleMarkWon(o)}
+                            className="flex-1 flex items-center justify-center gap-1 text-[11px] py-1 rounded-lg text-green-700 bg-green-50 hover:bg-green-100">
+                            <Trophy className="w-3 h-3" />فوز
+                          </button>
+                          <button onClick={() => setLostFor(o)}
+                            className="flex-1 flex items-center justify-center gap-1 text-[11px] py-1 rounded-lg text-red-700 bg-red-50 hover:bg-red-100">
+                            <XCircle className="w-3 h-3" />خسارة
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )
       ) : (
-        /* List View */
+        /* List View — عملاء */
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
-                {["الاسم", "النوع", "الجوال", "البريد", "المسمى / ضريبي", "المرحلة", ""].map(h => (
+                {["الاسم", "النوع", "الجوال", "البريد", "المسمى / ضريبي", ""].map(h => (
                   <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">
+                <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />جاري التحميل...
                   </div>
                 </td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا يوجد عملاء</td></tr>
-              ) : filtered.map(l => (
+              ) : leads.length === 0 ? (
+                <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا يوجد عملاء</td></tr>
+              ) : leads.map(l => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -434,12 +718,6 @@ export default function StorageCRM() {
                   <td className="px-4 py-3 text-muted-foreground text-xs">{l.mobile || l.phone || "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{l.email || "—"}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{l.job_title || l.vat || "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium
-                      ${STAGE_COLORS[l.pipeline_stage || "جديد"] || "bg-gray-100 text-gray-600"}`}>
-                      {l.pipeline_stage || "جديد"}
-                    </span>
-                  </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       <button onClick={() => setSelected(l)} className="p-1.5 hover:bg-muted rounded">
@@ -465,7 +743,29 @@ export default function StorageCRM() {
         />
       )}
       {selected && (
-        <CustomerDetailModal customer={selected} onClose={() => setSelected(null)} />
+        <CustomerDetailModal
+          customer={selected}
+          opportunities={opportunities}
+          onAddOpportunity={() => { setOppDefaultPartnerId(selected.id); setOppForm({}); setSelected(null); }}
+          onClose={() => setSelected(null)}
+        />
+      )}
+      {oppForm !== null && (
+        <OpportunityForm
+          opportunity={oppForm?.id ? oppForm : null}
+          customers={leads}
+          stages={stages}
+          defaultPartnerId={oppDefaultPartnerId}
+          onSave={() => { setOppForm(null); loadOpportunities(); }}
+          onClose={() => setOppForm(null)}
+        />
+      )}
+      {lostFor && (
+        <LostReasonModal
+          lostReasons={lostReasons}
+          onConfirm={handleLostConfirm}
+          onClose={() => setLostFor(null)}
+        />
       )}
     </div>
   );

@@ -12,6 +12,8 @@ import {
 } from "@/api/requestsApi";
 import { getEmployeesList } from "@/api/employeesApi";
 import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
 
 const STATUS_MAP = {
   draft:"قيد الانتظار" ,
@@ -44,6 +46,7 @@ const STATUS_COLORS = {
 };
 
 export default function Leaves() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canCreate = canDo("leaves", "create");
   const canApprove = canDo("leaves", "approve");
@@ -165,6 +168,12 @@ export default function Leaves() {
   };
 
   const managerApprove = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد المدير",
+      message: "هل أنت متأكد من اعتماد طلب الإجازة؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
     try {
       await apiManagerApprove(id);
       load();
@@ -176,6 +185,25 @@ export default function Leaves() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleAcceptLeave = async (id) => {
+    const ok = await confirmDialog({
+      title: "قبول الإجازة",
+      message: "هل أنت متأكد من قبول طلب الإجازة؟",
+      confirmText: "قبول",
+    });
+    if (ok) await updateStatus(id, "accept");
+  };
+
+  const handleRefuseLeave = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض الإجازة",
+      message: "هل أنت متأكد من رفض طلب الإجازة؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (ok) await updateStatus(id, "refuse");
   };
 
   const filtered = leaves.filter(
@@ -299,7 +327,7 @@ export default function Leaves() {
                                 ✓ اعتماد المدير
                               </button>
                               <button
-                                onClick={() => updateStatus(leave.request_id, "refuse")}
+                                onClick={() => handleRefuseLeave(leave.id)}
                                 title="رفض"
                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded"
                               >
@@ -309,14 +337,14 @@ export default function Leaves() {
                           ) : !["validate", "refuse"].includes(leave.state) ? (
                             <>
                               <button
-                                onClick={() => updateStatus(leave.request_id, "refuse")}
+                                onClick={() => handleRefuseLeave(leave.id)}
                                 title="رفض"
                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded"
                               >
                                 <XCircle className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => updateStatus(leave.request_id, "accept")}
+                                onClick={() => handleAcceptLeave(leave.id)}
                                 title="قبول"
                                 className="p-1.5 hover:bg-green-50 text-green-600 rounded"
                               >

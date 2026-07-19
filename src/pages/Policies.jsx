@@ -8,6 +8,7 @@ import {
   downloadCompanyPolicy,
 } from "@/api/companyPoliciesApi";
 import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const CATEGORIES = ["الإجازات والغياب", "السلوك المهني", "الرواتب والمزايا", "الصحة والسلامة", "الأمن المعلوماتي", "أخرى"];
 
@@ -392,6 +393,7 @@ const handleSave = async () => {
 
 
 export default function Policies() {
+  const confirmDialog = useConfirm();
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -440,7 +442,13 @@ file_url: p.policy_pdf || p.file_url || null
   useEffect(() => { load(); }, []);
 
  const deletePolicy = async (id) => {
-  if (!confirm("هل أنت متأكد من حذف هذه السياسة؟")) return;
+  const ok = await confirmDialog({
+    title: "حذف السياسة",
+    message: "هل أنت متأكد من حذف هذه السياسة؟ لا يمكن التراجع عن هذا الإجراء.",
+    confirmText: "حذف",
+    variant: "destructive",
+  });
+  if (!ok) return;
 
   try {
     await deleteCompanyPolicy(id);

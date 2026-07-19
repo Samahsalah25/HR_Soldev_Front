@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getUsers, inviteEmployee, changeUserRole } from "@/api/usersApi";
 import { UserPlus, Shield, Search, Edit2, Check, X, Mail } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const ROLES = [
   { value: "admin", label: "مدير النظام", color: "bg-red-100 text-red-700" },
@@ -22,6 +23,7 @@ function getRoleBadge(role) {
 }
 
 export default function UserManagement() {
+  const confirmDialog = useConfirm();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -77,14 +79,17 @@ export default function UserManagement() {
   };
 
   const saveRole = async (userId) => {
-    try {
-      // POST /auth/users/:id/role — body: { role }
-      await changeUserRole(userId, editingRole);
-      setEditingId(null);
-      await load();
-    } catch (err) {
-      console.error("Failed to change role:", err);
-    }
+    const roleLabel = ROLES.find(r => r.value === editingRole)?.label || editingRole;
+    const ok = await confirmDialog({
+      title: "تغيير دور المستخدم",
+      message: `هل أنت متأكد من تغيير دور هذا المستخدم إلى "${roleLabel}"؟ سيؤثر هذا على صلاحياته في النظام.`,
+      confirmText: "تغيير",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    await base44.entities.User.update(userId, { role: editingRole });
+    setEditingId(null);
+    load();
   };
 
   const filtered = users.filter(u =>

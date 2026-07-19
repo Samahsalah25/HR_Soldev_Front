@@ -10,6 +10,7 @@ import LoanDetailModal from "@/components/loans/LoanDetailModal";
 import LoanWorkflowBadge from "@/components/loans/LoanWorkflowBadge";
 import MonthlyInstallmentsView from "@/components/loans/MonthlyInstallmentsView";
 import { updateSalaryAdvance ,getAllInstallments } from "@/api/salaryAdvancesApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import {
   getActiveSalaryAdvances ,
@@ -314,6 +315,7 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
 
 // ─── HR / Admin View (Full) ──────────────────────────────────────────
 function FullView({ applications, loans, employees, user, role, onAction, onDisbUrse, onReject, onOpenLoanDetail, search, setSearch, filterStatus, setFilterStatus, showNewApp, setShowNewApp, showTypeManager, setShowTypeManager, isAdmin, load }) {
+  const confirmDialog = useConfirm();
   const filteredApps = applications
     .filter(a => !filterStatus || a.status === filterStatus)
     .filter(a => !search || a.employee_name?.includes(search) || a.loan_type_name?.includes(search));
@@ -461,6 +463,12 @@ const getActions = (app) => {
         label: "✓ موافقة المدير",
         color: "purple",
         fn: async () => {
+          const ok = await confirmDialog({
+            title: "موافقة المدير",
+            message: "هل أنت متأكد من الموافقة على طلب السلفة؟",
+            confirmText: "موافقة",
+          });
+          if (!ok) return;
           await updateSalaryAdvance(app.id, "manager_approve");
           load();
         }
@@ -479,6 +487,12 @@ const getActions = (app) => {
         label: "✓ موافقة HR",
         color: "blue",
         fn: async () => {
+          const ok = await confirmDialog({
+            title: "موافقة HR",
+            message: "هل أنت متأكد من الموافقة على طلب السلفة؟",
+            confirmText: "موافقة",
+          });
+          if (!ok) return;
           await updateSalaryAdvance(app.id, "hr_approve");
           load();
         }
@@ -497,6 +511,12 @@ const getActions = (app) => {
         label: "✓ موافقة المالية",
         color: "orange",
         fn: async () => {
+          const ok = await confirmDialog({
+            title: "موافقة المالية",
+            message: "هل أنت متأكد من الموافقة على طلب السلفة؟",
+            confirmText: "موافقة",
+          });
+          if (!ok) return;
           await updateSalaryAdvance(app.id, "financial_approve");
           load();
         }
@@ -515,6 +535,13 @@ const getActions = (app) => {
         label: "💸 صرف",
         color: "green",
         fn: async () => {
+          const ok = await confirmDialog({
+            title: "صرف السلفة",
+            message: "هل أنت متأكد من صرف هذه السلفة؟ لا يمكن التراجع عن هذا الإجراء.",
+            confirmText: "صرف",
+            variant: "destructive",
+          });
+          if (!ok) return;
           await updateSalaryAdvance(app.id, "pay");
           load();
         }
@@ -661,6 +688,7 @@ const getActions = (app) => {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 export default function LoanManagement() {
+  const confirmDialog = useConfirm();
   const { user, role } = useRole();
   const isAdmin = role === "admin";
   const isHR = role === "admin" || role === "hr";
@@ -827,6 +855,13 @@ const installmentsView = installments.map(ins => ({
   };
 
   const disburseLoan = async (app) => {
+    const ok = await confirmDialog({
+      title: "صرف السلفة",
+      message: "هل أنت متأكد من صرف هذه السلفة؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "صرف",
+      variant: "destructive",
+    });
+    if (!ok) return;
     const disbursedAt = new Date().toISOString().slice(0, 10);
     const startMonth = nextMonth();
     const installmentAmount = Math.ceil(app.amount / app.installments);
@@ -872,8 +907,14 @@ const installmentsView = installments.map(ins => ({
   }
 };
 
-  const handleAction = (app, newStatus, approvalField) => {
+  const handleAction = async (app, newStatus, approvalField) => {
     if (newStatus === "reject") { setRejectModal({ id: app.id, employee_name: app.employee_name }); return; }
+    const ok = await confirmDialog({
+      title: "الموافقة على الطلب",
+      message: "هل أنت متأكد من الموافقة على طلب السلفة؟",
+      confirmText: "موافقة",
+    });
+    if (!ok) return;
     advanceWorkflow(app, newStatus, approvalField);
   };
 

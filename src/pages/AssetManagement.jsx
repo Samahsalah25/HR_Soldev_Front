@@ -14,6 +14,7 @@ import AssetRequestModal from "../components/assets/AssetRequestModal";
 import AssetHistoryModal from "../components/assets/AssetHistoryModal";
 import CustodyDeliverModal from "../components/assets/CustodyDeliverModal";
 import CustodyReceiveModal from "../components/assets/CustodyReceiveModal";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 // State badge colours — in_use treated same as assigned
 const STATUS_COLORS = {
@@ -30,6 +31,7 @@ const CONDITION_COLORS = {
 };
 
 export default function AssetManagement() {
+  const confirmDialog = useConfirm();
   const { role } = useRole();
   const isAdminOrHR = ["admin", "hr"].includes(role);
 
@@ -78,6 +80,12 @@ export default function AssetManagement() {
 
   // ── Request actions ─────────────────────────────────────────────────────────
   const handleAccept = async (req) => {
+    const ok = await confirmDialog({
+      title: "قبول الطلب",
+      message: "هل أنت متأكد من قبول هذا الطلب؟",
+      confirmText: "قبول",
+    });
+    if (!ok) return;
     try {
       // Use custody_returns endpoint if the request came from returns source
       if (req._source === "returns") {
@@ -92,6 +100,13 @@ export default function AssetManagement() {
   };
 
   const handleReject = async (req) => {
+    const ok = await confirmDialog({
+      title: "رفض الطلب",
+      message: "هل أنت متأكد من رفض هذا الطلب؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       if (req._source === "returns") {
         await rejectCustodyReturn(req.id);

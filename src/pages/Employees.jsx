@@ -255,6 +255,8 @@ import EmployeeImportExport from "../components/employees/EmployeeImportExport";
 import AddEmployeeDropdown from "../components/employees/AddEmployeeDropdown";
 import { useRole } from "../lib/useRole";
 import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
 const STATUS_COLORS = {
   "نشط": "bg-green-100 text-green-700",
   "في إجازة": "bg-amber-100 text-amber-700",
@@ -307,6 +309,7 @@ function DeleteConfirmDialog({ employee, onCancel, onConfirm, loading }) {
 }
 
 export default function Employees() {
+  const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canAdd = canDo("employees", "create");
   const canEdit = canDo("employees", "edit");
@@ -376,6 +379,21 @@ const { toast } = useToast();
       });
     } finally {
       setDeleting(false);
+  const handleDelete = async (id) => {
+    const ok = await confirmDialog({
+      title: "حذف الموظف",
+      message: "هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) {
+      try {
+        await deleteEmployee(id);
+        load();
+      } catch (err) {
+        console.error("Delete employee error:", err);
+        alert(err?.response?.data?.message || "حدث خطأ أثناء الحذف");
+      }
     }
   };
 

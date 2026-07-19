@@ -18,6 +18,8 @@ import {
   createCompanyRecord 
 } from "../api/companyRecordsApi";
 import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
 const STATUS_COLORS = {
   ساري: "bg-green-100 text-green-700",
   منتهي: "bg-red-100 text-red-600",
@@ -440,6 +442,7 @@ const { toast } = useToast();
 }
 
 export default function CompanyRecords() {
+  const confirmDialog = useConfirm();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -470,7 +473,13 @@ const load = async () => {
   }, []);
 
   const deleteRecord = async (id) => {
-    if (!confirm("حذف السجل؟")) return;
+    const ok = await confirmDialog({
+      title: "حذف السجل",
+      message: "هل أنت متأكد من حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (!ok) return;
 
     try {
     await deleteCompanyRecord(id);

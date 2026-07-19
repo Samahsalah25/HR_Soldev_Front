@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, CheckCircle, Clock, Search, X, Save, User } from "lucide-react";
 import { useRole } from "../lib/useRole";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   getTasks,
   createTask,
@@ -149,6 +150,7 @@ function TaskForm({ task, employees, onSave, onClose }) {
 
 export default function Tasks() {
   const { user, canDo } = useRole();
+  const confirmDialog = useConfirm();
   const canCreate = canDo("tasks", "create");
   const canEdit = canDo("tasks", "edit");
   const canDelete = canDo("tasks", "delete");
@@ -229,7 +231,13 @@ export default function Tasks() {
   useEffect(() => { load(); }, []);
 
   const deleteTask = async (id) => {
-    if (confirm("حذف هذه المهمة؟")) { await await deleteTaskApi(id); load(); }
+    const ok = await confirmDialog({
+      title: "حذف المهمة",
+      message: "هل أنت متأكد من حذف هذه المهمة؟ لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "حذف",
+      variant: "destructive",
+    });
+    if (ok) { await deleteTaskApi(id); load(); }
   };
 
   const toggleComplete = async (task) => {

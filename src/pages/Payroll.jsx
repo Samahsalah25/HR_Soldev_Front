@@ -18,6 +18,14 @@ export default function Payroll() {
   const canApprove = canDo(user, "payroll", "approve");
   const { toast } = useToast();
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
+export default function Payroll() {
+  const confirmDialog = useConfirm();
+  const { user, canDo } = useRole();
+  const canApprove = canDo("payroll", "approve");
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
 
@@ -52,11 +60,65 @@ const loadPayroll = async () => {
 
   } finally {
     setLoading(false);
-  }
-};
-useEffect(() => {
-  loadPayroll();
-}, [month]);
+  };
+
+  useEffect(() => { loadPayroll(); }, [month]);
+
+  const generatePayslips = (emps, activeLoans = [], deductions = [], bonuses = []) => {
+    const slips = emps.map(emp => {
+      const empLoan = activeLoans.find(l => l.employee_id === emp.id);
+      const loanDeduction = empLoan ? (empLoan.monthly_deduction || 0) : 0;
+      const empDeductions = deductions.filter(d => d.employee_id === emp.id && d.status === "معتمد");
+      const extraDeduction = empDeductions.reduce((s, d) => s + (d.amount || 0), 0);
+      const empBonuses = bonuses.filter(b => b.employee_id === emp.id && b.status === "معتمدة");
+      const bonusTotal = empBonuses.reduce((s, b) => s + (b.amount || 0), 0);
+      return { emp, loanDeduction, empLoan, extraDeduction, bonusTotal, empDeductions, empBonuses, ...calcPayslip(emp, 0, 0, 0, loanDeduction + extraDeduction) };
+    });
+    setPayslips(slips);
+  };
+
+  const totals = payslips.reduce((acc, p) => ({
+    earnings: acc.earnings + p.totalEarnings,
+    gosiEmp: acc.gosiEmp + p.gosiEmployee,
+    gosiEmployer: acc.gosiEmployer + p.gosiEmployer,
+    net: acc.net + p.netSalary,
+  }), { earnings: 0, gosiEmp: 0, gosiEmployer: 0, net: 0 });
+
+  const saudis = employees.filter(e => e.is_saudi);
+  const nonSaudis = employees.filter(e => !e.is_saudi);
+  const totalExpatLevy = nonSaudis.length * EXPAT_LEVY;
+
+  const postPayrollJournal = async () => {
+    const ok = await confirmDialog({
+      title: "ترحيل قيد الرواتب",
+      message: `هل أنت متأكد من ترحيل قيد رواتب شهر ${month}؟ لا يمكن التراجع عن هذا الإجراء بعد الترحيل.`,
+      confirmText: "ترحيل",
+      variant: "destructive",
+    });
+    if (!ok) return;
+
+    const accounts = await base44.entities.AccountChart.list();
+    const salaryAcc = accounts.find(a => (a.account_name?.includes("رواتب") || a.account_name?.includes("أجور")) && !a.is_parent);
+    const bankAcc = accounts.find(a => (a.account_name?.includes("بنك") || a.account_name?.includes("صندوق")) && !a.is_parent);
+    if (!salaryAcc || !bankAcc) { alert("يرجى إنشاء حسابات الرواتب والبنك في دليل الحسابات أولاً"); return; }
+    const currentUser = await base44.auth.me();
+    const netTotal = payslips.reduce((s, p) => s + p.netSalary, 0);
+    await base44.entities.JournalEntry.create({
+      entry_number: `JE-SAL-${month.replace("-", "")}`,
+      entry_date: new Date().toISOString().slice(0, 10),
+      description: `قيد رواتب شهر ${month} — ${employees.length} موظف`,
+      lines: [
+        { account_id: salaryAcc.id, account_code: salaryAcc.account_code, account_name: salaryAcc.account_name, debit: netTotal, credit: 0, description: `رواتب ${month}` },
+        { account_id: bankAcc.id, account_code: bankAcc.account_code, account_name: bankAcc.account_name, debit: 0, credit: netTotal, description: `صرف رواتب ${month}` },
+      ],
+      total_debit: netTotal, total_credit: netTotal,
+      status: "مرحل", source: "رواتب",
+      posted_by: currentUser.full_name || currentUser.email,
+      posted_date: new Date().toISOString().slice(0, 10),
+    });
+    alert(`✅ تم ترحيل قيد الرواتب بمبلغ ${netTotal.toLocaleString("ar-SA")} ريال`);
+  };
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       {/* Header */}

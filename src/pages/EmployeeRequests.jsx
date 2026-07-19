@@ -12,6 +12,9 @@ import { getAllRequests, requestAction, sendToManager as apiSendToManager, manag
 import {getSalaryAdvances} from "@/api/salaryAdvancesApi";
 import {getCustodyRequests} from "@/api/assetsApi"; 
 import { useToast } from "@/components/ui/use-toast";
+import {getCustodyRequests} from "@/api/assetsApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
   { type: "تقديم شكوى", icon: AlertTriangle, color: "bg-red-50 text-red-700 border-red-200", modal: "complaint" },
@@ -69,6 +72,7 @@ const STATUS_COLORS = {
 };
 
 export default function EmployeeRequests() {
+  const confirmDialog = useConfirm();
   const [requests, setRequests] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [custodies, setCustodies] = useState([]);
@@ -108,32 +112,26 @@ setLoans(loanRes?.data || []);
     }
   };
 
-const managerApprove = async (id) => {
-  try {
-    await apiManagerApprove(id);
-    load();
-  } catch (err) {
-    console.error("Manager approve error:", err);
-
-    let message =
-      err?.response?.data?.error ||
-      err?.response?.data?.message ||
-      err?.message ||
-      "حدث خطأ أثناء اعتماد الطلب";
-
-    if (
-      message.toLowerCase().includes("allocation") ||
-      message.toLowerCase().includes("time off type")
-    ) {
-      message =
-        "لا يمكن اعتماد طلب الإجازة لأن الموظف لا يملك رصيدًا من هذا النوع من الإجازات.";
-    }
-
+  const managerApprove = async (id) => {
+    const ok = await confirmDialog({
+      title: "اعتماد المدير",
+      message: "هل أنت متأكد من اعتماد هذا الطلب؟",
+      confirmText: "اعتماد",
+    });
+    if (!ok) return;
+    try {
+      await apiManagerApprove(id);
+      load();
+    } catch (err) {
+      console.error(err?.response?.data || err);
     toast({
       title: "خطأ",
       description: message,
       variant: "destructive",
     });
+    }
+
+  
   }
 };
 
@@ -172,6 +170,25 @@ const updateStatus = async (id, status) => {
     });
   }
 };
+  const handleAcceptRequest = async (id) => {
+    const ok = await confirmDialog({
+      title: "قبول الطلب",
+      message: "هل أنت متأكد من قبول هذا الطلب؟",
+      confirmText: "قبول",
+    });
+    if (ok) await updateStatus(id, "مقبولة");
+  };
+
+  const handleRejectRequest = async (id) => {
+    const ok = await confirmDialog({
+      title: "رفض الطلب",
+      message: "هل أنت متأكد من رفض هذا الطلب؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (ok) await updateStatus(id, "مرفوضة");
+  };
+
   const settleCustody = async (custodyId) => {
     await base44.entities.Custody.update(custodyId, {
       status: "مُرجَعة",
@@ -330,7 +347,7 @@ const activeLoans = loans;
         </button>
 
         <button
-          onClick={() => updateStatus(req.id, "مرفوضة")}
+          onClick={() => handleRejectRequest(req.id)}
           title="رفض"
           className="p-1.5 hover:bg-red-50 text-red-500 rounded"
         >
@@ -341,7 +358,7 @@ const activeLoans = loans;
       <>
         {/* رفض */}
         <button
-          onClick={() => updateStatus(req.id, "مرفوضة")}
+          onClick={() => handleRejectRequest(req.id)}
           title="رفض"
           className="p-1.5 hover:bg-red-50 text-red-500 rounded"
         >
@@ -350,7 +367,7 @@ const activeLoans = loans;
 
         {/* قبول */}
         <button
-          onClick={() => updateStatus(req.id, "مقبولة")}
+          onClick={() => handleAcceptRequest(req.id)}
           title="قبول"
           className="p-1.5 hover:bg-green-50 text-green-600 rounded"
         >

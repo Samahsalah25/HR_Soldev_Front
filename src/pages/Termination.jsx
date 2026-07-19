@@ -5,6 +5,7 @@ import { useRole } from "../lib/useRole";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, calcTicketEncashment, formatCurrency } from "../lib/hrUtils";
 import { getEmployees } from "@/api/departmentsApi";
 import { createEndOfService, getEndOfService, eosAction, getDepartureReasons } from "@/api/endOfService"
+import { useConfirm } from "@/components/ui/confirm-dialog";
 const WORKFLOW_STEPS = [
   { key: "Pending Manager", label: "تأكيد المدير", icon: "👔" },
   { key: "Pending HR Review", label: "مراجعة HR", icon: "📋" },
@@ -211,6 +212,7 @@ function NewTerminationForm({ employees, onSave, onClose }) {
 
 // ─── Detail / Workflow Modal ──────────────────────────────────────────
 function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate }) {
+  const confirmDialog = useConfirm();
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [settlement, setSettlement] = useState(null);
@@ -251,6 +253,35 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleApprove = async () => {
+    const ok = await confirmDialog({
+      title: "اعتماد المرحلة",
+      message: "هل أنت متأكد من اعتماد هذه المرحلة من إجراء إنهاء الخدمة؟",
+      confirmText: "اعتماد",
+    });
+    if (ok) await handleAction("approve");
+  };
+
+  const handleReject = async () => {
+    const ok = await confirmDialog({
+      title: "رفض إنهاء الخدمة",
+      message: "هل أنت متأكد من رفض هذه المرحلة من إجراء إنهاء الخدمة؟",
+      confirmText: "رفض",
+      variant: "destructive",
+    });
+    if (ok) await handleAction("reject");
+  };
+
+  const handleFinalApprove = async () => {
+    const ok = await confirmDialog({
+      title: "الموافقة النهائية وإغلاق الملف",
+      message: "سيتم تلقائيًا عند الموافقة: تغيير حالة الموظف إلى \"مُنهي الخدمة\"، إيقاف الراتب بعد آخر يوم عمل، تعطيل حساب المستخدم، وإنهاء التأمين الاجتماعي. لا يمكن التراجع عن هذا الإجراء.",
+      confirmText: "موافقة نهائية",
+      variant: "destructive",
+    });
+    if (ok) await handleAction("approve");
   };
 
   const stepIndex = WORKFLOW_STEPS.findIndex(s => s.key === req.status);
@@ -489,24 +520,24 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
             {req.status === "Pending Manager" && isManager && (
               <ActionCard title="تأكيد المدير" icon="👔" color="blue"
                 notes={notes} setNotes={setNotes}
-                onApprove={() => handleAction("approve")}
-                onReject={() => handleAction("reject")}
+                onApprove={handleApprove}
+                onReject={handleReject}
                 saving={saving} />
             )}
 
             {req.status === "Pending HR Review" && isHR && (
               <ActionCard title="مراجعة HR وتحديد التسوية" icon="📋" color="purple"
                 notes={notes} setNotes={setNotes}
-                onApprove={() => handleAction("approve")}
-                onReject={() => handleAction("reject")}
+                onApprove={handleApprove}
+                onReject={handleReject}
                 saving={saving} />
             )}
 
             {req.status === "Pending Finance" && isFinance && (
               <ActionCard title="تخليص المالية" icon="💰" color="orange"
                 notes={notes} setNotes={setNotes}
-                onApprove={() => handleAction("approve")}
-                onReject={() => handleAction("reject")}
+                onApprove={handleApprove}
+                onReject={handleReject}
                 saving={saving} />
             )}
 
@@ -527,7 +558,7 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
                 </div>
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="ملاحظات..."
                   className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
-                <button disabled={saving} onClick={() => handleAction("approve")}
+                <button disabled={saving} onClick={handleApprove}
                   className="w-full py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
                   {saving ? "جاري الحفظ..." : "✓ تم التخليص الكامل"}
                 </button>
@@ -544,7 +575,7 @@ function TerminationDetailModal({ req, employees, user, role, onClose, onUpdate 
                   <p>• تعطيل حساب المستخدم</p>
                   <p>• إنهاء التأمين الاجتماعي</p>
                 </div>
-                <button disabled={saving} onClick={() => handleAction("approve")}
+                <button disabled={saving} onClick={handleFinalApprove}
                   className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 disabled:opacity-50">
                   {saving ? "جاري الإغلاق..." : "✓ موافقة نهائية وإغلاق الملف"}
                 </button>

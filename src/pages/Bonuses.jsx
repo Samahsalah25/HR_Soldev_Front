@@ -383,29 +383,18 @@ const [selectedBonus, setSelectedBonus] = useState(null);
     });
     load();
   };
+
   const pay = async (id) => {
-    const ok = await confirmDialog({
-      title: "صرف المكافأة",
-      message: "هل أنت متأكد من صرف هذه المكافأة؟ لا يمكن التراجع عن هذا الإجراء.",
-      confirmText: "صرف",
-      variant: "destructive",
-    });
-    if (!ok) return;
     await updateAddition(id, {
       state: "paid",
     });
     load();
-  };
-
-  const pay = async () => {
-  await updateAddition(selectedBonus.id, {
-    state: "paid",
-  });
-
-  setShowPayConfirm(false);
-  setSelectedBonus(null);
-  load();
 };
+
+  
+
+
+  
   const pending = bonuses.filter(
     b => b.raw_state === "under_approval"
   );
@@ -617,14 +606,17 @@ const [selectedBonus, setSelectedBonus] = useState(null);
           إلغاء
         </button>
 
-
-        <button
-          onClick={pay}
-          className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          <DollarSign className="w-4 h-4" />
-          تأكيد الصرف
-        </button>
+<button
+  onClick={async () => {
+    await pay(selectedBonus.id);
+    setShowPayConfirm(false);
+    setSelectedBonus(null);
+  }}
+  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+>
+  <DollarSign className="w-4 h-4" />
+  تأكيد الصرف
+</button>
 
       </div>
 
@@ -633,5 +625,6 @@ const [selectedBonus, setSelectedBonus] = useState(null);
 )}
       {showForm && <BonusForm employees={employees} departments={departments} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
     </div>
-  );
-}
+  
+
+)};

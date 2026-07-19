@@ -12,7 +12,6 @@ import { getAllRequests, requestAction, sendToManager as apiSendToManager, manag
 import {getSalaryAdvances} from "@/api/salaryAdvancesApi";
 import {getCustodyRequests} from "@/api/assetsApi"; 
 import { useToast } from "@/components/ui/use-toast";
-import {getCustodyRequests} from "@/api/assetsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const REQUEST_TYPES = [
@@ -122,17 +121,18 @@ setLoans(loanRes?.data || []);
     try {
       await apiManagerApprove(id);
       load();
-    } catch (err) {
+    } catch (err) 
+    {
       console.error(err?.response?.data || err);
     toast({
       title: "خطأ",
-      description: message,
+      description:msg ,
       variant: "destructive",
     });
     }
 
   
-  }
+  
 };
 
 const updateStatus = async (id, status) => {

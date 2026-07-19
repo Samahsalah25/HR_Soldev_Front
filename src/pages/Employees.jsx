@@ -245,6 +245,7 @@
 //     </div>
 //   );
 // }
+
 import { useState, useEffect } from "react";
 import { Search, Eye, Edit, Trash2, AlertCircle, X } from "lucide-react";
 import { getEmployeesList, deleteEmployee, normalizeEmployee } from "@/api/employeesApi";
@@ -379,6 +380,8 @@ const { toast } = useToast();
       });
     } finally {
       setDeleting(false);
+    }}
+    
   const handleDelete = async (id) => {
     const ok = await confirmDialog({
       title: "حذف الموظف",

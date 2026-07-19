@@ -327,7 +327,7 @@ export default function Leaves() {
                                 ✓ اعتماد المدير
                               </button>
                               <button
-                                onClick={() => handleRefuseLeave(leave.id)}
+                                onClick={() => handleRefuseLeave(leave.request_id)}
                                 title="رفض"
                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded"
                               >
@@ -337,14 +337,14 @@ export default function Leaves() {
                           ) : !["validate", "refuse"].includes(leave.state) ? (
                             <>
                               <button
-                                onClick={() => handleRefuseLeave(leave.id)}
+                                onClick={() => handleRefuseLeave(leave.request_id)}
                                 title="رفض"
                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded"
                               >
                                 <XCircle className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => handleAcceptLeave(leave.id)}
+                                onClick={() => handleAcceptLeave(leave.request_id)}
                                 title="قبول"
                                 className="p-1.5 hover:bg-green-50 text-green-600 rounded"
                               >

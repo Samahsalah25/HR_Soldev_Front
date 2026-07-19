@@ -13,22 +13,20 @@ import {
   downloadWPS,
 } from "@/api/financeApi";
 import { useToast } from "@/components/ui/use-toast";
-export default function Payroll() {
-  const { user } = useRole();
-  const canApprove = canDo(user, "payroll", "approve");
-  const { toast } = useToast();
-
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
+
+
 export default function Payroll() {
+   const { toast } = useToast();
+
   const confirmDialog = useConfirm();
   const { user, canDo } = useRole();
   const canApprove = canDo("payroll", "approve");
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [loading, setLoading] = useState(true);
-
+ 
 const [kpis, setKpis] = useState({});
 const [payslips, setPayslips] = useState([]);
 const [gosiInsurance, setGosiInsurance] = useState({});
@@ -40,27 +38,22 @@ const [costSummary, setCostSummary] = useState({});
 const loadPayroll = async () => {
   try {
     setLoading(true);
-
-    const [
-      kpisData,
-      dashboardData,
-      gosiData,
-      costData,
-    ] = await Promise.all([
+    const [kpisData, dashboardData, gosiData, costData] = await Promise.all([
       getInsuranceKPIs(month),
       getInsuranceDashboard(month),
       getGosiInsurance(month),
       getCostSummary(month),
     ]);
-
     setKpis(kpisData);
     setPayslips(dashboardData);
     setGosiInsurance(gosiData);
     setCostSummary(costData);
-
+  } catch (err) {
+    console.error("Load payroll error:", err);
   } finally {
     setLoading(false);
-  };
+  }
+};
 
   useEffect(() => { loadPayroll(); }, [month]);
 

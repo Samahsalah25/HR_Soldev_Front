@@ -4,7 +4,7 @@ import { FileText, RefreshCw, Search, Eye, StopCircle } from "lucide-react";
 import ContractView from "../components/storage/ContractView";
 import InvoiceView from "../components/storage/InvoiceView";
 import api from "../api/axios";
-
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
    getContracts,
   getContractById,
@@ -62,6 +62,7 @@ export default function StorageContracts() {
   const [selectedContract, setSelectedContract] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [processing, setProcessing] = useState({});
+const confirmDialog = useConfirm();
 
  const load = async () => {
   setLoading(true);
@@ -105,11 +106,16 @@ const handlePayInvoice = async () => {
 };
   // Auto-renew contracts that reach end_date
 const handleRenewContract = async (contract) => {
+  const ok = await confirmDialog({
+    title: "تجديد العقد",
+    message: `هل أنت متأكد من تجديد العقد رقم ${contract.contract_number}؟`,
+    confirmText: "تجديد",
+  });
+  if (!ok) return;
+
   try {
     setProcessing((p) => ({ ...p, [contract.id]: true }));
-
     await renewContract(contract.id);
-
     await load();
   } catch (error) {
     console.error(error);
@@ -117,7 +123,16 @@ const handleRenewContract = async (contract) => {
     setProcessing((p) => ({ ...p, [contract.id]: false }));
   }
 };
+
 const stopRenew = async (contract) => {
+  const ok = await confirmDialog({
+    title: "إيقاف التجديد",
+    message: `هل أنت متأكد من إيقاف التجديد التلقائي للعقد رقم ${contract.contract_number}؟`,
+    confirmText: "إيقاف",
+    variant: "destructive",
+  });
+  if (!ok) return;
+
   try {
     await stopRenewalContract(contract.id);
     await load();
@@ -125,7 +140,6 @@ const stopRenew = async (contract) => {
     console.error(error);
   }
 };
-
   const filteredContracts = contracts.filter(c => !search || c.customer_name?.includes(search) || c.contract_number?.includes(search) || c.unit_number?.includes(search));
   const filteredInvoices = invoices.filter(i => !search || i.customer_name?.includes(search) || i.invoice_number?.includes(search));
   const unpaid = invoices.filter(i => i.status === "غير مدفوعة").length;

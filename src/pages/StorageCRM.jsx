@@ -566,6 +566,12 @@ export default function StorageCRM() {
     loadOpportunities();
   };
 
+  // فلترة إضافية على الفرونت — السيرفر مش دايمًا بيلتزم بفلتر company_type اللي بنبعته
+  const visibleLeads = leads.filter(l => {
+    if (!filterType) return true;
+    return filterType === "company" ? l.is_company : !l.is_company;
+  });
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
 
@@ -694,9 +700,9 @@ export default function StorageCRM() {
                     <Loader2 className="w-4 h-4 animate-spin" />جاري التحميل...
                   </div>
                 </td></tr>
-              ) : leads.length === 0 ? (
+              ) : visibleLeads.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا يوجد عملاء</td></tr>
-              ) : leads.map(l => (
+              ) : visibleLeads.map(l => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

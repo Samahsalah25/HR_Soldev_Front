@@ -283,7 +283,7 @@ import {
   uploadVoucherAttachment,
   getAccounts,
 } from "@/api/accountingApi";
-
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import  api  from "@/api/axios";
 const STATE_LABELS = {
   draft: "مسودة",
@@ -488,6 +488,7 @@ export default function Vouchers() {
   const [showForm, setShowForm] = useState(null); // "receipt" | "payment" | null
   const [editVoucher, setEditVoucher] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const confirmDialog = useConfirm();
 
   const load = async () => {
     try {
@@ -522,29 +523,44 @@ export default function Vouchers() {
 
   useEffect(() => { load(); }, []);
 
-  const handlePost = async (id) => {
-    try {
-      setActionLoadingId(id);
-      await postVoucher(id);
-      await load();
-    } catch (err) {
-      console.error("خطأ أثناء اعتماد السند:", err);
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
+ const handlePost = async (id) => {
+  const ok = await confirmDialog({
+    title: "اعتماد وترحيل السند",
+    message: "هل أنت متأكد من اعتماد هذا السند؟ سيتم إنشاء قيد محاسبي تلقائي مرتبط به.",
+    confirmText: "اعتماد",
+  });
+  if (!ok) return;
+
+  try {
+    setActionLoadingId(id);
+    await postVoucher(id);
+    await load();
+  } catch (err) {
+    console.error("خطأ أثناء اعتماد السند:", err);
+  } finally {
+    setActionLoadingId(null);
+  }
+};
 
   const handleCancel = async (id) => {
-    try {
-      setActionLoadingId(id);
-      await cancelVoucher(id);
-      await load();
-    } catch (err) {
-      console.error("خطأ أثناء إلغاء السند:", err);
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
+  const ok = await confirmDialog({
+    title: "إلغاء السند",
+    message: "هل أنت متأكد من إلغاء هذا السند؟ لا يمكن التراجع عن هذا الإجراء.",
+    confirmText: "إلغاء السند",
+    variant: "destructive",
+  });
+  if (!ok) return;
+
+  try {
+    setActionLoadingId(id);
+    await cancelVoucher(id);
+    await load();
+  } catch (err) {
+    console.error("خطأ أثناء إلغاء السند:", err);
+  } finally {
+    setActionLoadingId(null);
+  }
+};
 
   const openEdit = (voucher, type) => {
     setEditVoucher(voucher);

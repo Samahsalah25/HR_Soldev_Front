@@ -431,12 +431,18 @@ const getActions = (app) => {
   // =========================
   // 1) Draft → Submit
   // =========================
-  if (app.apiState === "draft") {
+if (app.apiState === "draft") {
 
     actions.push({
       label: "إحالة للمدير",
       color: "purple",
       fn: async () => {
+        const ok = await confirmDialog({
+          title: "إحالة الطلب للمدير",
+          message: "هل أنت متأكد من إحالة طلب السلفة للمدير المباشر للموافقة؟",
+          confirmText: "إحالة",
+        });
+        if (!ok) return;
         await updateSalaryAdvance(app.id, "submit_to_manager");
         load();
       }
@@ -446,11 +452,17 @@ const getActions = (app) => {
       label: "إرسال مباشر HR",
       color: "blue",
       fn: async () => {
+        const ok = await confirmDialog({
+          title: "إرسال مباشر لـ HR",
+          message: "هل أنت متأكد من إرسال الطلب مباشرة لموافقة HR (تخطي المدير)؟",
+          confirmText: "إرسال",
+        });
+        if (!ok) return;
         await updateSalaryAdvance(app.id, "direct_hr");
         load();
       }
     });
-  }
+}
 
   // =========================
   // 2) Manager approval

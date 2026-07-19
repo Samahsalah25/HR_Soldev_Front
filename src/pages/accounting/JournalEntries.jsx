@@ -345,6 +345,7 @@ import {
   getAccounts,
 } from "@/api/accountingApi";
 import api from "@/api/axios";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 const STATE_LABELS = {
   draft: "مسودة",
   posted: "مرحل",
@@ -609,7 +610,7 @@ export default function JournalEntries() {
   const [expanded, setExpanded] = useState(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState(null);
-
+  const confirmDialog = useConfirm();
   const load = async () => {
     try {
       setLoading(true);
@@ -640,29 +641,44 @@ export default function JournalEntries() {
 
   useEffect(() => { load(); }, []);
 
-  const handlePost = async (id) => {
-    try {
-      setActionLoadingId(id);
-      await postDailyEntry(id);
-      await load();
-    } catch (err) {
-      console.error("خطأ أثناء ترحيل القيد:", err);
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
+const handlePost = async (id) => {
+  const ok = await confirmDialog({
+    title: "ترحيل القيد",
+    message: "هل أنت متأكد من ترحيل هذا القيد؟ بعد الترحيل لن يمكن تعديله.",
+    confirmText: "ترحيل",
+  });
+  if (!ok) return;
 
-  const handleReverse = async (id) => {
-    try {
-      setActionLoadingId(id);
-      await reverseDailyEntry(id);
-      await load();
-    } catch (err) {
-      console.error("خطأ أثناء عكس القيد:", err);
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
+  try {
+    setActionLoadingId(id);
+    await postDailyEntry(id);
+    await load();
+  } catch (err) {
+    console.error("خطأ أثناء ترحيل القيد:", err);
+  } finally {
+    setActionLoadingId(null);
+  }
+};
+
+const handleReverse = async (id) => {
+  const ok = await confirmDialog({
+    title: "عكس القيد",
+    message: "هل أنت متأكد من عكس هذا القيد؟ سيتم إلغاء أثره المحاسبي بقيد عكسي. لا يمكن التراجع عن هذا الإجراء.",
+    confirmText: "عكس القيد",
+    variant: "destructive",
+  });
+  if (!ok) return;
+
+  try {
+    setActionLoadingId(id);
+    await reverseDailyEntry(id);
+    await load();
+  } catch (err) {
+    console.error("خطأ أثناء عكس القيد:", err);
+  } finally {
+    setActionLoadingId(null);
+  }
+};
 
   const openEdit = (entry) => {
     setEditEntry(entry);

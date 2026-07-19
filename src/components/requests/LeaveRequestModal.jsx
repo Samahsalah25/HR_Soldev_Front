@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Save, AlertTriangle } from "lucide-react";
 import { createVacationRequest, getVacationYearlyBalance } from "@/api/requestsApi";
-
+import { useToast } from "@/components/ui/use-toast";
 const LEAVE_TYPES = {
   yearly: "سنوية",
   sick_leaves: "مرضية (حتى 120 يوم)",
@@ -25,6 +25,7 @@ export default function LeaveRequestModal({ employees, onSave, onClose }) {
   const [leaveBalance, setLeaveBalance] = useState(null); // null = لم يُحدد بعد
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+    const { toast } = useToast();  
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const days = form.from && form.to
@@ -64,10 +65,15 @@ export default function LeaveRequestModal({ employees, onSave, onClose }) {
 
   const handleSave = async () => {
     // تحقق من رصيد الإجازة السنوية
-    if (isYearly && leaveBalance !== null && days > leaveBalance) {
-      alert(`رصيد إجازاتك السنوية (${leaveBalance} يوم) غير كافٍ للأيام المطلوبة (${days} يوم)`);
-      return;
-    }
+ if (isYearly && leaveBalance !== null && days > leaveBalance) {
+  toast({
+    title: "رصيد غير كافٍ",
+    description: `رصيد إجازاتك السنوية (${leaveBalance} يوم) غير كافٍ للأيام المطلوبة (${days} يوم)`,
+    variant: "destructive",
+  });
+  return;
+}
+
 
     setSaving(true);
     try {
@@ -93,7 +99,11 @@ export default function LeaveRequestModal({ employees, onSave, onClose }) {
           msg = rawError.error;
         }
       }
-      alert(msg);
+      toast({
+        title: "خطأ",
+        description: msg,
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }

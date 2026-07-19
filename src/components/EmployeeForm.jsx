@@ -968,6 +968,7 @@ import { X, Save, User, Briefcase, DollarSign, FileText, Plane, Upload } from "l
 import { base44 } from "@/api/base44Client";
 import api from "@/api/axios";
 import { createEmployee, updateEmployee, uploadEmployeeDocument, toApiPayload } from "@/api/employeesApi";
+import { useToast } from "@/components/ui/use-toast";
 
 const NATIONALITIES = ["سعودي", "مصري", "سوداني", "يمني", "باكستاني", "هندي", "فلبيني", "إندونيسي", "بنغلاديشي", "نيبالي", "إثيوبي", "أردني", "فلسطيني", "سوري", "لبناني", "عراقي", "كويتي", "إماراتي", "بحريني", "قطري", "عُماني", "تونسي", "جزائري", "مغربي", "ليبي", "أمريكي", "بريطاني", "فرنسي", "أخرى"];
 function genEmployeeNumber() { return `EMP-${Date.now().toString().slice(-6)}`; }
@@ -1038,6 +1039,7 @@ export default function EmployeeForm({ employee, initialRole, onClose, onSave })
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docFiles, setDocFiles] = useState([]);
 const [errors, setErrors] = useState({});
+  const { toast } = useToast();  
 
   useEffect(() => {
     const loadFormData = async () => {
@@ -1401,8 +1403,11 @@ const handleSubmit = async () => {
       "حدث خطأ أثناء الحفظ";
 
 
-    alert(msg);
-
+ toast({
+        title: "خطأ",
+        description: msg,
+        variant: "destructive",
+      });
 
   } finally {
 

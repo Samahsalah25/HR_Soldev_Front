@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { FileText, Plus, RefreshCw, Eye, AlertCircle } from "lucide-react";
 import InvoiceTemplate from "../components/storage/InvoiceTemplate";
+import { useToast } from "@/components/ui/use-toast";
 
 function addMonths(dateStr, months) {
   if (!dateStr) return new Date().toISOString().slice(0, 10);
@@ -78,7 +79,7 @@ export default function StorageInvoices() {
   const [viewInvoice, setViewInvoice] = useState(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [processingId, setProcessingId] = useState(null);
-
+const { toast } = useToast();
   const load = async () => {
     const [invs, bks] = await Promise.all([
       base44.entities.StorageInvoice.list("-created_date"),
@@ -105,7 +106,10 @@ export default function StorageInvoices() {
     }
     setProcessingId(null);
     load();
-    alert(`✅ تم فحص التجديدات. ${expiring.length} عقد تم مراجعته.`);
+    toast({
+      title: "✅ تم فحص التجديدات",
+      description: `${expiring.length} عقد تم مراجعته.`,
+    });
   };
 
   const handleIssue = async (booking) => {

@@ -17,7 +17,7 @@ import {
   downloadCompanyRecord,
   createCompanyRecord 
 } from "../api/companyRecordsApi";
-
+import { useToast } from "@/components/ui/use-toast";
 const STATUS_COLORS = {
   ساري: "bg-green-100 text-green-700",
   منتهي: "bg-red-100 text-red-600",
@@ -100,7 +100,7 @@ const [loadingBranches, setLoadingBranches] = useState(false);
 
   const [documentBase64, setDocumentBase64] = useState("");
   const [documentName, setDocumentName] = useState("");
-
+const { toast } = useToast();
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -114,7 +114,11 @@ const [loadingBranches, setLoadingBranches] = useState(false);
       setBranches(list);
     } catch (err) {
       console.error(err);
-      alert("فشل تحميل الفروع");
+      toast({
+        title: "خطأ",
+        description: "فشل تحميل الفروع",
+        variant: "destructive",
+      });
     } finally {
       setLoadingBranches(false);
     }
@@ -149,7 +153,11 @@ const [loadingBranches, setLoadingBranches] = useState(false);
       setDocumentName(file.name);
     } catch (err) {
       console.error(err);
-      alert("فشل رفع الملف");
+      toast({
+        title: "خطأ",
+        description: "فشل رفع الملف",
+        variant: "destructive",
+      });
     }
 
     setUploading(false);
@@ -181,7 +189,11 @@ const [loadingBranches, setLoadingBranches] = useState(false);
     onSave();
   } catch (err) {
     console.error(err);
-    alert(err?.message || "فشل حفظ السجل");
+    toast({
+      title: "خطأ",
+      description: err?.message || "فشل حفظ السجل",
+      variant: "destructive",
+    });
   } finally {
     setSaving(false);
   }
@@ -433,7 +445,7 @@ export default function CompanyRecords() {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
-
+const { toast } = useToast();
 const load = async () => {
   try {
     setLoading(true);
@@ -443,7 +455,11 @@ const load = async () => {
     setRecords(data?.data || data || []);
   } catch (err) {
     console.error(err);
-    alert("فشل تحميل السجلات");
+    toast({
+      title: "خطأ",
+      description: "فشل تحميل السجلات",
+      variant: "destructive",
+    });
   } finally {
     setLoading(false);
   }
@@ -462,7 +478,11 @@ const load = async () => {
       load();
     } catch (err) {
       console.error(err);
-      alert("فشل حذف السجل");
+      toast({
+        title: "خطأ",
+        description: "فشل حذف السجل",
+        variant: "destructive",
+      });
     }
   };
 
@@ -471,9 +491,14 @@ const downloadRecord = async (id, filename) => {
     await downloadCompanyRecord(id, filename);
   } catch (err) {
     console.error(err);
-    alert("فشل التحميل");
+    toast({
+      title: "خطأ",
+      description: "فشل التحميل",
+      variant: "destructive",
+    });
   }
 };
+
   const today = new Date();
 
   const expiringSoon = records.filter((r) => {

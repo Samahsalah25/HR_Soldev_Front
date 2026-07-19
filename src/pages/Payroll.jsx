@@ -12,9 +12,11 @@ import {
     postSalaryEntry,
   downloadWPS,
 } from "@/api/financeApi";
+import { useToast } from "@/components/ui/use-toast";
 export default function Payroll() {
   const { user } = useRole();
   const canApprove = canDo(user, "payroll", "approve");
+  const { toast } = useToast();
 
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,11 @@ useEffect(() => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      alert("فشل تحميل ملف WPS");
+      toast({
+        title: "خطأ",
+        description: "فشل تحميل ملف WPS",
+        variant: "destructive",
+      });
     }
   }}
   className="flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 text-sm font-medium"
@@ -98,12 +104,10 @@ useEffect(() => {
       try {
         const res = await postSalaryEntry(month);
 
-        alert(
-          `✅ تم ترحيل قيد الرواتب بنجاح\n\n` +
-          `رقم القيد: ${res.data.name}\n` +
-          `إجمالي القيد: ${res.data.total_debit.toLocaleString("ar-SA")} ريال`
-        );
-
+       toast({
+  title: "تم ترحيل القيد بنجاح ✅",
+  description: `رقم القيد: ${res.data.name} — إجمالي القيد: ${res.data.total_debit.toLocaleString("ar-SA")} ريال`,
+});
         // إعادة تحميل البيانات بعد الترحيل
         loadPayroll();
       } catch (err) {
@@ -115,11 +119,19 @@ useEffect(() => {
           "حدث خطأ أثناء ترحيل قيد الرواتب.";
 
         if (error.includes("already been posted")) {
-          alert("ℹ️ تم ترحيل رواتب هذا الشهر مسبقًا.");
+          toast({
+            title: "خطأ",
+            description: "ℹ️ تم ترحيل رواتب هذا الشهر مسبقًا.",
+            variant: "destructive",
+          });
           return;
         }
 
-        alert(error);
+        toast({
+          title: "خطأ",
+          description: error,
+          variant: "destructive",
+        });
       }
     }}
     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"

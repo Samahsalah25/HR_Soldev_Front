@@ -11,7 +11,7 @@ import { getEmployees } from "@/api/departmentsApi";
 import { getAllRequests, requestAction, sendToManager as apiSendToManager, managerApprove as apiManagerApprove } from "@/api/requestsApi"
 import {getSalaryAdvances} from "@/api/salaryAdvancesApi";
 import {getCustodyRequests} from "@/api/assetsApi"; 
-
+import { useToast } from "@/components/ui/use-toast";
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
   { type: "تقديم شكوى", icon: AlertTriangle, color: "bg-red-50 text-red-700 border-red-200", modal: "complaint" },
@@ -78,7 +78,7 @@ export default function EmployeeRequests() {
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("requests");
-
+const { toast } = useToast();
  const load = async () => {
  const [reqs, emps, custodyRes, loanRes] = await Promise.all([
   getAllRequests(),
@@ -129,7 +129,11 @@ const managerApprove = async (id) => {
         "لا يمكن اعتماد طلب الإجازة لأن الموظف لا يملك رصيدًا من هذا النوع من الإجازات.";
     }
 
-    alert(message);
+    toast({
+      title: "خطأ",
+      description: message,
+      variant: "destructive",
+    });
   }
 };
 
@@ -161,7 +165,11 @@ const updateStatus = async (id, status) => {
         "لا يمكن اعتماد طلب الإجازة لأن الموظف لا يملك رصيدًا من هذا النوع من الإجازات.";
     }
 
-    alert(message);
+    toast({
+      title: "خطأ",
+      description: message,
+      variant: "destructive",
+    });
   }
 };
   const settleCustody = async (custodyId) => {

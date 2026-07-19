@@ -43,30 +43,28 @@ export const deleteCompanyRecord = async (id) => {
 // ======================
 // DOWNLOAD FILE
 // ======================
+// ======================
+// DOWNLOAD FILE
+// ======================
 export const downloadCompanyRecord = async (id, filename) => {
-  try {
-    const res = await api.get(
-      `/company_records/${id}/download`,
-      { responseType: "blob" }
-    );
+  const res = await api.get(
+    `/company_records/${id}/download`,
+    { responseType: "blob" }
+  );
 
-    const blob = new Blob([res.data], {
-      type: res.headers["content-type"],
-    });
+  const blob = new Blob([res.data], {
+    type: res.headers["content-type"],
+  });
 
-    const url = window.URL.createObjectURL(blob);
+  const url = window.URL.createObjectURL(blob);
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename || "document";
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename || "document";
 
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    alert("فشل التحميل");
-  }
+  window.URL.revokeObjectURL(url);
 };

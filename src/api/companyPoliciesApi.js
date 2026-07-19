@@ -1,5 +1,5 @@
 import api from "./axios";
-import { toast } from "sonner";
+
 // GET ALL
 export const getCompanyPolicies = async () => {
   const res = await api.get("/company_policies");
@@ -38,68 +38,60 @@ export const deleteCompanyPolicy = async (id) => {
   return res.data;
 };
 
-// DOWNLOAD
+
 // DOWNLOAD
 export const downloadCompanyPolicy = async (
   id,
   filename = "policy"
 ) => {
-  try {
-    const res = await api.get(
-      `/company_policies/${id}/download`,
-      {
-        responseType: "blob", // 👈 مهم جدًا
-      }
-    );
-
-
-
-    // 👇 نعرف نوع الفايل
-    const contentType = res.headers["content-type"];
-
-    let extension = "";
-
-    if (contentType.includes("pdf")) {
-      extension = ".pdf";
-    } else if (contentType.includes("png")) {
-      extension = ".png";
-    } else if (
-      contentType.includes("jpg") ||
-      contentType.includes("jpeg")
-    ) {
-      extension = ".jpg";
-    } else if (contentType.includes("csv")) {
-      extension = ".csv";
-    } else {
-      extension = "";
+  const res = await api.get(
+    `/company_policies/${id}/download`,
+    {
+      responseType: "blob", // 👈 مهم جدًا
     }
+  );
 
-    // 👇 create blob
-    const blob = new Blob([res.data], {
-      type: contentType,
-    });
+  // 👇 نعرف نوع الفايل
+  const contentType = res.headers["content-type"];
 
-    // 👇 create local url
-    const url = window.URL.createObjectURL(blob);
+  let extension = "";
 
-    // 👇 download
-    const link = document.createElement("a");
-    link.href = url;
-    link.download =
-      filename?.includes(".")
-        ? filename
-        : `${filename}${extension}`;
-
-    document.body.appendChild(link);
-    link.click();
-
-    link.remove();
-
-    // cleanup
-    window.URL.revokeObjectURL(url);
-
-  } catch (err) {
-    console.error("❌ DOWNLOAD ERROR:", err);
-    alert("فشل التحميل");
+  if (contentType.includes("pdf")) {
+    extension = ".pdf";
+  } else if (contentType.includes("png")) {
+    extension = ".png";
+  } else if (
+    contentType.includes("jpg") ||
+    contentType.includes("jpeg")
+  ) {
+    extension = ".jpg";
+  } else if (contentType.includes("csv")) {
+    extension = ".csv";
+  } else {
+    extension = "";
   }
+
+  // 👇 create blob
+  const blob = new Blob([res.data], {
+    type: contentType,
+  });
+
+  // 👇 create local url
+  const url = window.URL.createObjectURL(blob);
+
+  // 👇 download
+  const link = document.createElement("a");
+  link.href = url;
+  link.download =
+    filename?.includes(".")
+      ? filename
+      : `${filename}${extension}`;
+
+  document.body.appendChild(link);
+  link.click();
+
+  link.remove();
+
+  // cleanup
+  window.URL.revokeObjectURL(url);
 };

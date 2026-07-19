@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, Save, DollarSign, Upload, CheckCircle } from "lucide-react";
 import { createAllowanceRequest, createExpenseRequest } from "@/api/requestsApi";
 import { base44 } from "@/api/base44Client";
-
+import { useToast } from "@/components/ui/use-toast";
 // allowance_type options
 const ALLOWANCE_TYPE_MAP = {
   "بدل سكن": "housing",
@@ -53,7 +53,8 @@ export default function ExpenseModal({ requestType, employees, onSave, onClose }
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
+  const { toast } = useToast();  
+  
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -92,7 +93,11 @@ export default function ExpenseModal({ requestType, employees, onSave, onClose }
       onSave();
     } catch (err) {
       console.error(err?.response?.data || err);
-      alert("حصل خطأ أثناء إرسال الطلب");
+      toast({
+        title: "خطأ",
+        description: "حصل خطأ أثناء إرسال الطلب",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }

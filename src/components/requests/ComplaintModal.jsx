@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, Save, AlertTriangle } from "lucide-react";
 import { createComplaintRequest, createAppealRequest } from "@/api/requestsApi";
+import { useToast } from "@/components/ui/use-toast";
 
 // complaint_type options
 const COMPLAINT_TYPE_MAP = {
@@ -22,9 +23,11 @@ const APPEAL_TYPE_MAP = {
 };
 
 export default function ComplaintModal({ requestType, employees, onSave, onClose }) {
+
   const isObjection = requestType === "تقديم اعتراض";
   const typeMap = isObjection ? APPEAL_TYPE_MAP : COMPLAINT_TYPE_MAP;
   const categories = Object.keys(typeMap);
+ const { toast } = useToast();
 
   const [form, setForm] = useState({
     is_anonymous: false,
@@ -63,7 +66,11 @@ export default function ComplaintModal({ requestType, employees, onSave, onClose
       onSave();
     } catch (err) {
       console.error(err?.response?.data || err);
-      alert("حصل خطأ أثناء إرسال الطلب");
+     toast({
+    title: "خطأ",
+    description: "حصل خطأ أثناء إرسال الطلب",
+    variant: "destructive",
+  });
     } finally {
       setSaving(false);
     }

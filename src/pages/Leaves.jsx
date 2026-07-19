@@ -11,7 +11,7 @@ import {
   managerApprove as apiManagerApprove,
 } from "@/api/requestsApi";
 import { getEmployeesList } from "@/api/employeesApi";
-
+import { useToast } from "@/components/ui/use-toast";
 
 const STATUS_MAP = {
   draft:"قيد الانتظار" ,
@@ -53,6 +53,7 @@ export default function Leaves() {
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState("requests");
   const [filterStatus, setFilterStatus] = useState("");
+  const { toast } = useToast();
   const [form, setForm] = useState({
     employee_id: "",
     vacation_type: "yearly",
@@ -126,7 +127,11 @@ export default function Leaves() {
           ? "الموظف لديه إجازة موافق عليها في نفس الفترة المطلوبة"
           : rawError.error;
       }
-      alert(msg);
+      toast({
+        title: "خطأ",
+        description: msg,
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -140,7 +145,11 @@ export default function Leaves() {
       load();
     } catch (err) {
       const msg = err?.response?.data?.error || "حصل خطأ أثناء تنفيذ الإجراء";
-      alert(msg);
+      toast({
+        title: "خطأ",
+        description: msg,
+        variant: "destructive",
+      });
     }
   };
 
@@ -161,7 +170,11 @@ export default function Leaves() {
       load();
     } catch (err) {
       console.error(err?.response?.data || err);
-      alert("حصل خطأ");
+      toast({
+        title: "خطأ",
+        description: "حصل خطأ",
+        variant: "destructive",
+      });
     }
   };
 

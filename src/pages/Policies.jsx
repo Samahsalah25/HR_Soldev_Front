@@ -7,6 +7,7 @@ import {
   deleteCompanyPolicy,
   downloadCompanyPolicy,
 } from "@/api/companyPoliciesApi";
+import { useToast } from "@/components/ui/use-toast";
 
 const CATEGORIES = ["الإجازات والغياب", "السلوك المهني", "الرواتب والمزايا", "الصحة والسلامة", "الأمن المعلوماتي", "أخرى"];
 
@@ -38,7 +39,7 @@ function PolicyForm({ policy, onSave, onClose }) {
 
   const [fileBase64, setFileBase64] = useState("");
   const [fileName, setFileName] = useState("");
-
+const { toast } = useToast();
   const set = (k, v) =>
     setForm((f) => ({ ...f, [k]: v }));
 
@@ -82,7 +83,10 @@ function PolicyForm({ policy, onSave, onClose }) {
     } catch (err) {
       console.error(err);
 
-      alert("فشل رفع الملف");
+      toast({
+        title: "فشل رفع الملف",
+        description: "حدث خطأ أثناء رفع الملف",
+      });
     } finally {
       setUploading(false);
     }
@@ -132,7 +136,10 @@ const handleSave = async () => {
     onSave();
   } catch (err) {
     console.error("ERROR:", err?.response?.data || err);
-    alert("فشل الحفظ");
+    toast({
+      title: "فشل الحفظ",
+      description: "حدث خطأ أثناء حفظ السياسة",
+    });
   } finally {
     setSaving(false);
   }
@@ -390,7 +397,7 @@ export default function Policies() {
   const [showForm, setShowForm] = useState(false);
   const [editPolicy, setEditPolicy] = useState(null);
   const [filterCategory, setFilterCategory] = useState("");
-
+const { toast } = useToast();
  const load = async () => {
   try {
     setLoading(true);
@@ -421,6 +428,10 @@ file_url: p.policy_pdf || p.file_url || null
    
   } catch (err) {
     console.error(err);
+    toast({
+      title: "فشل التحميل",
+      description: "حدث خطأ أثناء تحميل السياسات",
+    });
   } finally {
     setLoading(false);
   }
@@ -436,12 +447,27 @@ file_url: p.policy_pdf || p.file_url || null
     load();
   } catch (err) {
     console.error(err);
-    alert("فشل الحذف");
+    toast({
+      title: "فشل الحذف",
+      description: "حدث خطأ أثناء حذف السياسة",
+    });
   }
 };
 const handleOpen = async (id) => {
   const url = await downloadCompanyPolicy(id);
 
+};
+const handleDownload = async (id, filename) => {
+  try {
+    await downloadCompanyPolicy(id, filename);
+  } catch (err) {
+    console.error(err);
+    toast({
+      title: "خطأ",
+      description: "فشل التحميل",
+      variant: "destructive",
+    });
+  }
 };
   const filtered = filterCategory ? policies.filter(p => p.category === filterCategory) : policies;
   const grouped = CATEGORIES.reduce((acc, cat) => {
@@ -526,9 +552,9 @@ const handleOpen = async (id) => {
                     )}
                   </div>
                   <div className="flex flex-col gap-1 flex-shrink-0">
-                   {pol.has_pdf && (
+                {pol.has_pdf && (
  <button
-  onClick={() => downloadCompanyPolicy(pol.id, pol.file_name)}
+  onClick={() => handleDownload(pol.id, pol.file_name)}
   className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs"
 >
   <ExternalLink className="w-3 h-3" />

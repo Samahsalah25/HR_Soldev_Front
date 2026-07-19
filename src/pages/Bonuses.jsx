@@ -10,7 +10,7 @@ import {
 import {
   getEmployees, getDepartments
 } from "@/api/departmentsApi";
-
+import { useToast } from "@/components/ui/use-toast";
 const STATUS_COLORS = {
   "قيد الاعتماد": "bg-amber-100 text-amber-700",
   "معتمدة": "bg-blue-100 text-blue-700",
@@ -25,6 +25,8 @@ function BonusForm({ employees, departments, onSave, onClose }) {
     requires_gm_approval: false,
   });
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleEmpSelect = (id) => {
@@ -92,7 +94,11 @@ function BonusForm({ employees, departments, onSave, onClose }) {
         err?.response?.data || err
       );
 
-      alert("فشل إنشاء المكافأة");
+      toast({
+        title: "خطأ",
+        description: "فشل إنشاء المكافأة",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }

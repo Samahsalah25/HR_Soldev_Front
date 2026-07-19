@@ -9,7 +9,7 @@ import {
   importStorageUnitsCsv,
 } from "@/api/storageUnitsApi";
 import UnitPhoto from "@/components/storage/UnitPhoto";
-
+import { useToast } from "@/components/ui/use-toast";
 const STATUS_COLORS = {
   "متاحة": "bg-green-100 text-green-700",
   "محجوزة": "bg-amber-100 text-amber-700",
@@ -202,7 +202,7 @@ export default function StorageUnits() {
   const [form, setForm] = useState(null);       // null = مخفي | {} = إضافة | unit = تعديل
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-
+const { toast } = useToast();
   // ─── Load ─────────────────────────────────────────────────────────────────
 
   const load = async () => {
@@ -228,7 +228,11 @@ export default function StorageUnits() {
       await deleteStorageUnit(id);
       load();
     } catch (e) {
-      alert(e?.response?.data?.message || "فشل الحذف");
+      toast({
+        title: "فشل الحذف",
+        description: e?.response?.data?.message || "حدث خطأ أثناء حذف الوحدة",
+        variant: "destructive"
+      });
     }
   };
 
@@ -241,7 +245,11 @@ export default function StorageUnits() {
     try {
       await exportStorageUnitsCsv();
     } catch (e) {
-      alert(e?.response?.data?.message || e?.message || "فشل تصدير الملف");
+      toast({
+        title: "فشل التصدير",
+        description: e?.response?.data?.message || "حدث خطأ أثناء تصدير الملف",
+        variant: "destructive"
+      });
     } finally {
       setExporting(false);
     }
@@ -259,10 +267,17 @@ export default function StorageUnits() {
     try {
       const result = await importStorageUnitsCsv(file);
       const count = result?.data?.imported_count ?? result?.imported_count;
-      alert(`✅ ${count != null ? `تم استيراد ${count} وحدة` : "تم الاستيراد بنجاح"}`);
+      toast({
+        title: "تم الاستيراد",
+        description: `✅ ${count != null ? `تم استيراد ${count} وحدة` : "تم الاستيراد بنجاح"}`,
+      });
       load();
     } catch (err) {
-      alert(err?.response?.data?.message || err?.message || "فشل الاستيراد");
+      toast({
+        title: "فشل الاستيراد",
+        description: err?.response?.data?.message || err?.message || "حدث خطأ أثناء استيراد الملف",
+        variant: "destructive"
+      });
     } finally {
       setImporting(false);
       e.target.value = "";

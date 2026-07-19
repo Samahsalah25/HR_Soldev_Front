@@ -254,7 +254,7 @@ import EmployeeDetail from "../components/EmployeeDetail";
 import EmployeeImportExport from "../components/employees/EmployeeImportExport";
 import AddEmployeeDropdown from "../components/employees/AddEmployeeDropdown";
 import { useRole } from "../lib/useRole";
-
+import { useToast } from "@/components/ui/use-toast";
 const STATUS_COLORS = {
   "نشط": "bg-green-100 text-green-700",
   "في إجازة": "bg-amber-100 text-amber-700",
@@ -321,7 +321,7 @@ export default function Employees() {
   const [editEmployee, setEditEmployee] = useState(null);
   const [viewEmployee, setViewEmployee] = useState(null);
   const [newUserRole, setNewUserRole] = useState("employee");
-
+const { toast } = useToast();
   // بدل الـ confirm() الافتراضي: نخزن الموظف اللي هيتحذف وحالة تحميل الحذف
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -368,7 +368,12 @@ export default function Employees() {
       load();
     } catch (err) {
       console.error("Delete employee error:", err);
-      alert(err?.response?.data?.message || "حدث خطأ أثناء الحذف");
+
+      toast({
+        title: "خطأ",
+        description: err?.response?.data?.message || "حدث خطأ أثناء الحذف",
+        variant: "destructive",
+      });
     } finally {
       setDeleting(false);
     }

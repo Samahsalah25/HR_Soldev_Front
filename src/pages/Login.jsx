@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Lock, LogIn } from "lucide-react";
+import { User, Lock, LogIn, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { loginUser } from "../api/authApi";
 import { GoogleLogin } from "@react-oauth/google";
@@ -12,6 +12,7 @@ export default function Login() {
 
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -110,7 +111,7 @@ const handleGoogleSuccess = async (credentialResponse) => {
         </div>
 
         {/* Form */}
-        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+        <form onSubmit={handleLogin} className="bg-card border border-border rounded-xl p-6 space-y-4">
 
           {/* Employee Number */}
           <div className="space-y-1.5">
@@ -134,18 +135,28 @@ const handleGoogleSuccess = async (credentialResponse) => {
               كلمة المرور
             </label>
 
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 pl-9 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           {/* LOGIN BUTTON */}
           <button
-            onClick={handleLogin}
+            type="submit"
             disabled={loading}
             className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60"
           >
@@ -171,7 +182,7 @@ const handleGoogleSuccess = async (credentialResponse) => {
     });
   }}
 />
-        </div>
+        </form>
       </div>
     </div>
   );

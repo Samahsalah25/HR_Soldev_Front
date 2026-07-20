@@ -12,16 +12,32 @@ import {
   getBranches,
 } from "@/api/branchesApi";
 import { getEmployees } from "@/api/departmentsApi";
+import { useToast } from "@/components/ui/use-toast";
+const STATUS_AR = {
+  attended: "حاضر",
+  present: "حاضر",
+  absent: "غائب",
+  late: "متأخر",
+  timeoff: "اجازة",
+  leave: "اجازة",
+  on_leave: "اجازة",
+  mission: "مهمة عمل",
+  business_trip: "مهمة عمل",
+  remote: "عمل عن بُعد",
+  work_from_home: "عمل عن بُعد",
+};
+
 const STATUS_STYLES = {
   "حاضر": "bg-green-100 text-green-700",
   "غائب": "bg-red-100 text-red-600",
   "متأخر": "bg-amber-100 text-amber-700",
-  "إجازة": "bg-blue-100 text-blue-700",
+  "اجازة": "bg-blue-100 text-blue-700",
   "مهمة عمل": "bg-purple-100 text-purple-700",
   "عمل عن بُعد": "bg-teal-100 text-teal-700",
 };
 
 export default function Attendance() {
+  const { toast } = useToast();
   const { user, canDo } = useRole();
   const canCreate = canDo("attendance", "create");
   const [activeTab, setActiveTab] = useState("daily");
@@ -77,6 +93,7 @@ export default function Attendance() {
         status:
           r.state_arabic ||
           STATUS_AR[r.state] ||
+          r.state ||
           "—",
 
         raw_status: r.state,
@@ -194,6 +211,11 @@ export default function Attendance() {
       load();
     } catch (err) {
       console.error("CREATE ERROR:", err);
+      toast({
+        title: "تعذّر تسجيل الحضور",
+        description: err?.response?.data?.error || err?.response?.data?.message || "حدث خطأ أثناء تسجيل الحضور",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -290,12 +312,15 @@ export default function Attendance() {
                       <Clock className="w-10 h-10 mx-auto mb-2 opacity-20" />
                       لا توجد سجلات لهذا اليوم
                     </td></tr>
-                  ) : records.map(rec => (
+                  ) : records.map(rec => {
+                    // غائب/إجازة: الأوقات الجاية من الـ EOD job وقت وهمي مش حضور حقيقي
+                    const hasRealAttendance = !["غائب", "إجازة"].includes(rec.status);
+                    return (
                     <tr key={rec.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-3 font-medium text-foreground">{rec.employee_name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{rec.department_name}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-green-700">{rec.check_in || "—"}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-red-600">{rec.check_out || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{rec.department || "—"}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-green-700">{hasRealAttendance && rec.check_in ? rec.check_in : "—"}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-red-600">{hasRealAttendance && rec.check_out ? rec.check_out : "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[rec.status] || ""}`}>{rec.status}</span>
                       </td>
@@ -307,7 +332,8 @@ export default function Attendance() {
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs max-w-40 truncate">{rec.notes || "—"}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

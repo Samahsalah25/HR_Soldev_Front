@@ -187,6 +187,24 @@ export default function Missions() {
     if (ok) await updateStatus(id, "cancelled");
   };
 
+  const handleStartMission = async (id) => {
+    const ok = await confirmDialog({
+      title: "بدء المهمة",
+      message: "هل أنت متأكد من بدء تنفيذ هذه المهمة؟",
+      confirmText: "بدء",
+    });
+    if (ok) await updateStatus(id, "ongoing");
+  };
+
+  const handleCompleteMission = async (id) => {
+    const ok = await confirmDialog({
+      title: "إكمال المهمة",
+      message: "هل أنت متأكد من تسجيل هذه المهمة كمكتملة؟",
+      confirmText: "إكمال",
+    });
+    if (ok) await updateStatus(id, "completed");
+  };
+
   const stats = {
     total: missions.length,
 
@@ -405,7 +423,7 @@ export default function Missions() {
                         {m.state === "approved" && (
                           <button
                             onClick={() =>
-                              updateStatus(m.id, "ongoing")
+                              handleStartMission(m.id)
                             }
                             className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
                           >
@@ -416,7 +434,7 @@ export default function Missions() {
                         {m.state === "ongoing" && (
                           <button
                             onClick={() =>
-                              updateStatus(m.id, "completed")
+                              handleCompleteMission(m.id)
                             }
                             className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                           >

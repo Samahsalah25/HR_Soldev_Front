@@ -473,6 +473,31 @@ import { useToast } from "@/components/ui/use-toast";
 const API_URL =
   "https://flow-except-plumbing-vintage.trycloudflare.com/api/v1/salary_advances";
 
+// ترجمة رسايل خطأ السيرفر المعروفة لعربي — لو الرسالة مش من الأنماط دي بترجع زي ما هي
+function translateLoanApiError(msg) {
+  if (typeof msg !== "string") return msg;
+
+  // "The monthly installment (X ر.س) cannot exceed 50% of the employee's basic salary (Y ر.س). Please increase the number of installments to at least Z."
+  const installmentMatch = msg.match(
+    /monthly installment \(([\d.,]+)[^)]*\).*?basic salary \(([\d.,]+)[^)]*\).*?at least (\d+)/i
+  );
+  if (installmentMatch) {
+    const [, installment, halfSalary, minInstallments] = installmentMatch;
+    return `القسط الشهري (${Number(installment).toLocaleString("ar-SA")} ر.س) لا يمكن أن يتجاوز 50% من الراتب الأساسي للموظف (${Number(halfSalary).toLocaleString("ar-SA")} ر.س). من فضلك زوّد عدد الأقساط ليصبح ${minInstallments} على الأقل.`;
+  }
+
+  // "Employee has not completed the minimum service period of N months for advance type 'X'."
+  const serviceMatch = msg.match(
+    /minimum service period of (\d+) months? for advance type '([^']+)'/i
+  );
+  if (serviceMatch) {
+    const [, months, typeName] = serviceMatch;
+    return `الموظف لم يُكمل بعد مدة الخدمة المطلوبة (${months} شهر) للاستفادة من نوع السلفة "${typeName}".`;
+  }
+
+  return msg;
+}
+
 export default function LoanApplicationModal({
 
   onSave,
@@ -518,6 +543,7 @@ const [apiErrors, setApiErrors] = useState([]);
       const list = (res.data || []).map((e) => ({
         ...e,
         basic_salary: e.basic_salary ?? e.wage ?? 0,
+        join_date: e.join_date ?? e.start_date ?? "",
       }));
 
       setEmployees(list);
@@ -570,18 +596,41 @@ const handleFileUpload = (e) => {
       : 0;
 
   // تنبيه فوري (toast) لو القسط الشهري تجاوز نص الراتب الأساسي
+  const halfSalaryLimit = (selectedEmp?.basic_salary || 0) / 2;
   const installmentExceedsHalfSalary =
-    !!selectedEmp && monthlyDeduction > (selectedEmp.basic_salary || 0) / 2;
+    !!selectedEmp && monthlyDeduction > halfSalaryLimit;
+  const minInstallmentsNeeded =
+    halfSalaryLimit > 0 ? Math.ceil(form.amount / halfSalaryLimit) : 0;
 
   useEffect(() => {
     if (installmentExceedsHalfSalary) {
       toast({
         title: "القسط أكبر من المسموح",
-        description: `القسط الشهري (${monthlyDeduction.toLocaleString("ar-SA")} ر.س) لا يمكن أن يتجاوز نص الراتب الأساسي (${((selectedEmp.basic_salary || 0) / 2).toLocaleString("ar-SA")} ر.س).`,
+        description: `القسط الشهري (${monthlyDeduction.toLocaleString("ar-SA")} ر.س) لا يمكن أن يتجاوز 50% من الراتب الأساسي للموظف (${halfSalaryLimit.toLocaleString("ar-SA")} ر.س). من فضلك زوّد عدد الأقساط ليصبح ${minInstallmentsNeeded} على الأقل.`,
         variant: "destructive",
       });
     }
   }, [installmentExceedsHalfSalary]);
+
+  // تنبيه فوري (toast) لو مدة خدمة الموظف أقل من الحد الأدنى المطلوب لنوع السلفة
+  const serviceMonths = selectedEmp?.join_date
+    ? Math.floor(calcServiceYears(selectedEmp.join_date) * 12)
+    : null;
+  const serviceTooShort =
+    !!selectedEmp &&
+    !!selectedType?.minimum_service_period &&
+    serviceMonths !== null &&
+    serviceMonths < selectedType.minimum_service_period;
+
+  useEffect(() => {
+    if (serviceTooShort) {
+      toast({
+        title: "مدة الخدمة غير كافية",
+        description: `الموظف لم يُكمل بعد مدة الخدمة المطلوبة (${selectedType.minimum_service_period} شهر) للاستفادة من نوع السلفة "${selectedType.name}" — مدة خدمته الحالية ${serviceMonths} شهر.`,
+        variant: "destructive",
+      });
+    }
+  }, [serviceTooShort]);
 
 // VALIDATION
 const errors = (() => {
@@ -612,11 +661,12 @@ const errors = (() => {
 
   // التحقق من إن القسط الشهري ميتجاوزش نص الراتب الأساسي
   const halfSalary = (selectedEmp.basic_salary || 0) / 2;
-  if (form.amount > 0 && form.installments > 0) {
+  if (form.amount > 0 && form.installments > 0 && halfSalary > 0) {
     const installmentAmount = Math.ceil(form.amount / form.installments);
     if (installmentAmount > halfSalary) {
+      const minInstallments = Math.ceil(form.amount / halfSalary);
       err.push(
-        `القسط الشهري (${installmentAmount.toLocaleString("ar-SA")} ر.س) أكبر من نص الراتب الأساسي (${halfSalary.toLocaleString("ar-SA")} ر.س) — زوّد عدد الأقساط أو قلّل المبلغ`
+        `القسط الشهري (${installmentAmount.toLocaleString("ar-SA")} ر.س) لا يمكن أن يتجاوز 50% من الراتب الأساسي للموظف (${halfSalary.toLocaleString("ar-SA")} ر.س). من فضلك زوّد عدد الأقساط ليصبح ${minInstallments} على الأقل.`
       );
     }
   }
@@ -691,18 +741,24 @@ const handleSave = async () => {
     onClose?.();
   } catch (error) {
     const responseData = error?.response?.data;
+    let translated;
 
     if (Array.isArray(responseData?.errors)) {
-      setApiErrors(responseData.errors);
+      translated = responseData.errors.map(translateLoanApiError);
     } else if (responseData?.message) {
-      setApiErrors([responseData.message]);
+      translated = [translateLoanApiError(responseData.message)];
     } else if (responseData?.error) {
-      setApiErrors([responseData.error]);
+      translated = [translateLoanApiError(responseData.error)];
     } else {
-      setApiErrors([
-        "حدث خطأ أثناء إرسال الطلب"
-      ]);
+      translated = ["حدث خطأ أثناء إرسال الطلب"];
     }
+
+    setApiErrors(translated);
+    toast({
+      title: "تعذّر إرسال الطلب",
+      description: translated[0],
+      variant: "destructive",
+    });
   } finally {
     setSaving(false);
   }

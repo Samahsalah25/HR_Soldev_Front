@@ -469,6 +469,7 @@ import {
 } from "@/api/salaryAdvancesApi";
 
 import { getEmployees } from "@/api/departmentsApi";
+import { useToast } from "@/components/ui/use-toast";
 const API_URL =
   "https://flow-except-plumbing-vintage.trycloudflare.com/api/v1/salary_advances";
 
@@ -477,7 +478,7 @@ export default function LoanApplicationModal({
   onSave,
   onClose,
 }) {
-  
+  const { toast } = useToast();
   const [loanTypes, setLoanTypes] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
@@ -514,9 +515,12 @@ const [apiErrors, setApiErrors] = useState([]);
     try {
       const res = await getEmployees();
 
-      
+      const list = (res.data || []).map((e) => ({
+        ...e,
+        basic_salary: e.basic_salary ?? e.wage ?? 0,
+      }));
 
-      setEmployees(res.data || []);
+      setEmployees(list);
     } catch (error) {
       console.error("Error loading employees:", error);
     }
@@ -565,7 +569,20 @@ const handleFileUpload = (e) => {
       ? Math.ceil(form.amount / form.installments)
       : 0;
 
- 
+  // تنبيه فوري (toast) لو القسط الشهري تجاوز نص الراتب الأساسي
+  const installmentExceedsHalfSalary =
+    !!selectedEmp && monthlyDeduction > (selectedEmp.basic_salary || 0) / 2;
+
+  useEffect(() => {
+    if (installmentExceedsHalfSalary) {
+      toast({
+        title: "القسط أكبر من المسموح",
+        description: `القسط الشهري (${monthlyDeduction.toLocaleString("ar-SA")} ر.س) لا يمكن أن يتجاوز نص الراتب الأساسي (${((selectedEmp.basic_salary || 0) / 2).toLocaleString("ar-SA")} ر.س).`,
+        variant: "destructive",
+      });
+    }
+  }, [installmentExceedsHalfSalary]);
+
 // VALIDATION
 const errors = (() => {
   const err = [];
@@ -591,6 +608,17 @@ const errors = (() => {
         "ar-SA"
       )} ر.س)`
     );
+  }
+
+  // التحقق من إن القسط الشهري ميتجاوزش نص الراتب الأساسي
+  const halfSalary = (selectedEmp.basic_salary || 0) / 2;
+  if (form.amount > 0 && form.installments > 0) {
+    const installmentAmount = Math.ceil(form.amount / form.installments);
+    if (installmentAmount > halfSalary) {
+      err.push(
+        `القسط الشهري (${installmentAmount.toLocaleString("ar-SA")} ر.س) أكبر من نص الراتب الأساسي (${halfSalary.toLocaleString("ar-SA")} ر.س) — زوّد عدد الأقساط أو قلّل المبلغ`
+      );
+    }
   }
 
   // التحقق من عدد الأقساط

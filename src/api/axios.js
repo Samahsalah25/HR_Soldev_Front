@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  // baseURL: "https://undelved-semiacademical-roxann.ngrok-free.dev/api/v1",
-   baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "https://undelved-semiacademical-roxann.ngrok-free.dev/api/v1",
+  //  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
   xsrfCookieName: "session_id",
   xsrfHeaderName: "X-Session-Id",

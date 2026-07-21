@@ -44,7 +44,7 @@ export default function Login() {
           title: "تم تسجيل الدخول",
           description: `مرحباً ${res.name}`,
         });
-        console.log("Login successful:", res);
+     
 
         navigate("/dashboard");
       } else {

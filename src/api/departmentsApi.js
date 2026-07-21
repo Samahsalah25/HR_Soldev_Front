@@ -38,8 +38,30 @@ export const deleteDepartmentApi = async (id) => {
 };
 
 // GET EMPLOYEES (FOR MANAGER DROPDOWN)
+// السيرفر بيرجع الاسم في name_ar (وحقل name اللي مش دايمًا متطابق معاه) —
+// بنطبّع كل السجلات هنا في مكان واحد عشان كل الصفحات (اللي بتقرا full_name_ar/employee_name/name)
+// تعرض نفس الاسم العربي دايمًا.
 export const getEmployees = async () => {
   const response = await api.get("/employees");
+  const payload = response.data;
 
-  return response.data;
+  const list = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload)
+      ? payload
+      : [];
+
+  const normalized = list.map((e) => {
+    const arabicName = e.name_ar || e.name || "";
+    return {
+      ...e,
+      name: arabicName,
+      full_name_ar: arabicName,
+      employee_name: arabicName,
+      full_name: arabicName,
+    };
+  });
+
+  if (Array.isArray(payload)) return normalized;
+  return { ...payload, data: normalized };
 };

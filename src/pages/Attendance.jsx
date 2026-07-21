@@ -225,7 +225,7 @@ export default function Attendance() {
     present: records.filter(r => r.status === "حاضر").length,
     absent: records.filter(r => r.status === "غائب").length,
     late: records.filter(r => r.status === "متأخر").length,
-    leave: records.filter(r => r.status === "إجازة").length,
+    leave: records.filter(r => r.status === "اجازة").length,
   };
   const totalOT = records.reduce((s, r) => s + (r.overtime_hours || 0), 0);
   const totalLate = records.reduce((s, r) => s + (r.late_minutes || 0), 0);
@@ -272,7 +272,7 @@ export default function Attendance() {
               { label: "حاضر", value: stats.present, color: "text-green-600", bg: "bg-green-50 border-green-200" },
               { label: "غائب", value: stats.absent, color: "text-red-600", bg: "bg-red-50 border-red-200" },
               { label: "متأخر", value: stats.late, color: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
-              { label: "إجازة", value: stats.leave, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+              { label: "اجازة", value: stats.leave, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
               { label: "إضافي (ساعة)", value: totalOT.toFixed(1), color: "text-purple-600", bg: "bg-purple-50 border-purple-200" },
             ].map(s => (
               <div key={s.label} className={`rounded-xl border p-4 text-center ${s.bg}`}>
@@ -314,7 +314,7 @@ export default function Attendance() {
                     </td></tr>
                   ) : records.map(rec => {
                     // غائب/إجازة: الأوقات الجاية من الـ EOD job وقت وهمي مش حضور حقيقي
-                    const hasRealAttendance = !["غائب", "إجازة"].includes(rec.status);
+                    const hasRealAttendance = !["غائب", "اجازة"].includes(rec.status);
                     return (
                     <tr key={rec.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-3 font-medium text-foreground">{rec.employee_name}</td>

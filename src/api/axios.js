@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "https://207.180.213.61/api/v1",
+    baseURL: "https://207.180.213.61/odoo",
   // baseURL: "https://undelved-semiacademical-roxann.ngrok-free.dev/api/v1",
   //  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,

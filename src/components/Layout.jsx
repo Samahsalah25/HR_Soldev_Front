@@ -156,13 +156,13 @@ export default function Layout() {
 
       {/* Bottom */}
       <div className="px-2 py-3 border-t border-sidebar-border space-y-0.5">
-        {canSee("home") && (
+        {/* {canSee("home") && (
           <Link to="/home" onClick={() => setMobileSidebarOpen(false)}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/home" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
             <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
             {sidebarOpen && <span className="text-sm">لوحتي الشخصية</span>}
           </Link>
-        )}
+        )} */}
         {canSee("ess") && (
           <Link to="/ess" onClick={() => setMobileSidebarOpen(false)}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/ess" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>

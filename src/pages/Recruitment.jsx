@@ -13,6 +13,14 @@ import { getDepartments, getEmployees } from "@/api/departmentsApi";
 import { getCurrentUser } from "@/api/authApi";
 import { deleteMeeting as deleteMeetingApi, updateMeeting } from "@/api/meetingsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { API_ORIGIN } from "@/api/axios";
+
+// روابط الـ CV/المستندات ممكن ترجع من الـ API كمسار نسبي (مش رابط كامل) — نضيفله دومين السيرفر
+function resolveFileUrl(url) {
+  if (!url) return url;
+  return /^https?:\/\//i.test(url) ? url : `${API_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 // تحويل نوع المقابلة من عربي لـ English key
 const INTERVIEW_TYPE_TO_KEY = {
   "مقابلة HR": "hr_meeting",
@@ -402,7 +410,7 @@ function InterviewModal({ app, users, currentUser, onSave, onClose }) {
             <div className="flex items-center gap-3 mt-0.5">
               <p className="text-xs text-muted-foreground">{app.applicant_name} — {app.job_title}</p>
               {app.cv_url && (
-                <a href={app.cv_url} target="_blank" rel="noopener noreferrer"
+                <a href={resolveFileUrl(app.cv_url)} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                   <ExternalLink className="w-3 h-3" />السيرة الذاتية
                 </a>
@@ -899,7 +907,7 @@ export default function Recruitment() {
                           <p className="font-medium text-foreground">{app.applicant_name}</p>
                           <p className="text-xs text-muted-foreground">{app.nationality}</p>
                           {app.resume_url && (
-                            <a href={app.resume_url} target="_blank" rel="noopener noreferrer"
+                            <a href={resolveFileUrl(app.resume_url)} target="_blank" rel="noopener noreferrer"
                               className="flex items-center gap-1 text-xs text-blue-600 hover:underline mt-0.5">
                               <ExternalLink className="w-3 h-3" />CV
                             </a>
@@ -985,7 +993,7 @@ export default function Recruitment() {
                   </div>
                   <div className="flex items-center gap-3">
                     {app.cv_url && (
-                      <a href={app.cv_url} target="_blank" rel="noopener noreferrer"
+                      <a href={resolveFileUrl(app.cv_url)} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                         <ExternalLink className="w-3.5 h-3.5" />السيرة الذاتية
                       </a>

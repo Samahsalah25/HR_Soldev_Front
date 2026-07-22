@@ -5,10 +5,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { loginUser } from "../api/authApi";
 import { GoogleLogin } from "@react-oauth/google";
 import { googleLoginUser } from "../api/authApi";
+import { usePermissions } from "@/lib/PermissionsContext";
 
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { refreshPermissions } = usePermissions();
 
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
@@ -39,12 +41,12 @@ export default function Login() {
 
       if (res?.success) {
         localStorage.setItem("user", JSON.stringify(res));
+        await refreshPermissions();
 
         toast({
           title: "تم تسجيل الدخول",
           description: `مرحباً ${res.name}`,
         });
-     
 
         navigate("/dashboard");
       } else {
@@ -78,6 +80,7 @@ const handleGoogleSuccess = async (credentialResponse) => {
 
     if (res.success) {
       localStorage.setItem("user", JSON.stringify(res));
+      await refreshPermissions();
 
       toast({
         title: "تم تسجيل الدخول",

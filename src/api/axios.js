@@ -8,6 +8,9 @@ const api = axios.create({
   },
 });
 
+// دومين السيرفر بدون /api/v1 — يستخدم لبناء روابط ملفات (CV، مستندات...) الراجعة كمسار نسبي من الـ API
+export const API_ORIGIN = api.defaults.baseURL.replace(/\/api\/v1\/?$/, "");
+
 // Attach token from localStorage on every request (if present)
 api.interceptors.request.use((config) => {
   try {

@@ -17,8 +17,8 @@ export default function InvoiceTemplate({ invoice, onClose }) {
   const fmt = (n) => (n || 0).toLocaleString("ar-SA", { minimumFractionDigits: 2 });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" dir="rtl">
-      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 print:static print:bg-transparent print:p-0 print:block" dir="rtl">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto shadow-2xl print:max-h-none print:overflow-visible print:w-full print:max-w-none print:shadow-none print:rounded-none">
         {/* Actions */}
         <div className="flex items-center justify-between p-4 border-b print:hidden">
           <h3 className="font-bold text-gray-800">فاتورة ضريبية</h3>
@@ -32,7 +32,7 @@ export default function InvoiceTemplate({ invoice, onClose }) {
         </div>
 
         {/* Invoice Body */}
-        <div className="p-8 space-y-6" id="invoice-print">
+        <div className="p-8 space-y-6 print-area print:p-3 print:space-y-3 print:text-xs" id="invoice-print">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="space-y-1">

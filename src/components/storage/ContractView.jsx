@@ -125,15 +125,15 @@ useEffect(() => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 print:static print:bg-transparent print:p-0 print:block"
       dir="rtl"
     >
 
-      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col print:max-h-none print:w-full print:max-w-none print:shadow-none print:rounded-none print:block">
 
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white rounded-t-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white rounded-t-2xl print:hidden">
 
 
           <h3 className="font-bold text-gray-900">
@@ -174,7 +174,7 @@ useEffect(() => {
 
 
         <div
-          className="flex-1 overflow-y-auto p-8 space-y-6 text-sm"
+          className="flex-1 overflow-y-auto p-8 space-y-6 text-sm print:overflow-visible print-area print:p-3 print:space-y-3 print:text-xs"
           id="contract-print"
         >
 
@@ -209,7 +209,7 @@ useEffect(() => {
 
           {/* الأطراف */}
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-6 print:break-inside-avoid">
 
 
 
@@ -322,7 +322,7 @@ useEffect(() => {
 
           {/* تفاصيل العقد */}
 
-          <div className="border rounded-xl p-4">
+          <div className="border rounded-xl p-4 print:break-inside-avoid">
 
 
             <h3 className="font-bold border-b pb-2 mb-3">
@@ -417,7 +417,7 @@ useEffect(() => {
 
           {/* الشروط */}
 
-          <div className="border rounded-xl p-4">
+          <div className="border rounded-xl p-4 print:break-inside-avoid">
 
 
             <h3 className="font-bold border-b pb-2 mb-3">
@@ -462,7 +462,7 @@ useEffect(() => {
 
           {/* التوقيعات */}
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-6 print:break-inside-avoid">
 
 
 

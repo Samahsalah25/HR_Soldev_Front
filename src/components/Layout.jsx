@@ -79,39 +79,14 @@ const ALL_NAV_GROUPS = [
 ];
 
 
-export default function Layout() {
-  const location = useLocation();
-  const { canSee, role, loading: roleLoading } = useRole();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState({});
-  const { lang, toggle, isAr } = useLanguage();
-
-  const toggleGroup = (label) => setCollapsedGroups(g => ({ ...g, [label]: !g[label] }));
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await logoutUser();
-    } catch (err) {
-      console.log("logout error:", err);
-    }
-    localStorage.removeItem("user");
-    navigate("/");
-  };
-
-  // انتظر لحد ما الصلاحيات تتحمل قبل ما ترسم السايد بار
-  if (roleLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-
-  const SidebarContent = () => (
+// مكوّن ثابت برّه Layout عشان الـ DOM بتاعه (وسكرول الـ nav) ميتعملوش remount
+// كل ما الصفحة تتغيّر — تعريفه جوه Layout كان بيعمل identity جديدة كل render
+// فـ React كان يشيل الـ nav القديم ويحط واحد جديد (سكرول يرجع لفوق تلقائي).
+function SidebarContent({
+  sidebarOpen, collapsedGroups, toggleGroup, canSee, locationPathname,
+  setMobileSidebarOpen, handleLogout,
+}) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
@@ -139,7 +114,7 @@ export default function Layout() {
               const navKey = item.path.startsWith("/") ? item.path.slice(1) : item.path;
               return canSee(navKey);
             }).map(({ path, icon: Icon, label }) => {
-              const active = location.pathname === path;
+              const active = locationPathname === path;
               return (
                 <Link key={path} to={path} onClick={() => setMobileSidebarOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all group
@@ -165,7 +140,7 @@ export default function Layout() {
         )} */}
         {canSee("ess") && (
           <Link to="/ess" onClick={() => setMobileSidebarOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/ess" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${locationPathname === "/ess" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
             <UserCircle className="w-4 h-4 flex-shrink-0" />
             {sidebarOpen && <span className="text-sm">بوابتي</span>}
           </Link>
@@ -179,7 +154,7 @@ export default function Layout() {
         )}
         {canSee("settings") && (
           <Link to="/settings" onClick={() => setMobileSidebarOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${location.pathname === "/settings" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full transition-all ${locationPathname === "/settings" ? "bg-secondary text-white" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
             <Settings className="w-4 h-4 flex-shrink-0" />
             {sidebarOpen && <span className="text-sm">الإعدادات</span>}
           </Link>
@@ -192,12 +167,49 @@ export default function Layout() {
       </div>
     </div>
   );
+}
+
+export default function Layout() {
+  const location = useLocation();
+  const { canSee, role, loading: roleLoading } = useRole();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const { toggle, isAr } = useLanguage();
+
+  const toggleGroup = (label) => setCollapsedGroups(g => ({ ...g, [label]: !g[label] }));
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.log("logout error:", err);
+    }
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+
+  // انتظر لحد ما الصلاحيات تتحمل قبل ما ترسم السايد بار
+  if (roleLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const sidebarProps = {
+    sidebarOpen, collapsedGroups, toggleGroup, canSee,
+    locationPathname: location.pathname, setMobileSidebarOpen, handleLogout,
+  };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden" dir="rtl">
       {/* Desktop Sidebar */}
       <aside className={`hidden lg:flex flex-col bg-sidebar transition-all duration-300 flex-shrink-0 ${sidebarOpen ? "w-56" : "w-14"}`}>
-        <SidebarContent />
+        <SidebarContent {...sidebarProps} />
       </aside>
 
       {/* Mobile Overlay */}
@@ -205,7 +217,7 @@ export default function Layout() {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
           <aside className="relative w-56 bg-sidebar h-full z-50">
-            <SidebarContent />
+            <SidebarContent {...sidebarProps} />
           </aside>
         </div>
       )}

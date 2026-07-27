@@ -16,15 +16,15 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 print:static print:bg-transparent print:p-0 print:block"
       dir="rtl"
     >
 
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col print:max-h-none print:w-full print:max-w-none print:shadow-none print:rounded-none print:block">
 
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-white rounded-t-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-white rounded-t-2xl print:hidden">
 
           <h3 className="font-bold text-gray-900">
             فاتورة ضريبية
@@ -55,7 +55,7 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
 
 
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-5 text-sm">
+        <div className="flex-1 overflow-y-auto p-8 space-y-5 text-sm print:overflow-visible print-area print:p-3 print:space-y-3 print:text-xs">
 
 
           {/* Company Header */}
@@ -377,7 +377,7 @@ export default function InvoiceView({ invoice, onClose, onPay }) {
 
               onClick={onPay}
 
-              className="w-full py-3 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2"
+              className="w-full py-3 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 print:hidden"
 
             >
 

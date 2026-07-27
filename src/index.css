@@ -86,3 +86,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* طباعة عنصر واحد بس (عقد/فاتورة) وإخفاء باقي الصفحة (السايد بار، الجدول اللي وراه...) */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+}

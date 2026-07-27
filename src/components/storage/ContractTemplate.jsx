@@ -22,8 +22,8 @@ export default function ContractTemplate({ booking, onClose }) {
   const totalAmount = booking.total_amount || (booking.monthly_price * booking.contract_months);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" dir="rtl">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 print:static print:bg-transparent print:p-0 print:block" dir="rtl">
+      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto shadow-2xl print:max-h-none print:overflow-visible print:w-full print:max-w-none print:shadow-none print:rounded-none">
         {/* Actions */}
         <div className="flex items-center justify-between p-4 border-b print:hidden">
           <h3 className="font-bold text-gray-800">عقد إيجار وحدة تخزين</h3>
@@ -37,7 +37,7 @@ export default function ContractTemplate({ booking, onClose }) {
         </div>
 
         {/* Contract Body */}
-        <div className="p-10 space-y-6 text-gray-800 leading-relaxed" style={{ fontFamily: "serif" }}>
+        <div className="p-10 space-y-6 text-gray-800 leading-relaxed print-area print:p-4 print:space-y-3 print:text-xs" style={{ fontFamily: "serif" }}>
           {/* Header */}
           <div className="text-center space-y-2 border-b-2 border-gray-900 pb-6">
             <div className="w-20 h-8 bg-gray-900 rounded mx-auto flex items-center justify-center mb-3">
@@ -112,7 +112,7 @@ export default function ContractTemplate({ booking, onClose }) {
           </div>
 
           {/* Signatures */}
-          <div className="grid grid-cols-2 gap-8 pt-6 border-t border-gray-300">
+          <div className="grid grid-cols-2 gap-8 pt-6 border-t border-gray-300 print:break-inside-avoid">
             <div className="space-y-4">
               <p className="font-bold text-center">توقيع الطرف الأول (المؤجر)</p>
               <div className="h-16 border-b-2 border-gray-400" />

@@ -2,25 +2,6 @@
 
 import api from "./axios";
 
-const BASE_URL = "https://undelved-semiacademical-roxann.ngrok-free.dev/api/v1";
-
-// helper يبعت request بـ credentials (session cookie) وBearertoken معاً
-async function apiFetch(path, options = {}) {
-    const stored = localStorage.getItem("user");
-    const token = stored ? JSON.parse(stored)?.id || JSON.parse(stored)?.token : null;
-    const res = await fetch(`${BASE_URL}${path}`, {
-        credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...(options.headers || {}),
-        },
-        ...options,
-    });
-    return res.json();
-}
-
 // =============================
 // الأقسام المتاحة في الصلاحيات (بنفس ترتيب الـ Sidebar)
 // =============================
@@ -78,41 +59,38 @@ export const PERMISSION_MODULES = [
 // GET PERMISSION ROLES
 // =============================
 export const getPermissionRoles = async () => {
-    const result = await apiFetch("/permissions/roles");
-  
-    return result;
+    const res = await api.get("/permissions/roles");
+    return res.data;
 };
 
 // =============================
 // UPDATE ROLE PERMISSIONS
 // =============================
 export const updateRolePermissions = async (jobGrade, permissions) => {
-    return apiFetch("/permissions/roles", {
-        method: "POST",
-        body: JSON.stringify({ job_grade: jobGrade, permissions }),
-    });
+    const res = await api.post("/permissions/roles", { job_grade: jobGrade, permissions });
+    return res.data;
 };
 
 // =============================
 // GET EMPLOYEE PERMISSIONS
 // =============================
 export const getEmployeePermissions = async (employeeId) => {
-    return apiFetch(`/permissions/employees/${employeeId}`);
+    const res = await api.get(`/permissions/employees/${employeeId}`);
+    return res.data;
 };
 
 // =============================
 // UPDATE EMPLOYEE PERMISSIONS
 // =============================
 export const updateEmployeePermissions = async (employeeId, hasOverrides, permissions) => {
-    return apiFetch(`/permissions/employees/${employeeId}`, {
-        method: "POST",
-        body: JSON.stringify({ has_overrides: hasOverrides, permissions }),
-    });
+    const res = await api.post(`/permissions/employees/${employeeId}`, { has_overrides: hasOverrides, permissions });
+    return res.data;
 };
 
 // =============================
 // GET PERMISSION LOGS
 // =============================
 export const getPermissionLogs = async () => {
-    return apiFetch("/permissions/logs");
+    const res = await api.get("/permissions/logs");
+    return res.data;
 };

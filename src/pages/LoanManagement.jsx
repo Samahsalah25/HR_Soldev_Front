@@ -598,7 +598,7 @@ if (app.apiState === "draft") {
         </div>
         {activeTab === "applications" && (
           <div className="flex flex-wrap gap-1">
-            {[["", "الكل"], ["قيد المراجعة", "جديدة"], ["انتظار موافقة المدير", "المدير"], ["انتظار موافقة HR", "HR"], ["انتظار موافقة المالية", "المالية"], ["معتمدة", "معتمدة"], ["مصروفة", "مصروفة"], ["مرفوضة", "مرفوضة"]].map(([val, label]) => (
+            {[["", "الكل"], ["قيد المراجعة", "جديدة"], ["انتظار موافقة المدير", "المدير"], ["انتظار موافقة HR", "HR"], ["انتظار موافقة المالية", "المالية"], ["معتمدة", "معتمدة"], ["مصروفة", "مصروفة"], ["مكتملة", "مكتملة"], ["مرفوضة", "مرفوضة"]].map(([val, label]) => (
               <button key={val} onClick={() => setFilterStatus(val)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterStatus === val ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-muted"}`}>
                 {label}
@@ -742,6 +742,9 @@ const mapStatus = (state) => {
 
     case "certified":
       return "مصروفة";
+
+    case "completed":
+      return "مكتملة";
 
     case "rejected":
       return "مرفوضة";

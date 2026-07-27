@@ -13,6 +13,7 @@ import { getDepartments, getEmployees } from "@/api/departmentsApi";
 import { getCurrentUser } from "@/api/authApi";
 import { deleteMeeting as deleteMeetingApi, updateMeeting } from "@/api/meetingsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 import { API_ORIGIN } from "@/api/axios";
 
 // روابط الـ CV/المستندات ممكن ترجع من الـ API كمسار نسبي (مش رابط كامل) — نضيفله دومين السيرفر
@@ -93,6 +94,7 @@ const STAGE_LABELS = {
 };
 
 function JobForm({ departments, branches, onSave, onClose }) {
+  const { toast } = useToast();
   const [form, setForm] = useState({
     job_title: "", department: "", branch: "", employment_type: "دوام كامل",
     vacancies_count: 1, salary_range_min: 0, salary_range_max: 0,
@@ -104,7 +106,21 @@ function JobForm({ departments, branches, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const salaryRangeInvalid =
+    +form.salary_range_min > 0 &&
+    +form.salary_range_max > 0 &&
+    +form.salary_range_min > +form.salary_range_max;
+
   const handleSave = async () => {
+    if (salaryRangeInvalid) {
+      toast({
+        title: "نطاق الراتب غير صحيح",
+        description: "لا يمكن أن يكون الحد الأدنى للراتب أكبر من الحد الأقصى.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
 
     await createJob({
@@ -198,12 +214,15 @@ function JobForm({ departments, branches, onSave, onClose }) {
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">الراتب من (ر.س)</label>
                 <input type="number" min={0} value={form.salary_range_min} onChange={e => set("salary_range_min", +e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+                  className={`w-full px-3 py-2 text-sm border rounded-lg bg-background focus:outline-none ${salaryRangeInvalid ? "border-red-400" : "border-border"}`} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">الراتب إلى (ر.س)</label>
                 <input type="number" min={0} value={form.salary_range_max} onChange={e => set("salary_range_max", +e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+                  className={`w-full px-3 py-2 text-sm border rounded-lg bg-background focus:outline-none ${salaryRangeInvalid ? "border-red-400" : "border-border"}`} />
+                {salaryRangeInvalid && (
+                  <p className="text-xs text-red-600">الحد الأدنى أكبر من الحد الأقصى</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">آخر موعد للتقديم</label>
@@ -274,7 +293,7 @@ function JobForm({ departments, branches, onSave, onClose }) {
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={handleSave} disabled={saving || !form.job_title || !form.department}
+          <button onClick={handleSave} disabled={saving || !form.job_title || !form.department || salaryRangeInvalid}
             className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
             <Save className="w-4 h-4" />{saving ? "حفظ..." : "حفظ الطلب"}
           </button>

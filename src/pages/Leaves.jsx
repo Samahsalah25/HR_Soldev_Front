@@ -305,7 +305,7 @@ export default function Leaves() {
                     </td>
 
                     <td className="px-4 py-3 font-semibold text-center">
-                      {leave.days ?? "—"}
+                      {leave.days > 0 ? leave.days : (calcDays(leave.from, leave.to) || "—")}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {leave.ticket ? <Plane className="w-4 h-4 text-secondary mx-auto" /> : "—"}

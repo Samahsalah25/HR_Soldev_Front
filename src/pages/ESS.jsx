@@ -30,6 +30,25 @@ const LEAVE_TYPES_CONFIG = {
   "بدون راتب":  { usesBalance: false, maxDays: null },
 };
 
+// نفس أسامي أنواع المخالفات المستخدمة في صفحة "المخالفات" (Violations.jsx) — عشان تبقى موحّدة
+const VIOLATION_TYPE_LABELS = {
+  "Frequent Lateness": "تأخر متكرر",
+  "Frequent Absence Without Permission": "غياب بدون إذن",
+  "Behaviour penalty": "مخالفة سلوكية",
+  "Violation of procedures": "مخالفة إجراءات",
+  "Negligence at work": "إهمال في العمل",
+  "Other": "أخرى",
+};
+
+// نفس حالات المخالفة المستخدمة في صفحة "المخالفات" (Violations.jsx)
+const VIOLATION_STATUS_LABELS = {
+  draft: "قيد المراجعة",
+  under_review: "قيد المراجعة",
+  approved: "مؤكدة",
+  rejected: "ملغاة",
+  pending: "قيد المراجعة",
+};
+
 export default function ESS() {
   const [employee, setEmployee] = useState(null);
   const [myLeaves, setMyLeaves] = useState([]);
@@ -1102,7 +1121,7 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
               {/* نوع المخالفة */}
               <td className="px-4 py-3">
                 <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
-                  {v.violation_type || "—"}
+                  {VIOLATION_TYPE_LABELS[v.violation_type] || v.violation_type || "—"}
                 </span>
               </td>
 
@@ -1128,16 +1147,12 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
                   className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     v.status === "approved"
                       ? "bg-green-100 text-green-700"
-                      : v.status === "pending"
+                      : v.status === "pending" || v.status === "draft" || v.status === "under_review"
                       ? "bg-amber-100 text-amber-700"
                       : "bg-red-100 text-red-600"
                   }`}
                 >
-                  {v.status === "approved"
-                    ? "معتمد"
-                    : v.status === "pending"
-                    ? "قيد المراجعة"
-                    : v.status || "—"}
+                  {VIOLATION_STATUS_LABELS[v.status] || v.status || "—"}
                 </span>
               </td>
             </tr>

@@ -61,6 +61,7 @@ export const WORKFLOW_STATUS_COLORS = {
   "انتظار موافقة المالية": "bg-orange-100 text-orange-700",
   "معتمدة": "bg-teal-100 text-teal-700",
   "مصروفة": "bg-green-100 text-green-700",
+  "مكتملة": "bg-emerald-100 text-emerald-700",
   "مرفوضة": "bg-red-100 text-red-600",
   "ملغاة": "bg-gray-100 text-gray-500",
 };

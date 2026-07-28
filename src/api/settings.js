@@ -6,11 +6,11 @@ const salarySettingsApi = api;
 
 /**
  * GET GOSI Rates
- * GET /salary/accounting/settings/gosi-rates
+ * GET /accounting/settings/gosi-rates
  */
 export async function getGosiRates() {
     const res = await salarySettingsApi.get(
-        "/salary/accounting/settings/gosi-rates"
+        "/accounting/settings/gosi-rates"
     );
 
     return res.data;
@@ -21,7 +21,7 @@ export async function getGosiRates() {
 
 /**
  * UPDATE GOSI Rates
- * PUT /salary/accounting/settings/gosi-rates
+ * PUT /accounting/settings/gosi-rates
  *
  * Body:
  * {
@@ -40,7 +40,7 @@ export async function getGosiRates() {
  */
 export async function updateGosiRates(data) {
     const res = await salarySettingsApi.put(
-        "/salary/accounting/settings/gosi-rates",
+        "/accounting/settings/gosi-rates",
         data
     );
 
@@ -55,7 +55,7 @@ export async function updateGosiRates(data) {
 
 /**
  * GET Labor Law Settings
- * GET /salary/accounting/settings/labor-law
+ * GET /accounting/settings/labor-law
  *
  * Response:
  * {
@@ -76,7 +76,7 @@ export async function updateGosiRates(data) {
  */
 export async function getLaborLawSettings() {
     const res = await salarySettingsApi.get(
-        "/salary/accounting/settings/labor-law"
+        "/accounting/settings/labor-law"
     );
 
     return res.data;
@@ -86,7 +86,7 @@ export async function getLaborLawSettings() {
 
 /**
  * UPDATE Labor Law Settings
- * PUT /salary/accounting/settings/labor-law
+ * PUT /accounting/settings/labor-law
  *
  * Body:
  * {
@@ -106,7 +106,7 @@ export async function getLaborLawSettings() {
  */
 export async function updateLaborLawSettings(data) {
     const res = await salarySettingsApi.put(
-        "/salary/accounting/settings/labor-law",
+        "/accounting/settings/labor-law",
         data
     );
 
@@ -121,7 +121,7 @@ export async function updateLaborLawSettings(data) {
 
 /**
  * GET WPS Settings
- * GET /salary/accounting/settings/wps
+ * GET /accounting/settings/wps
  *
  * Response:
  * {
@@ -131,7 +131,7 @@ export async function updateLaborLawSettings(data) {
  */
 export async function getWpsSettings() {
     const res = await salarySettingsApi.get(
-        "/salary/accounting/settings/wps"
+        "/accounting/settings/wps"
     );
 
     return res.data;
@@ -139,7 +139,7 @@ export async function getWpsSettings() {
 
 /**
  * UPDATE WPS Settings
- * PUT /salary/accounting/settings/wps
+ * PUT /accounting/settings/wps
  *
  * Body:
  * {
@@ -148,7 +148,7 @@ export async function getWpsSettings() {
  */
 export async function updateWpsSettings(data) {
     const res = await salarySettingsApi.put(
-        "/salary/accounting/settings/wps",
+        "/accounting/settings/wps",
         data
     );
 
@@ -160,7 +160,7 @@ export async function updateWpsSettings(data) {
 
 /**
  * RUN Sandbox Test
- * POST /salary/accounting/settings/test-environment/run
+ * POST /accounting/settings/test-environment/run
  *
  * Body:
  * {
@@ -169,7 +169,7 @@ export async function updateWpsSettings(data) {
  */
 export async function runSandboxTest(data) {
     const res = await salarySettingsApi.post(
-        "/salary/accounting/settings/test-environment/run",
+        "/accounting/settings/test-environment/run",
         data
     );
 

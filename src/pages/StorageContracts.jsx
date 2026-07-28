@@ -17,7 +17,7 @@ import {
 
 function createInvoice(contract, type = "تجديد") {
   const subtotal = contract.monthly_price * contract.contract_months;
-  const vatAmount = Math.round(subtotal * 0.15);
+  const vatAmount = Math.round(subtotal * 0.15 * 100) / 100;
   const total = subtotal + vatAmount;
   const now = new Date();
   const due = new Date(now); due.setDate(due.getDate() + 7);

@@ -187,7 +187,7 @@ export function calcServiceYears(joinDate) {
 
 // فرمات الأرقام بالعربي
 export function formatCurrency(amount) {
-  return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(amount || 0);
+  return new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
 }
 
 export function formatNumber(n) {

@@ -18,7 +18,7 @@ async function issueInvoice(booking, isRenewal = false) {
   const months = booking.contract_months || 1;
   const periodEnd = addMonths(periodStart, months);
   const subtotal = (booking.monthly_price || 0) * months;
-  const vatAmount = Math.round(subtotal * 0.15);
+  const vatAmount = Math.round(subtotal * 0.15 * 100) / 100;
   const total = subtotal + vatAmount;
   const due = addMonths(periodStart, 0); // due at start of period
 

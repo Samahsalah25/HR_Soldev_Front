@@ -21,7 +21,7 @@ function BookingModal({ unit, onClose, onBook }) {
   const plan = DISCOUNT_OPTIONS[selectedPlan];
   const base = unit.monthly_price * plan.months;
   const discount = base * plan.discount;
-  const total = Math.round(base - discount);
+  const total = Math.round((base - discount) * 100) / 100;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" dir="rtl">

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Download, CheckCircle, FileText, Info } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { canDo } from "../lib/crudPermissions";
 import { calcPayslip, calcGOSI_Saudi, calcGOSI_NonSaudi, formatCurrency, EXPAT_LEVY } from "../lib/hrUtils";
@@ -81,37 +80,6 @@ const loadPayroll = async () => {
   const nonSaudis = employees.filter(e => !e.is_saudi);
   const totalExpatLevy = nonSaudis.length * EXPAT_LEVY;
 
-  const postPayrollJournal = async () => {
-    const ok = await confirmDialog({
-      title: "ترحيل قيد الرواتب",
-      message: `هل أنت متأكد من ترحيل قيد رواتب شهر ${month}؟ لا يمكن التراجع عن هذا الإجراء بعد الترحيل.`,
-      confirmText: "ترحيل",
-      variant: "destructive",
-    });
-    if (!ok) return;
-
-    const accounts = await base44.entities.AccountChart.list();
-    const salaryAcc = accounts.find(a => (a.account_name?.includes("رواتب") || a.account_name?.includes("أجور")) && !a.is_parent);
-    const bankAcc = accounts.find(a => (a.account_name?.includes("بنك") || a.account_name?.includes("صندوق")) && !a.is_parent);
-    if (!salaryAcc || !bankAcc) { alert("يرجى إنشاء حسابات الرواتب والبنك في دليل الحسابات أولاً"); return; }
-    const currentUser = await base44.auth.me();
-    const netTotal = payslips.reduce((s, p) => s + p.netSalary, 0);
-    await base44.entities.JournalEntry.create({
-      entry_number: `JE-SAL-${month.replace("-", "")}`,
-      entry_date: new Date().toISOString().slice(0, 10),
-      description: `قيد رواتب شهر ${month} — ${employees.length} موظف`,
-      lines: [
-        { account_id: salaryAcc.id, account_code: salaryAcc.account_code, account_name: salaryAcc.account_name, debit: netTotal, credit: 0, description: `رواتب ${month}` },
-        { account_id: bankAcc.id, account_code: bankAcc.account_code, account_name: bankAcc.account_name, debit: 0, credit: netTotal, description: `صرف رواتب ${month}` },
-      ],
-      total_debit: netTotal, total_credit: netTotal,
-      status: "مرحل", source: "رواتب",
-      posted_by: currentUser.full_name || currentUser.email,
-      posted_date: new Date().toISOString().slice(0, 10),
-    });
-    alert(`✅ تم ترحيل قيد الرواتب بمبلغ ${netTotal.toLocaleString("ar-SA")} ريال`);
-  };
-
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       {/* Header */}
@@ -156,6 +124,14 @@ const loadPayroll = async () => {
 {canApprove && (
   <button
     onClick={async () => {
+      const ok = await confirmDialog({
+        title: "ترحيل قيد الرواتب",
+        message: `هل أنت متأكد من ترحيل قيد رواتب شهر ${month}؟ لا يمكن التراجع عن هذا الإجراء بعد الترحيل.`,
+        confirmText: "ترحيل",
+        variant: "destructive",
+      });
+      if (!ok) return;
+
       try {
         const res = await postSalaryEntry(month);
 

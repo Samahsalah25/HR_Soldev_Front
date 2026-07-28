@@ -443,7 +443,7 @@ function StepPayment({ data, unit, rentalId, onChange, onNext, onBack }) {
           <button onClick={() => setPaymentOption(PAYMENT_OPTION_API.DOWN_PAYMENT)}
             className={`p-3 rounded-xl border-2 text-right transition-all ${paymentOption === PAYMENT_OPTION_API.DOWN_PAYMENT ? "border-amber-500 bg-white shadow-sm" : "border-border bg-white/40"}`}>
             <p className="text-xs text-muted-foreground">عربون (25%)</p>
-            <p className="text-lg font-bold text-amber-600">{Math.round(total * 0.25).toLocaleString("ar-SA")} ر.س</p>
+            <p className="text-lg font-bold text-amber-600">{(Math.round(total * 0.25 * 100) / 100).toLocaleString("ar-SA")} ر.س</p>
           </button>
         </div>
       </div>

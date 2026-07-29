@@ -1,10 +1,17 @@
 import { useState } from "react";
-import { BookOpen, FileText, Receipt, BarChart2, TrendingUp } from "lucide-react";
+import { BookOpen, FileText, Receipt, BarChart2, TrendingUp , Users,
+  CreditCard,
+  FileSpreadsheet,
+  BadgePercent, } from "lucide-react";
 import ChartOfAccounts from "./accounting/ChartOfAccounts";
 import JournalEntries from "./accounting/JournalEntries";
 import Vouchers from "./accounting/Vouchers";
 import TrialBalance from "./accounting/TrialBalance";
 import FinancialStatements from "./accounting/FinancialStatements";
+import CustomerPayments from "./accounting/CustomerPayments";
+import Customers from "./accounting/Customers";
+import Invoices from "./accounting/Invoices";
+import CreditNotes from "./accounting/CreditNotes";
 
 const TABS = [
   { id: "chart", label: "دليل الحسابات", icon: BookOpen },
@@ -12,6 +19,10 @@ const TABS = [
   { id: "vouchers", label: "سندات القبض والدفع", icon: Receipt },
   { id: "trial", label: "ميزان المراجعة", icon: BarChart2 },
   { id: "statements", label: "القوائم المالية", icon: TrendingUp },
+  { id: "customer", label: "العملاء", icon: Users },
+  { id: "customer-payments", label: "دفعات العملاء", icon: CreditCard },
+  { id: "invoices", label: "الفواتير", icon: FileSpreadsheet },
+  { id: "credit-notes", label: "ملاحظات الائتمان", icon: BadgePercent },
 ];
 
 export default function AccountingMain() {
@@ -39,6 +50,12 @@ export default function AccountingMain() {
         {activeTab === "vouchers" && <Vouchers />}
         {activeTab === "trial" && <TrialBalance />}
         {activeTab === "statements" && <FinancialStatements />}
+        {activeTab === "customer" && <Customers />}
+        {activeTab === "customer-payments" && <CustomerPayments />}
+        {activeTab === "invoices" && <Invoices />}
+        {activeTab === "credit-notes" && <CreditNotes />}
+        
+        
       </div>
     </div>
   );

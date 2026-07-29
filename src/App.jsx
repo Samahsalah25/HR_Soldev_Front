@@ -58,6 +58,10 @@ import Login from "./pages/Login";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import { logoutUser } from "@/api/authApi";
 import { useNavigate } from "react-router-dom";
+import Invoices from './pages/accounting/Invoices.jsx';
+import CreditNotes from './pages/accounting/CreditNotes.jsx';
+import Customers from './pages/accounting/Customers.jsx';
+import CustomerPayments from './pages/accounting/CustomerPayments.jsx';
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 
@@ -169,6 +173,12 @@ const AuthenticatedApp = () => {
           <Route path="/home-dashboard" element={<RoleDashboard />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/payroll" element={<Payroll />} />
+          ///////new
+          <Route path="/invoices" element={<Invoices />} />
+          <Route path="/credit-notes" element={<CreditNotes />} />
+          <Route path="/customer" element={<Customers />} />
+          <Route path="/customer-payments" element={<CustomerPayments />} />
+          //////////
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/end-of-service" element={<EndOfService />} />

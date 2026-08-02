@@ -23,6 +23,7 @@ import api from "@/api/axios";
 const STATE_LABELS = {
   draft: "مسودة",
   posted: "مرحل",
+  in_process: "قيد المعالجة",
   sent: "مُرسل",
   paid: "مدفوع",
   canceled: "ملغي",
@@ -33,6 +34,7 @@ const STATE_LABELS = {
 const STATE_COLORS = {
   draft: "bg-amber-100 text-amber-700",
   posted: "bg-blue-100 text-blue-700",
+  in_process: "bg-blue-100 text-blue-700",
   sent: "bg-purple-100 text-purple-700",
   paid: "bg-green-100 text-green-700",
   canceled: "bg-red-100 text-red-600",
@@ -292,7 +294,7 @@ export default function Vouchers() {
             <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">لا توجد سندات</td></tr>
           ) : items.map(v => (
             <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-              <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{v.voucher_number}</td>
+              <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{v.voucher_number || "—"}</td>
               <td className="px-4 py-3 text-xs text-muted-foreground">{v.date ? new Date(v.date).toLocaleDateString("ar-SA") : "—"}</td>
               <td className="px-4 py-3 font-medium text-foreground">{v.partner_name || "—"}</td>
               <td className="px-4 py-3 text-xs text-muted-foreground">{v.journal_name || "—"}</td>
@@ -323,7 +325,7 @@ export default function Vouchers() {
                       </button>
                     </>
                   )}
-                  {v.state === "posted" && (
+                  {(v.state === "posted" || v.state === "in_process") && (
                     <>
                       <button onClick={() => handleValidate(v.id)} disabled={actionLoadingId === v.id}
                         className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 font-medium disabled:opacity-50">

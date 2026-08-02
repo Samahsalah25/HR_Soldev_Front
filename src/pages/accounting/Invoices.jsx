@@ -1,82 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  FileText, Plus, ArrowRight, Send, Printer, Eye, RotateCcw,
-  CreditCard, ReceiptText,
+  FileText, Plus, ArrowRight, Send, Printer, RotateCcw,
+  CreditCard, ReceiptText, X, Trash2, CheckCircle, Ban,
 } from "lucide-react";
+import {
+  getInvoices,
+  createInvoice,
+  updateInvoice,
+  confirmInvoice,
+  resetInvoiceToDraft,
+  cancelInvoice,
+  registerInvoicePayment,
+  creditNoteInvoice,
+  downloadInvoicePDF,
+  sendInvoiceEmail,
+  getCustomers,
+  getAccounts,
+  getTaxes,
+  getPaymentTerms,
+} from "@/api/accountingApi";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 
-// ===== Mock Data (فيك داتا مؤقتة لحد ما نربطها بالـ API) =====
-const MOCK_INVOICES = [
-  {
-    id: 6,
-    number: "INV/2026/00006",
-    customer: "Ahmed",
-    invoice_date: "2026-07-29",
-    due_date: "2026-07-29",
-    journal: "فواتير العملاء",
-    tax_excluded: 10,
-    status: "posted",
-    payment_status: "reversed",
-    payments_count: 0,
-    lines: [
-      { id: 1, product: "[EXP_GEN] Expenses", account: "400000 مبيعات المنتجات", qty: 10, price: 1, tax: "15%", amount: 10 },
-    ],
-    untaxed: 10, tax: 1.5, total: 11.5, amount_due: 0,
-  },
-  {
-    id: 4,
-    number: "INV/2026/00004",
-    customer: "Acme Corp",
-    invoice_date: "2026-07-29",
-    due_date: "2026-07-29",
-    journal: "فواتير العملاء",
-    tax_excluded: 1,
-    status: "posted",
-    payment_status: "reversed",
-    payments_count: 0,
-    lines: [
-      { id: 1, product: "[EXP_GEN] Expenses", account: "400000 مبيعات المنتجات", qty: 1, price: 1, tax: "15%", amount: 1 },
-    ],
-    untaxed: 1, tax: 0.15, total: 1.15, amount_due: 0,
-  },
-  {
-    id: 5,
-    number: "INV/2026/00005",
-    customer: "Ahmed",
-    invoice_date: "2026-07-28",
-    due_date: "2026-07-28",
-    journal: "فواتير العملاء",
-    tax_excluded: 1500,
-    status: "cancelled",
-    payment_status: "cancelled",
-    payments_count: 0,
-    lines: [
-      { id: 1, product: "[EXP_GEN] Expenses", account: "400000 مبيعات المنتجات", qty: 1500, price: 1, tax: "15%", amount: 1500 },
-    ],
-    untaxed: 1500, tax: 225, total: 1725, amount_due: 0,
-  },
-  {
-    id: 3,
-    number: "INV/2026/00003",
-    customer: "Ahmed",
-    invoice_date: "2026-07-28",
-    due_date: "2026-07-28",
-    journal: "فواتير العملاء",
-    tax_excluded: 1,
-    status: "posted",
-    payment_status: "in_payment",
-    payments_count: 1,
-    lines: [
-      { id: 1, product: "[EXP_GEN] Expenses", account: "400000 مبيعات المنتجات", qty: 1, price: 1, tax: "15%", amount: 1 },
-    ],
-    untaxed: 1, tax: 0.15, total: 1.15, amount_due: 1.15,
-  },
-];
-
-const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancelled: "ملغي" };
+const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancel: "ملغي", cancelled: "ملغي" };
 
 const PAYMENT_STATUS = {
   not_paid: { label: "غير مدفوع", badge: "bg-muted text-muted-foreground", ribbon: null },
   in_payment: { label: "قيد السداد", badge: "bg-amber-100 text-amber-700", ribbon: "bg-amber-500" },
+  partial: { label: "مدفوع جزئيًا", badge: "bg-amber-100 text-amber-700", ribbon: "bg-amber-500" },
   paid: { label: "مدفوع", badge: "bg-green-100 text-green-700", ribbon: "bg-green-600" },
   reversed: { label: "معكوس", badge: "bg-green-100 text-green-700", ribbon: "bg-green-600" },
   cancelled: { label: "ملغي", badge: "bg-muted text-muted-foreground", ribbon: null },
@@ -84,13 +35,22 @@ const PAYMENT_STATUS = {
 
 const fmt = (n) => (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 function Ribbon({ text, color }) {
   if (!color) return null;
   return (
     <div className="absolute top-0 left-0 w-32 h-32 overflow-hidden pointer-events-none">
-      <div
-        className={`absolute top-6 -left-9 w-40 text-center text-white text-xs font-bold py-1 -rotate-45 shadow ${color}`}
-      >
+      <div className={`absolute top-6 -left-9 w-40 text-center text-white text-xs font-bold py-1 -rotate-45 shadow ${color}`}>
         {text}
       </div>
     </div>
@@ -99,18 +59,13 @@ function Ribbon({ text, color }) {
 
 function StatusStepper({ status }) {
   const steps = ["draft", "posted"];
-  if (status === "cancelled") {
+  if (status === "cancel" || status === "cancelled") {
     return <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-muted text-muted-foreground">ملغي</span>;
   }
   return (
     <div className="flex items-center border border-border rounded-lg overflow-hidden text-xs font-medium">
       {steps.map((s, i) => (
-        <span
-          key={s}
-          className={`px-3 py-1.5 ${i > 0 ? "border-r border-border" : ""} ${
-            status === s ? "bg-primary text-primary-foreground font-bold" : "text-muted-foreground"
-          }`}
-        >
+        <span key={s} className={`px-3 py-1.5 ${i > 0 ? "border-r border-border" : ""} ${status === s ? "bg-primary text-primary-foreground font-bold" : "text-muted-foreground"}`}>
           {STATUS_LABELS[s]}
         </span>
       ))}
@@ -118,9 +73,398 @@ function StatusStepper({ status }) {
   );
 }
 
-function InvoiceDetail({ invoice, onBack }) {
+// ── فورم إنشاء/تعديل فاتورة ──────────────────────────────────────────────────
+function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, onSave, onClose }) {
+  const { toast } = useToast();
+  const isEdit = Boolean(invoice?.id);
+
+  const [form, setForm] = useState({
+    partner_id: invoice?.partner_id || "",
+    invoice_date: invoice?.invoice_date || new Date().toISOString().slice(0, 10),
+    invoice_date_due: invoice?.invoice_date_due || "",
+    invoice_payment_term_id: invoice?.invoice_payment_term_id || "",
+    journal_id: invoice?.journal_id || "",
+  });
+  const [lines, setLines] = useState(
+    invoice?.lines?.length
+      ? invoice.lines.map((l) => ({
+          product_id: l.product_id || "",
+          name: l.name || "",
+          quantity: l.quantity ?? 1,
+          price_unit: l.price_unit ?? 0,
+          account_id: l.account_id || "",
+          tax_id: l.tax_ids?.[0] || "",
+        }))
+      : [{ product_id: "", name: "", quantity: 1, price_unit: 0, account_id: "", tax_id: "" }]
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setLine = (i, k, v) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
+  const addLine = () => setLines((ls) => [...ls, { product_id: "", name: "", quantity: 1, price_unit: 0, account_id: "", tax_id: "" }]);
+  const removeLine = (i) => { if (lines.length > 1) setLines((ls) => ls.filter((_, idx) => idx !== i)); };
+
+  const activeAccounts = accounts.filter((a) => a.is_active);
+  const saleTaxes = taxes.filter((t) => t.type_tax_use === "sale");
+  const linesTotal = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.price_unit) || 0), 0);
+
+  const handleSave = async () => {
+    setError("");
+    try {
+      setSaving(true);
+
+      const payload = {
+        partner_id: Number(form.partner_id),
+        invoice_date: form.invoice_date,
+        invoice_date_due: form.invoice_date_due || undefined,
+        invoice_payment_term_id: form.invoice_payment_term_id ? Number(form.invoice_payment_term_id) : undefined,
+        journal_id: Number(form.journal_id),
+        invoice_line_ids: lines.map((l) => ({
+          product_id: l.product_id ? Number(l.product_id) : undefined,
+          name: l.name,
+          quantity: Number(l.quantity) || 0,
+          price_unit: Number(l.price_unit) || 0,
+          account_id: l.account_id ? Number(l.account_id) : undefined,
+          tax_ids: l.tax_id ? [Number(l.tax_id)] : [],
+        })),
+      };
+
+      if (isEdit) {
+        await updateInvoice(invoice.id, payload);
+      } else {
+        await createInvoice(payload);
+      }
+
+      onSave();
+    } catch (err) {
+      console.error("خطأ أثناء حفظ الفاتورة:", err);
+      setError(err?.response?.data?.message || "حصل خطأ أثناء حفظ الفاتورة، حاول تاني.");
+      toast({
+        title: "تعذّر حفظ الفاتورة",
+        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-3xl shadow-2xl max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h3 className="font-bold flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" />
+            {isEdit ? `تعديل الفاتورة ${invoice.name || ""}` : "فاتورة عميل جديدة"}
+          </h3>
+          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg border border-red-200">{error}</div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">العميل *</label>
+              <select value={form.partner_id} onChange={(e) => set("partner_id", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+                <option value="">اختر العميل...</option>
+                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">رقم دفتر اليومية *</label>
+              <input type="number" dir="ltr" value={form.journal_id} onChange={(e) => set("journal_id", e.target.value)}
+                placeholder="2" className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">تاريخ الفاتورة *</label>
+              <input type="date" value={form.invoice_date} onChange={(e) => set("invoice_date", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">تاريخ الاستحقاق</label>
+              <input type="date" value={form.invoice_date_due} onChange={(e) => set("invoice_date_due", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">شروط الدفع</label>
+              <select value={form.invoice_payment_term_id} onChange={(e) => set("invoice_payment_term_id", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+                <option value="">بدون</option>
+                {paymentTerms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold">بنود الفاتورة</label>
+              <button onClick={addLine} className="text-xs text-primary hover:underline flex items-center gap-1"><Plus className="w-3 h-3" />إضافة بند</button>
+            </div>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead><tr className="bg-muted/30 border-b border-border">
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">المنتج (ID)</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">الوصف</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">الحساب</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">الكمية</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">السعر</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">الضريبة</th>
+                  <th className="px-2 py-2"></th>
+                </tr></thead>
+                <tbody>
+                  {lines.map((l, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td className="px-3 py-2">
+                        <input type="number" dir="ltr" value={l.product_id} onChange={(e) => setLine(i, "product_id", e.target.value)}
+                          placeholder="5" className="w-16 px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input value={l.name} onChange={(e) => setLine(i, "name", e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none min-w-32" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <select value={l.account_id} onChange={(e) => setLine(i, "account_id", e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none min-w-32">
+                          <option value="">اختر الحساب...</option>
+                          {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.account_code} — {a.account_name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="number" min={0} value={l.quantity} onChange={(e) => setLine(i, "quantity", e.target.value)}
+                          className="w-16 px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="number" min={0} value={l.price_unit} onChange={(e) => setLine(i, "price_unit", e.target.value)}
+                          className="w-20 px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <select value={l.tax_id} onChange={(e) => setLine(i, "tax_id", e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none min-w-24">
+                          <option value="">بدون</option>
+                          {saleTaxes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <button onClick={() => removeLine(i)} className="p-1 hover:bg-red-50 text-red-400 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/20 font-bold">
+                    <td colSpan={4} className="px-3 py-2 text-xs text-muted-foreground">الإجمالي (غير شامل الضريبة)</td>
+                    <td colSpan={3} className="px-3 py-2 text-xs text-foreground">{fmt(linesTotal)} ر.س</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
+          <button onClick={handleSave} disabled={saving || !form.partner_id || !form.journal_id || !form.invoice_date}
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
+            {saving ? "جاري الحفظ..." : "حفظ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── مودال تسجيل دفعة ──────────────────────────────────────────────────────────
+function PaymentModal({ invoice, onClose, onDone }) {
+  const { toast } = useToast();
+  const [journalId, setJournalId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    try {
+      setSaving(true);
+      await registerInvoicePayment(invoice.id, {
+        journal_id: Number(journalId),
+        amount: amount ? Number(amount) : undefined,
+        memo: memo || undefined,
+      });
+      toast({ title: "تم تسجيل الدفعة بنجاح ✅" });
+      onDone();
+    } catch (err) {
+      console.error("خطأ أثناء تسجيل الدفعة:", err);
+      toast({
+        title: "تعذّر تسجيل الدفعة",
+        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
+        <h3 className="font-bold text-foreground flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" />تسجيل دفعة</h3>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">رقم دفتر اليومية *</label>
+          <input type="number" dir="ltr" value={journalId} onChange={(e) => setJournalId(e.target.value)}
+            placeholder="7" className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">المبلغ (اتركه فارغًا لتحصيل المبلغ المستحق بالكامل)</label>
+          <input type="number" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)}
+            placeholder={fmt(invoice.amount_residual)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">ملاحظة</label>
+          <input value={memo} onChange={(e) => setMemo(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
+          <button onClick={submit} disabled={saving || !journalId} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
+            {saving ? "جاري التسجيل..." : "تسجيل الدفعة"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── مودال إشعار دائن ──────────────────────────────────────────────────────────
+function CreditNoteModal({ invoice, onClose, onDone }) {
+  const { toast } = useToast();
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    try {
+      setSaving(true);
+      await creditNoteInvoice(invoice.id, { reason: reason.trim() });
+      toast({ title: "تم إصدار إشعار الدائن بنجاح ✅" });
+      onDone();
+    } catch (err) {
+      console.error("خطأ أثناء إصدار إشعار الدائن:", err);
+      toast({
+        title: "تعذّر إصدار إشعار الدائن",
+        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
+        <h3 className="font-bold text-foreground flex items-center gap-2"><ReceiptText className="w-5 h-5 text-primary" />إشعار دائن</h3>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">السبب *</label>
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
+        </div>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
+          <button onClick={submit} disabled={saving || !reason.trim()} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
+            {saving ? "جاري الإصدار..." : "إصدار إشعار الدائن"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── عرض تفاصيل الفاتورة ───────────────────────────────────────────────────────
+function InvoiceDetail({ invoice, onBack, onEdit, onChanged }) {
+  const { toast } = useToast();
+  const confirmDialog = useConfirm();
   const [tab, setTab] = useState("lines");
-  const ps = PAYMENT_STATUS[invoice.payment_status] || PAYMENT_STATUS.not_paid;
+  const [showPayment, setShowPayment] = useState(false);
+  const [showCreditNote, setShowCreditNote] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const ps = PAYMENT_STATUS[invoice.payment_state] || PAYMENT_STATUS.not_paid;
+  const isDraft = invoice.state === "draft";
+  const isCancelled = invoice.state === "cancel" || invoice.state === "cancelled";
+  const isPosted = invoice.state === "posted";
+  const isFullyPaid = invoice.payment_state === "paid" || invoice.payment_state === "reversed";
+
+  const run = async (fn, successMsg, errorTitle) => {
+    try {
+      setBusy(true);
+      await fn();
+      if (successMsg) toast({ title: successMsg });
+      onChanged();
+    } catch (err) {
+      console.error(`${errorTitle}:`, err);
+      toast({
+        title: errorTitle,
+        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    const ok = await confirmDialog({ title: "اعتماد الفاتورة", message: "هل أنت متأكد من اعتماد وترحيل هذه الفاتورة؟", confirmText: "اعتماد" });
+    if (!ok) return;
+    run(() => confirmInvoice(invoice.id), "تم اعتماد الفاتورة بنجاح ✅", "تعذّر اعتماد الفاتورة");
+  };
+
+  const handleResetToDraft = async () => {
+    const ok = await confirmDialog({ title: "إرجاع لمسودة", message: "هل تريد إرجاع هذه الفاتورة لحالة المسودة؟", confirmText: "إرجاع" });
+    if (!ok) return;
+    run(() => resetInvoiceToDraft(invoice.id), "تم إرجاع الفاتورة لمسودة", "تعذّر إرجاع الفاتورة لمسودة");
+  };
+
+  const handleCancel = async () => {
+    const ok = await confirmDialog({ title: "إلغاء الفاتورة", message: "هل أنت متأكد من إلغاء هذه الفاتورة؟ لا يمكن التراجع عن هذا الإجراء.", confirmText: "إلغاء الفاتورة", variant: "destructive" });
+    if (!ok) return;
+    run(() => cancelInvoice(invoice.id), "تم إلغاء الفاتورة", "تعذّر إلغاء الفاتورة");
+  };
+
+  const handlePrint = async () => {
+    try {
+      setBusy(true);
+      const blob = await downloadInvoicePDF(invoice.id);
+      window.open(window.URL.createObjectURL(blob), "_blank");
+    } catch (err) {
+      console.error("تعذّر فتح الفاتورة:", err);
+      toast({ title: "تعذّر فتح الفاتورة", description: "حصل خطأ أثناء تحميل ملف PDF.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setBusy(true);
+      const blob = await downloadInvoicePDF(invoice.id);
+      downloadBlob(blob, `${invoice.name || "invoice"}.pdf`);
+    } catch (err) {
+      console.error("تعذّر تحميل الفاتورة:", err);
+      toast({ title: "تعذّر تحميل الفاتورة", description: "حصل خطأ أثناء تحميل ملف PDF.", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSend = async () => {
+    const ok = await confirmDialog({ title: "إرسال الفاتورة", message: "هل تريد إرسال الفاتورة بالبريد الإلكتروني للعميل؟", confirmText: "إرسال" });
+    if (!ok) return;
+    run(() => sendInvoiceEmail(invoice.id), "تم إرسال الفاتورة بالبريد الإلكتروني ✅", "تعذّر إرسال الفاتورة");
+  };
 
   return (
     <div className="p-6 space-y-4 max-w-5xl mx-auto" dir="rtl">
@@ -130,45 +474,53 @@ function InvoiceDetail({ invoice, onBack }) {
           <ArrowRight className="w-4 h-4" /> فواتير العملاء
         </button>
         <span>/</span>
-        <span className="text-foreground font-medium">{invoice.number}</span>
+        <span className="text-foreground font-medium">{invoice.name}</span>
       </div>
 
       {/* Action bar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex flex-wrap gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
+          {isDraft && (
+            <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
+              تعديل
+            </button>
+          )}
+          {isDraft && (
+            <button onClick={handleConfirm} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
+              <CheckCircle className="w-4 h-4" /> اعتماد
+            </button>
+          )}
+          <button onClick={handleSend} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Send className="w-4 h-4" /> إرسال
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
+          <button onClick={handlePrint} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Printer className="w-4 h-4" /> طباعة
           </button>
-          {invoice.status === "posted" && invoice.payment_status !== "paid" && invoice.payment_status !== "reversed" && (
-            <button className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
+          <button onClick={handleDownload} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+            <FileText className="w-4 h-4" /> تحميل PDF
+          </button>
+          {isPosted && !isFullyPaid && (
+            <button onClick={() => setShowPayment(true)} className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
               <CreditCard className="w-4 h-4" /> دفع
             </button>
           )}
-          <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
-            <Eye className="w-4 h-4" /> معاينة
-          </button>
-          {invoice.status === "posted" && (
-            <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
+          {isPosted && (
+            <button onClick={() => setShowCreditNote(true)} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
               <ReceiptText className="w-4 h-4" /> إشعار دائن
             </button>
           )}
-          {invoice.status === "posted" && (
-            <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted">
+          {isPosted && (
+            <button onClick={handleResetToDraft} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
               <RotateCcw className="w-4 h-4" /> إعادة لمسودة
             </button>
           )}
-        </div>
-        <div className="flex items-center gap-3">
-          {invoice.payments_count > 0 && (
-            <span className="px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground">
-              المدفوعات: {invoice.payments_count}
-            </span>
+          {!isCancelled && (
+            <button onClick={handleCancel} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50">
+              <Ban className="w-4 h-4" /> إلغاء
+            </button>
           )}
-          <StatusStepper status={invoice.status} />
         </div>
+        <StatusStepper status={invoice.state} />
       </div>
 
       {/* Document card */}
@@ -176,12 +528,12 @@ function InvoiceDetail({ invoice, onBack }) {
         <Ribbon text={ps.label} color={ps.ribbon} />
 
         <p className="text-sm text-muted-foreground mb-1">فاتورة عميل</p>
-        <h2 className="text-3xl font-bold text-foreground mb-6">{invoice.number}</h2>
+        <h2 className="text-3xl font-bold text-foreground mb-6">{invoice.name}</h2>
 
         <div className="flex flex-wrap justify-between gap-6 mb-6">
           <div>
             <p className="text-xs text-muted-foreground mb-1">العميل</p>
-            <p className="text-sm font-medium text-foreground">{invoice.customer}</p>
+            <p className="text-sm font-medium text-foreground">{invoice.partner_name}</p>
           </div>
           <div className="flex gap-10">
             <div>
@@ -190,11 +542,7 @@ function InvoiceDetail({ invoice, onBack }) {
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">تاريخ الاستحقاق</p>
-              <p className="text-sm font-medium text-foreground">{invoice.due_date}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">دفتر اليومية</p>
-              <p className="text-sm font-medium text-foreground">{invoice.journal}</p>
+              <p className="text-sm font-medium text-foreground">{invoice.invoice_date_due || "—"}</p>
             </div>
           </div>
         </div>
@@ -203,16 +551,10 @@ function InvoiceDetail({ invoice, onBack }) {
         <div className="flex gap-1 border-b border-border mb-3">
           {[
             { id: "lines", label: "بنود الفاتورة" },
-            { id: "journal", label: "قيود اليومية" },
             { id: "other", label: "معلومات إضافية" },
           ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               {t.label}
             </button>
           ))}
@@ -223,33 +565,29 @@ function InvoiceDetail({ invoice, onBack }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b border-border">
-                  {["المنتج", "الحساب", "الكمية", "السعر", "الضريبة", "الإجمالي"].map((h) => (
+                  {["الوصف", "الكمية", "السعر", "الإجمالي"].map((h) => (
                     <th key={h} className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {invoice.lines.map((l) => (
+                {(invoice.lines || []).map((l) => (
                   <tr key={l.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2.5 font-medium text-foreground">{l.product}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{l.account}</td>
-                    <td className="px-4 py-2.5">{l.qty}</td>
-                    <td className="px-4 py-2.5">{fmt(l.price)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">{l.tax}</span>
-                    </td>
-                    <td className="px-4 py-2.5 font-semibold">ر.س {fmt(l.amount)}</td>
+                    <td className="px-4 py-2.5 font-medium text-foreground">{l.name}</td>
+                    <td className="px-4 py-2.5">{l.quantity}</td>
+                    <td className="px-4 py-2.5">{fmt(l.price_unit)}</td>
+                    <td className="px-4 py-2.5 font-semibold">ر.س {fmt(l.price_total)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        {tab === "journal" && (
-          <p className="text-sm text-muted-foreground text-center py-8">قيود اليومية المرتبطة بهذه الفاتورة</p>
-        )}
         {tab === "other" && (
-          <p className="text-sm text-muted-foreground text-center py-8">لا توجد معلومات إضافية</p>
+          <div className="text-sm text-muted-foreground py-4 space-y-2">
+            <p>مرجع الدفع: {invoice.payment_reference || "—"}</p>
+            <p>معرّف العملة: {invoice.currency_id ?? "—"}</p>
+          </div>
         )}
 
         {/* Totals */}
@@ -257,34 +595,105 @@ function InvoiceDetail({ invoice, onBack }) {
           <div className="w-full sm:w-72 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">الإجمالي غير شامل الضريبة</span>
-              <span className="font-medium">ر.س {fmt(invoice.untaxed)}</span>
+              <span className="font-medium">ر.س {fmt(invoice.amount_untaxed)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">ضريبة 15%</span>
-              <span className="font-medium">ر.س {fmt(invoice.tax)}</span>
+              <span className="text-muted-foreground">الضريبة</span>
+              <span className="font-medium">ر.س {fmt(invoice.amount_tax)}</span>
             </div>
             <div className="flex justify-between text-base font-bold border-t border-border pt-2">
               <span>الإجمالي</span>
-              <span>ر.س {fmt(invoice.total)}</span>
+              <span>ر.س {fmt(invoice.amount_total)}</span>
             </div>
             <div className="flex justify-between text-base font-bold pt-2 border-t border-border text-primary">
               <span>المبلغ المستحق</span>
-              <span>ر.س {fmt(invoice.amount_due)}</span>
+              <span>ر.س {fmt(invoice.amount_residual)}</span>
             </div>
           </div>
         </div>
       </div>
+
+      {showPayment && (
+        <PaymentModal invoice={invoice} onClose={() => setShowPayment(false)} onDone={() => { setShowPayment(false); onChanged(); }} />
+      )}
+      {showCreditNote && (
+        <CreditNoteModal invoice={invoice} onClose={() => setShowCreditNote(false)} onDone={() => { setShowCreditNote(false); onChanged(); }} />
+      )}
     </div>
   );
 }
 
 export default function Invoices() {
+  const { toast } = useToast();
+  const [invoices, setInvoices] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [taxes, setTaxes] = useState([]);
+  const [paymentTerms, setPaymentTerms] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const invoices = MOCK_INVOICES;
-  const total = invoices.reduce((s, i) => s + i.tax_excluded, 0);
+  const [showForm, setShowForm] = useState(false);
+  const [editInvoice, setEditInvoice] = useState(null);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const [invs, custs, accs, taxesRes, termsRes] = await Promise.all([
+        getInvoices("out_invoice"),
+        getCustomers().catch(() => []),
+        getAccounts().catch(() => []),
+        getTaxes().catch(() => []),
+        getPaymentTerms().catch(() => []),
+      ]);
+
+      const mapped = invs.map((inv) => ({
+        ...inv,
+        lines: (inv.invoice_line_ids || []).map((l) => ({ ...l })),
+      }));
+      setInvoices(mapped);
+      setCustomers(custs);
+      setTaxes(taxesRes);
+      setPaymentTerms(termsRes);
+      setAccounts(
+        (accs || []).map((item) => ({
+          id: item.id,
+          account_code: item.code ?? item.account_code,
+          account_name: item.name_ar ?? item.account_name,
+          is_active: item.active ?? item.is_active,
+        }))
+      );
+
+      // لو الفاتورة المفتوحة حاليًا اتغيرت، نحدّث نسختها المعروضة
+      setSelected((prev) => (prev ? mapped.find((i) => i.id === prev.id) || null : prev));
+    } catch (err) {
+      console.error("خطأ أثناء تحميل الفواتير:", err);
+      toast({
+        title: "تعذّر تحميل الفواتير",
+        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const total = invoices.reduce((s, i) => s + (i.amount_untaxed || 0), 0);
+
+  const openCreate = () => { setEditInvoice(null); setShowForm(true); };
+  const openEditForm = (inv) => { setEditInvoice(inv); setShowForm(true); };
+  const closeForm = () => { setShowForm(false); setEditInvoice(null); };
 
   if (selected) {
-    return <InvoiceDetail invoice={selected} onBack={() => setSelected(null)} />;
+    return (
+      <InvoiceDetail
+        invoice={selected}
+        onBack={() => setSelected(null)}
+        onEdit={() => openEditForm(selected)}
+        onChanged={load}
+      />
+    );
   }
 
   return (
@@ -296,7 +705,7 @@ export default function Invoices() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">إدارة فواتير المبيعات الصادرة للعملاء</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
+        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
           <Plus className="w-4 h-4" /> فاتورة جديدة
         </button>
       </div>
@@ -305,25 +714,26 @@ export default function Invoices() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/30 border-b border-border">
-              {["الرقم", "العميل", "تاريخ الفاتورة", "تاريخ الاستحقاق", "غير شامل الضريبة", "الحالة"].map((h) => (
+              {["الرقم", "العميل", "تاريخ الفاتورة", "تاريخ الاستحقاق", "غير شامل الضريبة", "الحالة", "حالة السداد"].map((h) => (
                 <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {invoices.map((inv) => {
-              const ps = PAYMENT_STATUS[inv.payment_status] || PAYMENT_STATUS.not_paid;
+            {loading ? (
+              <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+            ) : invoices.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد فواتير بعد</td></tr>
+            ) : invoices.map((inv) => {
+              const ps = PAYMENT_STATUS[inv.payment_state] || PAYMENT_STATUS.not_paid;
               return (
-                <tr
-                  key={inv.id}
-                  onClick={() => setSelected(inv)}
-                  className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer"
-                >
-                  <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{inv.number}</td>
-                  <td className="px-4 py-3 font-medium text-foreground">{inv.customer}</td>
+                <tr key={inv.id} onClick={() => setSelected(inv)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
+                  <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{inv.name}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{inv.partner_name}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{inv.invoice_date}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{inv.due_date}</td>
-                  <td className="px-4 py-3 font-semibold">ر.س {fmt(inv.tax_excluded)}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{inv.invoice_date_due || "—"}</td>
+                  <td className="px-4 py-3 font-semibold">ر.س {fmt(inv.amount_untaxed)}</td>
+                  <td className="px-4 py-3"><span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{STATUS_LABELS[inv.state] || inv.state}</span></td>
                   <td className="px-4 py-3">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ps.badge}`}>{ps.label}</span>
                   </td>
@@ -335,11 +745,23 @@ export default function Invoices() {
             <tr className="bg-muted/10">
               <td colSpan={4} />
               <td className="px-4 py-3 font-bold text-foreground">ر.س {fmt(total)}</td>
-              <td />
+              <td colSpan={2} />
             </tr>
           </tfoot>
         </table>
       </div>
+
+      {showForm && (
+        <InvoiceForm
+          invoice={editInvoice}
+          customers={customers}
+          accounts={accounts}
+          taxes={taxes}
+          paymentTerms={paymentTerms}
+          onSave={() => { closeForm(); load(); }}
+          onClose={closeForm}
+        />
+      )}
     </div>
   );
 }

@@ -356,6 +356,28 @@ export async function getPaymentTerms() {
   return res.data?.payment_terms || [];
 }
 
+// جلب كل دفاتر اليومية
+// كل واحد: { id, name, code, type, default_account_id, default_account_name, currency_id }
+export async function getJournals() {
+  const res = await accountingApi.get("/accounting/journals");
+  return res.data?.journals || [];
+}
+
+// دفاتر اليومية المستخدمة فعليًا كطرق دفع (bank + cash بس)
+export async function getPaymentJournals() {
+  const journals = await getJournals();
+  return journals.filter((j) => j.type === "bank" || j.type === "cash");
+}
+
+// جلب طرق الدفع الخاصة بدفتر يومية معيّن
+// direction: "inbound" (دفعات واردة - عملاء) | "outbound" (دفعات صادرة - موردين)
+export async function getPaymentMethodsForJournal(journalId, direction = "inbound") {
+  if (!journalId) return [];
+  const res = await accountingApi.get(`/accounting/journals/${journalId}/payment-methods`);
+  const data = res.data?.data || {};
+  return direction === "outbound" ? (data.outbound_methods || []) : (data.inbound_methods || []);
+}
+
 /* ===========================
    Products (المنتجات)
 =========================== */

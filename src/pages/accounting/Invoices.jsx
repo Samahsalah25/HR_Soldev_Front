@@ -19,6 +19,8 @@ import {
   getTaxes,
   getPaymentTerms,
   getProducts,
+  getJournals,
+  getPaymentMethodsForJournal,
 } from "@/api/accountingApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -75,7 +77,7 @@ function StatusStepper({ status }) {
 }
 
 // ── فورم إنشاء/تعديل فاتورة ──────────────────────────────────────────────────
-function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, products, onSave, onClose }) {
+function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, products, journals, onSave, onClose }) {
   const { toast } = useToast();
   const isEdit = Boolean(invoice?.id);
 
@@ -191,9 +193,12 @@ function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, produc
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">رقم دفتر اليومية *</label>
-              <input type="number" dir="ltr" value={form.journal_id} onChange={(e) => set("journal_id", e.target.value)}
-                placeholder="2" className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+              <label className="text-sm font-medium">دفتر اليومية *</label>
+              <select value={form.journal_id} onChange={(e) => set("journal_id", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+                <option value="">اختر دفتر اليومية...</option>
+                {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
+              </select>
             </div>
           </div>
 
@@ -300,10 +305,25 @@ function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, produc
 // ── مودال تسجيل دفعة ──────────────────────────────────────────────────────────
 function PaymentModal({ invoice, onClose, onDone }) {
   const { toast } = useToast();
+  const [journals, setJournals] = useState([]);
   const [journalId, setJournalId] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethodLineId, setPaymentMethodLineId] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getJournals().then(setJournals).catch(() => setJournals([]));
+  }, []);
+
+  useEffect(() => {
+    setPaymentMethodLineId("");
+    if (!journalId) { setPaymentMethods([]); return; }
+    getPaymentMethodsForJournal(journalId, "inbound")
+      .then(setPaymentMethods)
+      .catch(() => setPaymentMethods([]));
+  }, [journalId]);
 
   const submit = async () => {
     try {
@@ -312,6 +332,7 @@ function PaymentModal({ invoice, onClose, onDone }) {
         journal_id: Number(journalId),
         amount: amount ? Number(amount) : undefined,
         memo: memo || undefined,
+        payment_method_line_id: paymentMethodLineId ? Number(paymentMethodLineId) : undefined,
       });
       toast({ title: "تم تسجيل الدفعة بنجاح ✅" });
       onDone();
@@ -332,14 +353,26 @@ function PaymentModal({ invoice, onClose, onDone }) {
       <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
         <h3 className="font-bold text-foreground flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" />تسجيل دفعة</h3>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">رقم دفتر اليومية *</label>
-          <input type="number" dir="ltr" value={journalId} onChange={(e) => setJournalId(e.target.value)}
-            placeholder="7" className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+          <label className="text-sm font-medium">ادفع من (دفتر اليومية) *</label>
+          <select value={journalId} onChange={(e) => setJournalId(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+            <option value="">اختر دفتر اليومية...</option>
+            {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
+          </select>
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">المبلغ (اتركه فارغًا لتحصيل المبلغ المستحق بالكامل)</label>
           <input type="number" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)}
             placeholder={fmt(invoice.amount_residual)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">طريقة الدفع</label>
+          <select value={paymentMethodLineId} onChange={(e) => setPaymentMethodLineId(e.target.value)}
+            disabled={!journalId}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none disabled:opacity-50">
+            <option value="">بدون</option>
+            {paymentMethods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium">ملاحظة</label>
@@ -649,6 +682,7 @@ export default function Invoices() {
   const [taxes, setTaxes] = useState([]);
   const [paymentTerms, setPaymentTerms] = useState([]);
   const [products, setProducts] = useState([]);
+  const [journals, setJournals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -657,13 +691,14 @@ export default function Invoices() {
   const load = async () => {
     try {
       setLoading(true);
-      const [invs, custs, accs, taxesRes, termsRes, prods] = await Promise.all([
+      const [invs, custs, accs, taxesRes, termsRes, prods, jrnls] = await Promise.all([
         getInvoices("out_invoice"),
         getCustomers().catch(() => []),
         getAccounts().catch(() => []),
         getTaxes().catch(() => []),
         getPaymentTerms().catch(() => []),
         getProducts("sale").catch(() => []),
+        getJournals().catch(() => []),
       ]);
 
       const mapped = invs.map((inv) => ({
@@ -675,6 +710,7 @@ export default function Invoices() {
       setTaxes(taxesRes);
       setPaymentTerms(termsRes);
       setProducts(prods);
+      setJournals(jrnls);
       setAccounts(
         (accs || []).map((item) => ({
           id: item.id,
@@ -780,6 +816,7 @@ export default function Invoices() {
           taxes={taxes}
           paymentTerms={paymentTerms}
           products={products}
+          journals={journals}
           onSave={() => { closeForm(); load(); }}
           onClose={closeForm}
         />

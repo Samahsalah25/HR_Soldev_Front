@@ -401,8 +401,15 @@ function CreditNoteModal({ invoice, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getJournals().then(setJournals).catch(() => setJournals([]));
-  }, []);
+    getJournals().then((all) => {
+      const invoiceJournal = all.find((j) => j.id === invoice.journal_id);
+      const sameType = invoiceJournal
+        ? all.filter((j) => j.type === invoiceJournal.type)
+        : all.filter((j) => j.type === "sale");
+      setJournals(sameType);
+      setJournalId(String(invoice.journal_id || sameType[0]?.id || ""));
+    }).catch(() => setJournals([]));
+  }, [invoice.journal_id]);
 
   const submit = async () => {
     try {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { extractApiErrorMessage } from "@/lib/apiErrors";
 import {
   ReceiptText, ArrowRight, Send, Printer, RotateCcw, CreditCard, Ban, FileText,
 } from "lucide-react";
@@ -105,7 +106,7 @@ function PaymentModal({ note, onClose, onDone }) {
       console.error("خطأ أثناء تسجيل الدفعة:", err);
       toast({
         title: "تعذّر تسجيل الدفعة",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -179,7 +180,7 @@ function CreditNoteDetail({ note, onBack, onChanged }) {
       console.error(`${errorTitle}:`, err);
       toast({
         title: errorTitle,
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -399,7 +400,7 @@ export default function CreditNotes() {
       console.error("خطأ أثناء تحميل إشعارات الدائن:", err);
       toast({
         title: "تعذّر تحميل إشعارات الدائن",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {

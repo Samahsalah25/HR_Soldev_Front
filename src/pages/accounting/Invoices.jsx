@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { extractApiErrorMessage } from "@/lib/apiErrors";
 import {
   FileText, Plus, ArrowRight, Send, Printer, RotateCcw,
   CreditCard, ReceiptText, X, Trash2, CheckCircle, Ban,
@@ -156,10 +157,10 @@ function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, produc
       onSave();
     } catch (err) {
       console.error("خطأ أثناء حفظ الفاتورة:", err);
-      setError(err?.response?.data?.message || "حصل خطأ أثناء حفظ الفاتورة، حاول تاني.");
+      setError(extractApiErrorMessage(err, "حصل خطأ أثناء حفظ الفاتورة، حاول تاني."));
       toast({
         title: "تعذّر حفظ الفاتورة",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -340,7 +341,7 @@ function PaymentModal({ invoice, onClose, onDone }) {
       console.error("خطأ أثناء تسجيل الدفعة:", err);
       toast({
         title: "تعذّر تسجيل الدفعة",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -406,7 +407,7 @@ function CreditNoteModal({ invoice, onClose, onDone }) {
       console.error("خطأ أثناء إصدار إشعار الدائن:", err);
       toast({
         title: "تعذّر إصدار إشعار الدائن",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -459,7 +460,7 @@ function InvoiceDetail({ invoice, onBack, onEdit, onChanged }) {
       console.error(`${errorTitle}:`, err);
       toast({
         title: errorTitle,
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -726,7 +727,7 @@ export default function Invoices() {
       console.error("خطأ أثناء تحميل الفواتير:", err);
       toast({
         title: "تعذّر تحميل الفواتير",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {

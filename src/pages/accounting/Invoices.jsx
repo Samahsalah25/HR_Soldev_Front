@@ -18,6 +18,7 @@ import {
   getAccounts,
   getTaxes,
   getPaymentTerms,
+  getProducts,
 } from "@/api/accountingApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -74,7 +75,7 @@ function StatusStepper({ status }) {
 }
 
 // ── فورم إنشاء/تعديل فاتورة ──────────────────────────────────────────────────
-function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, onSave, onClose }) {
+function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, products, onSave, onClose }) {
   const { toast } = useToast();
   const isEdit = Boolean(invoice?.id);
 
@@ -104,6 +105,20 @@ function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, onSave
   const setLine = (i, k, v) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
   const addLine = () => setLines((ls) => [...ls, { product_id: "", name: "", quantity: 1, price_unit: 0, account_id: "", tax_id: "" }]);
   const removeLine = (i) => { if (lines.length > 1) setLines((ls) => ls.filter((_, idx) => idx !== i)); };
+
+  const handleProductSelect = (i, productId) => {
+    const product = products.find((p) => String(p.id) === String(productId));
+    setLines((ls) => ls.map((l, idx) => (idx === i
+      ? {
+          ...l,
+          product_id: productId,
+          name: product ? product.name : l.name,
+          price_unit: product ? product.list_price : l.price_unit,
+          account_id: product?.property_account_income_id || l.account_id,
+          tax_id: product?.taxes_id?.[0] || l.tax_id,
+        }
+      : l)));
+  };
 
   const activeAccounts = accounts.filter((a) => a.is_active);
   const saleTaxes = taxes.filter((t) => t.type_tax_use === "sale");
@@ -211,7 +226,7 @@ function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, onSave
             <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-xs">
                 <thead><tr className="bg-muted/30 border-b border-border">
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">المنتج (ID)</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">المنتج</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">الوصف</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">الحساب</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">الكمية</th>
@@ -223,8 +238,11 @@ function InvoiceForm({ invoice, customers, accounts, taxes, paymentTerms, onSave
                   {lines.map((l, i) => (
                     <tr key={i} className="border-b border-border last:border-0">
                       <td className="px-3 py-2">
-                        <input type="number" dir="ltr" value={l.product_id} onChange={(e) => setLine(i, "product_id", e.target.value)}
-                          placeholder="5" className="w-16 px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none" />
+                        <select value={l.product_id} onChange={(e) => handleProductSelect(i, e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-border rounded bg-background focus:outline-none min-w-32">
+                          <option value="">بدون منتج...</option>
+                          {products.map((p) => <option key={p.id} value={p.id}>{p.default_code ? `[${p.default_code}] ` : ""}{p.name}</option>)}
+                        </select>
                       </td>
                       <td className="px-3 py-2">
                         <input value={l.name} onChange={(e) => setLine(i, "name", e.target.value)}
@@ -630,6 +648,7 @@ export default function Invoices() {
   const [accounts, setAccounts] = useState([]);
   const [taxes, setTaxes] = useState([]);
   const [paymentTerms, setPaymentTerms] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -638,12 +657,13 @@ export default function Invoices() {
   const load = async () => {
     try {
       setLoading(true);
-      const [invs, custs, accs, taxesRes, termsRes] = await Promise.all([
+      const [invs, custs, accs, taxesRes, termsRes, prods] = await Promise.all([
         getInvoices("out_invoice"),
         getCustomers().catch(() => []),
         getAccounts().catch(() => []),
         getTaxes().catch(() => []),
         getPaymentTerms().catch(() => []),
+        getProducts("sale").catch(() => []),
       ]);
 
       const mapped = invs.map((inv) => ({
@@ -654,6 +674,7 @@ export default function Invoices() {
       setCustomers(custs);
       setTaxes(taxesRes);
       setPaymentTerms(termsRes);
+      setProducts(prods);
       setAccounts(
         (accs || []).map((item) => ({
           id: item.id,
@@ -758,6 +779,7 @@ export default function Invoices() {
           accounts={accounts}
           taxes={taxes}
           paymentTerms={paymentTerms}
+          products={products}
           onSave={() => { closeForm(); load(); }}
           onClose={closeForm}
         />

@@ -395,18 +395,29 @@ function PaymentModal({ invoice, onClose, onDone }) {
 function CreditNoteModal({ invoice, onClose, onDone }) {
   const { toast } = useToast();
   const [reason, setReason] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [journals, setJournals] = useState([]);
+  const [journalId, setJournalId] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getJournals().then(setJournals).catch(() => setJournals([]));
+  }, []);
 
   const submit = async () => {
     try {
       setSaving(true);
-      await creditNoteInvoice(invoice.id, { reason: reason.trim() });
-      toast({ title: "تم إصدار إشعار الدائن بنجاح ✅" });
+      await creditNoteInvoice(invoice.id, {
+        reason: reason.trim(),
+        date,
+        journal_id: Number(journalId),
+      });
+      toast({ title: "تم إنشاء إشعار الدائن بنجاح ✅" });
       onDone();
     } catch (err) {
-      console.error("خطأ أثناء إصدار إشعار الدائن:", err);
+      console.error("خطأ أثناء إنشاء إشعار الدائن:", err);
       toast({
-        title: "تعذّر إصدار إشعار الدائن",
+        title: "تعذّر إنشاء إشعار الدائن",
         description: extractApiErrorMessage(err),
         variant: "destructive",
       });
@@ -418,17 +429,34 @@ function CreditNoteModal({ invoice, onClose, onDone }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
       <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
-        <h3 className="font-bold text-foreground flex items-center gap-2"><ReceiptText className="w-5 h-5 text-primary" />إشعار دائن</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-foreground flex items-center gap-2"><ReceiptText className="w-5 h-5 text-primary" />إنشاء إشعار دائن</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+        </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">السبب *</label>
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
+          <label className="text-sm font-medium">السبب</label>
+          <input value={reason} onChange={(e) => setReason(e.target.value)}
+            placeholder="مثال: بضاعة تالفة، خصم..."
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">التاريخ</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">دفتر اليومية (journal_id) *</label>
+          <select value={journalId} onChange={(e) => setJournalId(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+            <option value="">اختر دفتر اليومية...</option>
+            {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
+          </select>
         </div>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={submit} disabled={saving || !reason.trim()} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
-            {saving ? "جاري الإصدار..." : "إصدار إشعار الدائن"}
+          <button onClick={submit} disabled={saving || !journalId} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
+            {saving ? "جاري الإنشاء..." : "إنشاء الإشعار"}
           </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
         </div>
       </div>
     </div>

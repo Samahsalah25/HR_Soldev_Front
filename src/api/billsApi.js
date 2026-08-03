@@ -82,47 +82,45 @@ export async function createBillCreditNote(id, payload) {
 
 /**
  * طباعة الفاتورة (PDF) — بترجع { blob, contentType }
+ * بتتأكد إن اللي راجع فعلاً PDF مش صفحة JSON/HTML للخطأ (اللي بيحصل لو
+ * الـ endpoint رجّع 404/500 برد نصي والـ blob اتلقفها عادي من غير reject)
+ * — أي حد بينادي الدالة دي (طباعة أو تحميل) بياخد الحماية دي تلقائيًا.
  */
 export async function printBill(id) {
   const res = await billsApi.get(`/accounting/bills/${id}/print`, {
     responseType: "blob",
   });
-  return {
-    blob: res.data,
-    contentType: res.headers?.["content-type"] || res.data?.type || "",
-  };
+  const blob = res.data;
+  const contentType = res.headers?.["content-type"] || blob?.type || "";
+
+  if (contentType && !contentType.includes("pdf")) {
+    const text = await blob.text();
+    let message = "تعذر تجهيز ملف الطباعة";
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.message || parsed.error || message;
+    } catch {
+      // مش JSON، سيبي الرسالة الافتراضية
+    }
+    throw new Error(message);
+  }
+
+  return { blob, contentType };
 }
 
 /**
  * فتح PDF الفاتورة في تاب جديد
  *
- * الإصلاحات هنا:
- * 1) بنفتح التاب الجديد فورًا وبشكل متزامن (sync) وقت الضغطة نفسها، قبل أي await.
- *    ده مهم جدًا لأن المتصفحات (Chrome/Safari) بتحظر window.open لو اتنادت
- *    بعد await — لأنها بتبقى مش جزء من "user gesture" الأصلي، فكانت
- *    الطباعة بتفشل بصمت من غير أي error ظاهر.
- * 2) بنتأكد إن اللي راجع فعلاً PDF مش صفحة JSON/HTML للخطأ (اللي بيحصل لو
- *    الـ endpoint رجّع 404/500 برد نصي والـ blob اتلقفها عادي من غير reject)
+ * الإصلاح هنا: بنفتح التاب الجديد فورًا وبشكل متزامن (sync) وقت الضغطة نفسها،
+ * قبل أي await. ده مهم جدًا لأن المتصفحات (Chrome/Safari) بتحظر window.open
+ * لو اتنادت بعد await — لأنها بتبقى مش جزء من "user gesture" الأصلي، فكانت
+ * الطباعة بتفشل بصمت من غير أي error ظاهر.
+ * (فحص إن الرد فعلاً PDF مش JSON خطأ متنكر بقى جوه printBill نفسها.)
  */
 export async function openBillPrint(id) {
   const newTab = window.open("", "_blank");
   try {
-    const { blob, contentType } = await printBill(id);
-
-    // لو الرد مش PDF فعليًا (يعني في الأغلب رسالة خطأ اترجعت بصيغة JSON/HTML)
-    if (contentType && !contentType.includes("pdf")) {
-      const text = await blob.text();
-      let message = "تعذر تجهيز ملف الطباعة";
-      try {
-        const parsed = JSON.parse(text);
-        message = parsed.message || parsed.error || message;
-      } catch {
-        // مش JSON، سيبي الرسالة الافتراضية
-      }
-      if (newTab) newTab.close();
-      throw new Error(message);
-    }
-
+    const { blob } = await printBill(id);
     const url = window.URL.createObjectURL(blob);
     if (newTab) {
       newTab.location.href = url;

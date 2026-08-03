@@ -1,9 +1,7 @@
-// src/pages/accounting/Refunds.jsx
 import { useState, useEffect } from "react";
 import {
-  ReceiptText, ArrowRight, Printer, RotateCcw, CreditCard, Ban, Loader2, AlertCircle, X,
+  ReceiptText, ArrowRight, Printer, RotateCcw, CreditCard, Ban, FileText,
 } from "lucide-react";
-
 import {
   getBills,
   getBillById,
@@ -11,22 +9,37 @@ import {
   resetBillToDraft,
   cancelBill,
   registerBillPayment,
+  printBill,
   openBillPrint,
-} from "../../api/billsApi";
-import { getJournals, getPaymentMethodsForJournal } from "../../api/accountingMetaApi";
-import { extractErrorMessage } from "../../utils/errorUtils";
+} from "@/api/billsApi";
+import { getPaymentJournals, getPaymentMethodsForJournal } from "@/api/accountingMetaApi";
+import { extractErrorMessage } from "@/utils/errorUtils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 
 const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancel: "ملغي", cancelled: "ملغي" };
 
 const PAYMENT_STATUS = {
   not_paid: { label: "غير مدفوع", badge: "bg-muted text-muted-foreground", ribbon: null },
   in_payment: { label: "قيد السداد", badge: "bg-amber-100 text-amber-700", ribbon: "bg-amber-500" },
-  paid: { label: "مدفوع", badge: "bg-green-100 text-green-700", ribbon: "bg-green-600" },
   partial: { label: "مدفوع جزئيًا", badge: "bg-amber-100 text-amber-700", ribbon: "bg-amber-500" },
+  paid: { label: "مدفوع", badge: "bg-green-100 text-green-700", ribbon: "bg-green-600" },
   reversed: { label: "معكوس", badge: "bg-green-100 text-green-700", ribbon: "bg-green-600" },
+  cancelled: { label: "ملغي", badge: "bg-muted text-muted-foreground", ribbon: null },
 };
 
 const fmt = (n) => (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
 
 function Ribbon({ text, color }) {
   if (!color) return null;
@@ -55,234 +68,196 @@ function StatusStepper({ status }) {
   );
 }
 
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="font-bold">{title}</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* دفتر يومية عام (كل الدفاتر) — لتسجيل دفعة على المرتجع */
-function AllJournalsSelect({ value, onChange, label }) {
+// ── مودال تسجيل دفعة على المرتجع ──────────────────────────────────────────────
+function PaymentModal({ refund, onClose, onDone }) {
+  const { toast } = useToast();
   const [journals, setJournals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const [journalId, setJournalId] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethodLineId, setPaymentMethodLineId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    getJournals().then((data) => { if (alive) { setJournals(data); setFailed(false); } })
-      .catch(() => { if (alive) setFailed(true); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+    getPaymentJournals().then((js) => {
+      setJournals(js);
+      if (js.length === 1) setJournalId(String(js[0].id));
+    }).catch(() => setJournals([]));
   }, []);
 
-  if (!loading && (failed || journals.length === 0)) {
-    return (
-      <div>
-        <label className="text-sm font-medium mb-1 block">{label}</label>
-        <input type="number" value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder="رقم دفتر اليومية (journal_id)" className="w-full border border-border rounded-lg p-2 text-sm" />
-        <p className="text-[11px] text-amber-600 mt-1">{failed ? "تعذر تحميل قايمة دفاتر اليومية من السيرفر" : "مفيش دفاتر يومية حاليًا"}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full border border-border rounded-lg p-2 text-sm">
-        <option value="">{loading ? "جاري التحميل..." : "اختر دفتر اليومية"}</option>
-        {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
-      </select>
-    </div>
-  );
-}
-
-function PaymentMethodSelect({ journalId, value, onChange }) {
-  const [methods, setMethods] = useState([]);
-  const [loading, setLoading] = useState(false);
-
   useEffect(() => {
-    onChange("");
-    if (!journalId) { setMethods([]); return; }
-    let alive = true;
-    setLoading(true);
-    getPaymentMethodsForJournal(journalId)
-      .then((data) => { if (alive) setMethods(data); })
-      .catch(() => { if (alive) setMethods([]); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPaymentMethodLineId("");
+    if (!journalId) { setPaymentMethods([]); return; }
+    getPaymentMethodsForJournal(journalId, "outbound")
+      .then((methods) => {
+        setPaymentMethods(methods);
+        if (methods.length === 1) setPaymentMethodLineId(String(methods[0].id));
+      })
+      .catch(() => setPaymentMethods([]));
   }, [journalId]);
 
-  if (!journalId) {
-    return (
-      <div>
-        <label className="text-sm font-medium mb-1 block">طريقة الدفع</label>
-        <p className="text-xs text-muted-foreground border border-dashed border-border rounded-lg p-2">اختر دفتر اليومية الأول عشان تظهر طرق الدفع المتاحة عليه</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <label className="text-sm font-medium mb-1 block">طريقة الدفع</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full border border-border rounded-lg p-2 text-sm">
-        <option value="">{loading ? "جاري التحميل..." : "بدون"}</option>
-        {methods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-      </select>
-    </div>
-  );
-}
-
-function RegisterPaymentModal({ refund, onClose, onDone }) {
-  const [journalId, setJournalId] = useState("");
-  const [amount, setAmount] = useState(refund.amount_residual ?? 0);
-  const [memo, setMemo] = useState(`${refund.name || ""} دفعة`);
-  const [paymentMethodLineId, setPaymentMethodLineId] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
   const submit = async () => {
-    if (!journalId || !amount) { setError("لازم تحدد دفتر اليومية والمبلغ"); return; }
-    setSaving(true);
-    setError(null);
     try {
+      setSaving(true);
       await registerBillPayment(refund.id, {
         journal_id: Number(journalId),
-        amount: parseFloat(amount),
-        memo,
-        payment_method_line_id: paymentMethodLineId ? Number(paymentMethodLineId) : undefined,
+        amount: amount ? Number(amount) : undefined,
+        memo: memo || undefined,
+        payment_method_line_id: Number(paymentMethodLineId),
       });
+      toast({ title: "تم تسجيل الدفعة بنجاح ✅" });
       onDone();
     } catch (err) {
-      setError(extractErrorMessage(err, "تعذر تسجيل الدفعة"));
+      console.error("خطأ أثناء تسجيل الدفعة:", err);
+      toast({
+        title: "تعذّر تسجيل الدفعة",
+        description: extractErrorMessage(err),
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal title="تسجيل دفعة على المرتجع" onClose={onClose}>
-      <div className="space-y-4">
-        <AllJournalsSelect value={journalId} onChange={setJournalId} label="ادفع من (journal_id) *" />
-        <div>
-          <label className="text-sm font-medium mb-1 block">المبلغ *</label>
-          <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full border border-border rounded-lg p-2 text-sm" />
-          {refund.amount_residual != null && (
-            <p className="text-[11px] text-muted-foreground mt-1">المبلغ المتبقي: ر.س {fmt(refund.amount_residual)}</p>
-          )}
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
+        <h3 className="font-bold text-foreground flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" />تسجيل دفعة</h3>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">ادفع من (دفتر اليومية) *</label>
+          <select value={journalId} onChange={(e) => setJournalId(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+            <option value="">اختر دفتر اليومية...</option>
+            {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
+          </select>
         </div>
-        <div>
-          <label className="text-sm font-medium mb-1 block">ملاحظة</label>
-          <input value={memo} onChange={(e) => setMemo(e.target.value)} className="w-full border border-border rounded-lg p-2 text-sm" />
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">المبلغ (اتركه فارغًا لتحصيل المبلغ المستحق بالكامل)</label>
+          <input type="number" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)}
+            placeholder={fmt(refund.amount_residual)} className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
         </div>
-        <PaymentMethodSelect journalId={journalId} value={paymentMethodLineId} onChange={setPaymentMethodLineId} />
-        {error && (
-          <p className="text-sm text-red-600 flex items-start gap-1 bg-red-50 px-3 py-2 rounded-lg">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{error}</span>
-          </p>
-        )}
-        <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 border border-border rounded-lg text-sm">إلغاء</button>
-          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm flex items-center gap-2 disabled:opacity-60">
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />} تسجيل الدفعة
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">طريقة الدفع *</label>
+          <select value={paymentMethodLineId} onChange={(e) => setPaymentMethodLineId(e.target.value)}
+            disabled={!journalId}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none disabled:opacity-50">
+            <option value="">اختر طريقة الدفع...</option>
+            {paymentMethods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">ملاحظة</label>
+          <input value={memo} onChange={(e) => setMemo(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
+        </div>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
+          <button onClick={submit} disabled={saving || !journalId || !paymentMethodLineId} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
+            {saving ? "جاري التسجيل..." : "تسجيل الدفعة"}
           </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }
 
-/* ========================================================================
-   عرض تفاصيل مرتجع (إشعار مدين مورد)
-   ======================================================================== */
-function RefundDetail({ refundId, onBack }) {
+// ── عرض تفاصيل مرتجع (إشعار مدين مورد) ────────────────────────────────────────
+function RefundDetail({ refundId, onBack, onChanged }) {
+  const { toast } = useToast();
+  const confirmDialog = useConfirm();
   const [refund, setRefund] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadingRefund, setLoadingRefund] = useState(true);
   const [tab, setTab] = useState("lines");
-  const [busy, setBusy] = useState(false);
-  const [printing, setPrinting] = useState(false);
-  const [actionError, setActionError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
-
-  const flashSuccess = (msg) => { setSuccessMessage(msg); setTimeout(() => setSuccessMessage(null), 4000); };
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    setLoading(true);
-    setError(null);
     try {
+      setLoadingRefund(true);
       const data = await getBillById(refundId);
       setRefund(data);
     } catch (err) {
-      setError(extractErrorMessage(err, "تعذر تحميل المرتجع"));
+      console.error("تعذّر تحميل المرتجع:", err);
+      toast({ title: "تعذّر تحميل المرتجع", description: extractErrorMessage(err), variant: "destructive" });
     } finally {
-      setLoading(false);
+      setLoadingRefund(false);
     }
   };
 
   useEffect(() => { load(); }, [refundId]);
 
-  const runAction = async (fn, successMsg) => {
-    setBusy(true);
-    setActionError(null);
-    try {
-      await fn();
-      await load();
-      if (successMsg) flashSuccess(successMsg);
-    } catch (err) {
-      setActionError(extractErrorMessage(err, "حدث خطأ أثناء تنفيذ العملية"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handlePrint = async () => {
-    setPrinting(true);
-    setActionError(null);
-    try {
-      await openBillPrint(refund.id);
-    } catch (err) {
-      setActionError(extractErrorMessage(err, "تعذر تجهيز ملف الطباعة"));
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground gap-2">
-        <Loader2 className="w-5 h-5 animate-spin" /> جاري تحميل المرتجع...
-      </div>
-    );
-  }
-
-  if (error || !refund) {
-    return (
-      <div className="p-6 max-w-5xl mx-auto" dir="rtl">
-        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">
-          <AlertCircle className="w-4 h-4" /> {error || "المرتجع غير موجود"}
-        </div>
-        <button onClick={onBack} className="mt-4 text-sm text-primary hover:underline">رجوع</button>
-      </div>
-    );
+  if (loadingRefund || !refund) {
+    return <div className="p-6 text-center text-muted-foreground">جاري تحميل المرتجع...</div>;
   }
 
   const ps = PAYMENT_STATUS[refund.payment_state] || PAYMENT_STATUS.not_paid;
   const isDraft = refund.state === "draft";
   const isPosted = refund.state === "posted";
   const isCancelled = refund.state === "cancel" || refund.state === "cancelled";
-  const isSettled = refund.payment_state === "paid" || refund.payment_state === "reversed" || (refund.amount_residual != null && refund.amount_residual <= 0);
+  const isFullyPaid = refund.payment_state === "paid" || refund.payment_state === "reversed";
+
+  const run = async (fn, successMsg, errorTitle) => {
+    try {
+      setBusy(true);
+      await fn();
+      if (successMsg) toast({ title: successMsg });
+      await load();
+      onChanged();
+    } catch (err) {
+      console.error(`${errorTitle}:`, err);
+      toast({
+        title: errorTitle,
+        description: extractErrorMessage(err),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    const ok = await confirmDialog({ title: "اعتماد المرتجع", message: "هل أنت متأكد من اعتماد وترحيل هذا المرتجع؟", confirmText: "اعتماد" });
+    if (!ok) return;
+    run(() => confirmBill(refund.id), "تم اعتماد المرتجع بنجاح ✅", "تعذّر اعتماد المرتجع");
+  };
+
+  const handleResetToDraft = async () => {
+    const ok = await confirmDialog({ title: "إرجاع لمسودة", message: "هل تريد إرجاع هذا المرتجع لحالة المسودة؟", confirmText: "إرجاع" });
+    if (!ok) return;
+    run(() => resetBillToDraft(refund.id), "تم إرجاع المرتجع لمسودة", "تعذّر إرجاع المرتجع لمسودة");
+  };
+
+  const handleCancel = async () => {
+    const ok = await confirmDialog({ title: "إلغاء المرتجع", message: "هل أنت متأكد من إلغاء هذا المرتجع؟ لا يمكن التراجع عن هذا الإجراء.", confirmText: "إلغاء المرتجع", variant: "destructive" });
+    if (!ok) return;
+    run(() => cancelBill(refund.id), "تم إلغاء المرتجع", "تعذّر إلغاء المرتجع");
+  };
+
+  const handlePrint = async () => {
+    try {
+      setBusy(true);
+      await openBillPrint(refund.id);
+    } catch (err) {
+      console.error("تعذّر فتح المرتجع:", err);
+      toast({ title: "تعذّر فتح المرتجع", description: extractErrorMessage(err, "حصل خطأ أثناء تحميل ملف PDF."), variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setBusy(true);
+      const { blob } = await printBill(refund.id);
+      downloadBlob(blob, `${refund.name || "refund"}.pdf`);
+    } catch (err) {
+      console.error("تعذّر تحميل المرتجع:", err);
+      toast({ title: "تعذّر تحميل المرتجع", description: extractErrorMessage(err, "حصل خطأ أثناء تحميل ملف PDF."), variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-4 max-w-5xl mx-auto" dir="rtl">
@@ -297,37 +272,28 @@ function RefundDetail({ refundId, onBack }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex flex-wrap gap-2">
           {isDraft && (
-            <button onClick={() => runAction(() => confirmBill(refund.id), "تم تأكيد المرتجع")} disabled={busy}
-              className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-60">
-              {busy && <Loader2 className="w-4 h-4 animate-spin" />} تأكيد
+            <button onClick={handleConfirm} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
+              اعتماد
             </button>
           )}
-
-          <button onClick={handlePrint} disabled={printing}
-            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-60">
-            {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} طباعة
+          <button onClick={handlePrint} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد المرتجع أولاً قبل الطباعة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+            <Printer className="w-4 h-4" /> طباعة
           </button>
-
-          {isPosted && (
-            <button onClick={() => setShowPayment(true)} disabled={isSettled}
-              title={isSettled ? "المرتجع متسدد بالفعل" : undefined}
-              className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+          <button onClick={handleDownload} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد المرتجع أولاً قبل تحميل PDF" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+            <FileText className="w-4 h-4" /> تحميل PDF
+          </button>
+          {isPosted && !isFullyPaid && (
+            <button onClick={() => setShowPayment(true)} className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
               <CreditCard className="w-4 h-4" /> دفع
             </button>
           )}
-
           {isPosted && (
-            <button onClick={() => runAction(() => resetBillToDraft(refund.id), "تم إرجاع المرتجع لمسودة")} disabled={busy}
-              className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-60">
+            <button onClick={handleResetToDraft} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
               <RotateCcw className="w-4 h-4" /> إعادة لمسودة
             </button>
           )}
-
           {!isCancelled && (
-            <button
-              onClick={() => { if (window.confirm("متأكد من إلغاء المرتجع؟")) runAction(() => cancelBill(refund.id), "تم إلغاء المرتجع"); }}
-              disabled={busy}
-              className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-60">
+            <button onClick={handleCancel} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50">
               <Ban className="w-4 h-4" /> إلغاء
             </button>
           )}
@@ -335,36 +301,20 @@ function RefundDetail({ refundId, onBack }) {
         <StatusStepper status={refund.state} />
       </div>
 
-      {actionError && (
-        <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 px-4 py-2.5 rounded-lg">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> <span>{actionError}</span>
-        </div>
-      )}
-      {successMessage && (
-        <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 px-4 py-2.5 rounded-lg">
-          <span>✓ {successMessage}</span>
-        </div>
-      )}
-
       <div className="relative bg-card rounded-2xl border border-border p-6 overflow-hidden">
         <Ribbon text={ps.label} color={ps.ribbon} />
-        <p className="text-sm text-muted-foreground mb-1">إشعار مدين مورد (مرتجع)</p>
+
+        <p className="text-sm text-muted-foreground mb-1">إشعار مدين مورد</p>
         <h2 className="text-3xl font-bold text-foreground mb-6">{refund.name || `#${refund.id}`}</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">المورد</p>
-              <p className="text-sm font-medium text-foreground">{refund.partner_name || `#${refund.partner_id}`}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">مرجع الدفع</p>
-              <p className="text-sm font-medium text-foreground">{refund.payment_reference || "—"}</p>
-            </div>
+        <div className="flex flex-wrap justify-between gap-6 mb-6">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">المورد</p>
+            <p className="text-sm font-medium text-foreground">{refund.partner_name}</p>
           </div>
-          <div className="space-y-4">
+          <div className="flex gap-10">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">تاريخ المرتجع</p>
+              <p className="text-xs text-muted-foreground mb-1">التاريخ</p>
               <p className="text-sm font-medium text-foreground">{refund.invoice_date}</p>
             </div>
             <div>
@@ -377,7 +327,6 @@ function RefundDetail({ refundId, onBack }) {
         <div className="flex gap-1 border-b border-border mb-3">
           {[
             { id: "lines", label: "البنود" },
-            { id: "journal", label: "قيود اليومية" },
             { id: "other", label: "معلومات إضافية" },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -392,7 +341,7 @@ function RefundDetail({ refundId, onBack }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b border-border">
-                  {["المنتج", "الكمية", "السعر", "الإجمالي (بدون ضريبة)", "الإجمالي شامل"].map((h) => (
+                  {["الوصف", "الكمية", "السعر", "الإجمالي"].map((h) => (
                     <th key={h} className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -403,7 +352,6 @@ function RefundDetail({ refundId, onBack }) {
                     <td className="px-4 py-2.5 font-medium text-foreground">{l.name}</td>
                     <td className="px-4 py-2.5">{l.quantity}</td>
                     <td className="px-4 py-2.5">{fmt(l.price_unit)}</td>
-                    <td className="px-4 py-2.5 font-semibold">ر.س {fmt(l.price_subtotal)}</td>
                     <td className="px-4 py-2.5 font-semibold">ر.س {fmt(l.price_total)}</td>
                   </tr>
                 ))}
@@ -411,11 +359,11 @@ function RefundDetail({ refundId, onBack }) {
             </table>
           </div>
         )}
-        {tab === "journal" && (
-          <p className="text-sm text-muted-foreground text-center py-8">قيود اليومية المرتبطة بهذا المرتجع</p>
-        )}
         {tab === "other" && (
-          <p className="text-sm text-muted-foreground text-center py-8">لا توجد معلومات إضافية</p>
+          <div className="text-sm text-muted-foreground py-4 space-y-2">
+            <p>مرجع الدفع: {refund.payment_reference || "—"}</p>
+            <p>معرّف العملة: {refund.currency_id ?? "—"}</p>
+          </div>
         )}
 
         <div className="flex justify-end mt-6">
@@ -441,35 +389,33 @@ function RefundDetail({ refundId, onBack }) {
       </div>
 
       {showPayment && (
-        <RegisterPaymentModal
-          refund={refund}
-          onClose={() => setShowPayment(false)}
-          onDone={() => { setShowPayment(false); load(); flashSuccess("تم تسجيل الدفعة بنجاح"); }}
-        />
+        <PaymentModal refund={refund} onClose={() => setShowPayment(false)} onDone={() => { setShowPayment(false); load(); onChanged(); }} />
       )}
     </div>
   );
 }
 
-/* ========================================================================
-   الصفحة الرئيسية: قائمة المرتجعات
-   ملحوظة: مفيش فورم "إنشاء مرتجع من الصفر" — المرتجع بيتعمل كـ "إشعار مدين"
-   من داخل فاتورة مورد موجودة (زرار "إشعار مدين" في Bills.jsx)
-   ======================================================================== */
+// ── الصفحة الرئيسية: قائمة المرتجعات ──────────────────────────────────────────
+// ملحوظة: مفيش فورم "إنشاء مرتجع من الصفر" — المرتجع بيتعمل كـ "إشعار مدين"
+// من داخل فاتورة مورد موجودة (زرار "إشعار مدين" في Bills.jsx)
 export default function Refunds() {
+  const { toast } = useToast();
   const [refunds, setRefunds] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
 
   const load = async () => {
-    setLoading(true);
-    setError(null);
     try {
+      setLoading(true);
       const data = await getBills({ type: "in_refund" });
       setRefunds(data);
     } catch (err) {
-      setError(extractErrorMessage(err, "تعذر تحميل المرتجعات"));
+      console.error("خطأ أثناء تحميل المرتجعات:", err);
+      toast({
+        title: "تعذّر تحميل المرتجعات",
+        description: extractErrorMessage(err),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -480,7 +426,7 @@ export default function Refunds() {
   const total = refunds.reduce((s, r) => s + (r.amount_untaxed || 0), 0);
 
   if (selectedId) {
-    return <RefundDetail refundId={selectedId} onBack={() => { setSelectedId(null); load(); }} />;
+    return <RefundDetail refundId={selectedId} onBack={() => setSelectedId(null)} onChanged={load} />;
   }
 
   return (
@@ -494,68 +440,46 @@ export default function Refunds() {
         </div>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" /> جاري تحميل المرتجعات...
-        </div>
-      )}
-
-      {!loading && error && (
-        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">
-          <AlertCircle className="w-4 h-4" /> {error}
-          <button onClick={load} className="underline mr-auto">إعادة المحاولة</button>
-        </div>
-      )}
-
-      {!loading && !error && refunds.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          لا توجد مرتجعات حتى الآن — يتم إنشاء المرتجع كـ "إشعار مدين" من داخل فاتورة مورد موجودة
-        </div>
-      )}
-
-      {!loading && !error && refunds.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/30 border-b border-border">
-                {["الرقم", "المورد", "التاريخ", "تاريخ الاستحقاق", "غير شامل الضريبة", "الحالة", "حالة الدفع"].map((h) => (
-                  <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {refunds.map((r) => {
-                const ps = PAYMENT_STATUS[r.payment_state] || PAYMENT_STATUS.not_paid;
-                return (
-                  <tr key={r.id} onClick={() => setSelectedId(r.id)}
-                    className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
-                    <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{r.name || `#${r.id}`}</td>
-                    <td className="px-4 py-3 font-medium text-foreground">{r.partner_name}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{r.invoice_date}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{r.invoice_date_due || "—"}</td>
-                    <td className="px-4 py-3 font-semibold">ر.س {fmt(r.amount_untaxed)}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                        {STATUS_LABELS[r.state] || r.state}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ps.badge}`}>{ps.label}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="bg-muted/10">
-                <td colSpan={4} />
-                <td className="px-4 py-3 font-bold text-foreground">ر.س {fmt(total)}</td>
-                <td colSpan={2} />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/30 border-b border-border">
+              {["الرقم", "المورد", "التاريخ", "تاريخ الاستحقاق", "غير شامل الضريبة", "الحالة", "حالة السداد"].map((h) => (
+                <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+            ) : refunds.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد مرتجعات بعد — يتم إنشاؤها من داخل فاتورة مورد موجودة</td></tr>
+            ) : refunds.map((r) => {
+              const ps = PAYMENT_STATUS[r.payment_state] || PAYMENT_STATUS.not_paid;
+              return (
+                <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
+                  <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{r.name || `#${r.id}`}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{r.partner_name}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.invoice_date}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.invoice_date_due || "—"}</td>
+                  <td className="px-4 py-3 font-semibold">ر.س {fmt(r.amount_untaxed)}</td>
+                  <td className="px-4 py-3"><span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">{STATUS_LABELS[r.state] || r.state}</span></td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ps.badge}`}>{ps.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="bg-muted/10">
+              <td colSpan={4} />
+              <td className="px-4 py-3 font-bold text-foreground">ر.س {fmt(total)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }

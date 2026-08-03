@@ -22,6 +22,7 @@ import {
 } from "@/api/accountingApi";
 import { getVendors } from "@/api/partnersApi";
 import { getPaymentJournals, getPaymentMethodsForJournal } from "@/api/accountingMetaApi";
+import { extractErrorMessage } from "@/utils/errorUtils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -98,10 +99,10 @@ function PaymentForm({ payment, vendors, journals, onBack, onSave }) {
       onSave();
     } catch (err) {
       console.error("خطأ أثناء حفظ سند الدفع:", err);
-      setError(err?.response?.data?.message || "حصل خطأ أثناء حفظ سند الدفع، حاول تاني.");
+      setError(extractErrorMessage(err, "حصل خطأ أثناء حفظ سند الدفع، حاول تاني."));
       toast({
         title: "تعذّر حفظ سند الدفع",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -123,7 +124,7 @@ function PaymentForm({ payment, vendors, journals, onBack, onSave }) {
       console.error(`${errorTitle}:`, err);
       toast({
         title: errorTitle,
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -280,11 +281,12 @@ export default function VendorPayments() {
       setPayments(vRes?.payment_vouchers || []);
       setVendors(vends);
       setJournals(jrnls);
+      setSelected((prev) => (prev ? (vRes?.payment_vouchers || []).find((p) => p.id === prev.id) || null : prev));
     } catch (err) {
       console.error("خطأ أثناء تحميل دفعات الموردين:", err);
       toast({
         title: "تعذّر تحميل دفعات الموردين",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractErrorMessage(err),
         variant: "destructive",
       });
     } finally {

@@ -25,6 +25,13 @@ import {
   updatePartner,
   deletePartner,
 } from "../../api/partnersApi";
+import { extractErrorMessage } from "../../utils/errorUtils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[+]?[\d\s-]{7,20}$/;
+const URL_REGEX = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/.*)?$/i;
 
 const emptyVendor = {
   name: "",
@@ -68,6 +75,7 @@ function InfoField({ label, value, icon }) {
    فورم إنشاء / تعديل مورد
    ======================================================================== */
 function VendorForm({ vendor, onBack, onSaved }) {
+  const { toast } = useToast();
   const [form, setForm] = useState(
     vendor
       ? {
@@ -90,16 +98,45 @@ function VendorForm({ vendor, onBack, onSaved }) {
   const [tab, setTab] = useState("contacts");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const change = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
-  const handleSave = async () => {
-    if (!form.name.trim()) {
-      setError("اسم المورد مطلوب");
-      return;
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!form.name?.trim()) {
+      newErrors.name = "اسم المورد مطلوب";
     }
-    setSaving(true);
+
+    if (form.email && !EMAIL_REGEX.test(form.email.trim())) {
+      newErrors.email = "البريد الإلكتروني غير صحيح";
+    }
+
+    if (form.phone && !PHONE_REGEX.test(form.phone.trim())) {
+      newErrors.phone = "رقم الهاتف غير صحيح";
+    }
+
+    if (form.mobile && !PHONE_REGEX.test(form.mobile.trim())) {
+      newErrors.mobile = "رقم الموبايل غير صحيح";
+    }
+
+    if (form.website && !URL_REGEX.test(form.website.trim())) {
+      newErrors.website = "رابط الموقع الإلكتروني غير صحيح";
+    }
+
+    if (form.country_id !== "" && (Number(form.country_id) <= 0 || !Number.isInteger(Number(form.country_id)))) {
+      newErrors.country_id = "رقم الدولة يجب أن يكون رقمًا صحيحًا أكبر من صفر";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
     setError(null);
+    if (!validateForm()) return;
+    setSaving(true);
     try {
       const payload = {
         ...form,
@@ -114,9 +151,13 @@ function VendorForm({ vendor, onBack, onSaved }) {
       }
       onSaved();
     } catch (err) {
-      setError(
-        err?.response?.data?.message || "حدث خطأ أثناء حفظ بيانات المورد"
-      );
+      console.error("خطأ أثناء حفظ المورد:", err);
+      setError(extractErrorMessage(err, "حدث خطأ أثناء حفظ بيانات المورد"));
+      toast({
+        title: "تعذّر حفظ المورد",
+        description: extractErrorMessage(err),
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -180,12 +221,15 @@ function VendorForm({ vendor, onBack, onSaved }) {
         </div>
 
         <div className="flex justify-between items-start gap-6 mb-6">
-          <input
-            value={form.name}
-            onChange={(e) => change("name", e.target.value)}
-            placeholder="مثال: شركة الأخشاب المتحدة"
-            className="flex-1 text-2xl font-medium border-0 border-b border-border focus:border-primary focus:outline-none pb-2 bg-transparent placeholder:text-muted-foreground/50"
-          />
+          <div className="flex-1">
+            <input
+              value={form.name}
+              onChange={(e) => change("name", e.target.value)}
+              placeholder="مثال: شركة الأخشاب المتحدة"
+              className={`w-full text-2xl font-medium border-0 border-b focus:outline-none pb-2 bg-transparent placeholder:text-muted-foreground/50 ${errors.name ? "border-red-400" : "border-border focus:border-primary"}`}
+            />
+            {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name}</p>}
+          </div>
           <div className="w-24 h-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
             <Camera className="w-6 h-6" />
           </div>
@@ -234,8 +278,9 @@ function VendorForm({ vendor, onBack, onSaved }) {
                 value={form.country_id}
                 onChange={(e) => change("country_id", e.target.value)}
                 placeholder="رقم الدولة (country_id)"
-                className="w-full border border-border rounded-lg p-2 text-sm placeholder:text-muted-foreground"
+                className={`w-full border rounded-lg p-2 text-sm placeholder:text-muted-foreground ${errors.country_id ? "border-red-400" : "border-border"}`}
               />
+              {errors.country_id && <p className="text-xs text-red-600 mt-1">{errors.country_id}</p>}
               <p className="text-[11px] text-muted-foreground mt-1">
                 * لسه محتاجين endpoint لجلب قائمة الدول عشان نستبدلها بـ select صحيح
               </p>
@@ -261,33 +306,41 @@ function VendorForm({ vendor, onBack, onSaved }) {
               <input
                 value={form.phone}
                 onChange={(e) => change("phone", e.target.value)}
-                className="w-full border border-border rounded-lg p-2 text-sm"
+                dir="ltr"
+                className={`w-full border rounded-lg p-2 text-sm ${errors.phone ? "border-red-400" : "border-border"}`}
               />
+              {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">الموبايل</label>
               <input
                 value={form.mobile}
                 onChange={(e) => change("mobile", e.target.value)}
-                className="w-full border border-border rounded-lg p-2 text-sm"
+                dir="ltr"
+                className={`w-full border rounded-lg p-2 text-sm ${errors.mobile ? "border-red-400" : "border-border"}`}
               />
+              {errors.mobile && <p className="text-xs text-red-600 mt-1">{errors.mobile}</p>}
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">البريد الإلكتروني</label>
               <input
                 value={form.email}
                 onChange={(e) => change("email", e.target.value)}
-                className="w-full border border-border rounded-lg p-2 text-sm"
+                dir="ltr"
+                className={`w-full border rounded-lg p-2 text-sm ${errors.email ? "border-red-400" : "border-border"}`}
               />
+              {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">الموقع الإلكتروني</label>
               <input
                 value={form.website}
                 onChange={(e) => change("website", e.target.value)}
+                dir="ltr"
                 placeholder="e.g. https://www.example.com"
-                className="w-full border border-border rounded-lg p-2 text-sm placeholder:text-muted-foreground"
+                className={`w-full border rounded-lg p-2 text-sm placeholder:text-muted-foreground ${errors.website ? "border-red-400" : "border-border"}`}
               />
+              {errors.website && <p className="text-xs text-red-600 mt-1">{errors.website}</p>}
             </div>
           </div>
         </div>
@@ -340,6 +393,8 @@ function VendorForm({ vendor, onBack, onSaved }) {
    الصفحة الرئيسية
    ======================================================================== */
 export default function Vendors() {
+  const { toast } = useToast();
+  const confirmDialog = useConfirm();
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -354,9 +409,7 @@ export default function Vendors() {
       const data = await getVendors();
       setVendors(data);
     } catch (err) {
-      setError(
-        err?.response?.data?.message || "تعذر تحميل قائمة الموردين"
-      );
+      setError(extractErrorMessage(err, "تعذر تحميل قائمة الموردين"));
     } finally {
       setLoading(false);
     }
@@ -374,13 +427,15 @@ export default function Vendors() {
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm("متأكدة من حذف هذا المورد؟")) return;
+    const ok = await confirmDialog({ title: "حذف المورد", message: "متأكد من حذف هذا المورد؟", confirmText: "حذف", variant: "destructive" });
+    if (!ok) return;
     setDeletingId(id);
     try {
       await deletePartner(id);
+      toast({ title: "تم حذف المورد" });
       loadVendors();
     } catch (err) {
-      alert(err?.response?.data?.message || "تعذر حذف المورد");
+      toast({ title: "تعذّر حذف المورد", description: extractErrorMessage(err), variant: "destructive" });
     } finally {
       setDeletingId(null);
     }

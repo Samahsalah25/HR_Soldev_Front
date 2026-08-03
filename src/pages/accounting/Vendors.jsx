@@ -515,7 +515,7 @@ export default function Vendors() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
+                  {/* <button
                     onClick={(e) => handleDelete(e, vendor.id)}
                     disabled={deletingId === vendor.id}
                     className="text-muted-foreground hover:text-red-600 p-1"
@@ -526,7 +526,7 @@ export default function Vendors() {
                     ) : (
                       <Trash2 className="w-4 h-4" />
                     )}
-                  </button>
+                  </button> */}
                   <Pencil className="w-4 h-4 text-muted-foreground" />
                 </div>
               </div>

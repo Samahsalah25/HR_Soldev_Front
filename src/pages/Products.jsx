@@ -269,12 +269,18 @@ export default function Products() {
   const load = async () => {
     try {
       setLoading(true);
-      const [prods, taxesRes, accs] = await Promise.all([
+      // الصفحة دي مشتركة بين تبويب "العملاء" و"الموردين" (نفس الكومبوننت في
+      // AccountingMain.jsx)، فبنجيب منتجات المبيعات والمشتريات مع بعض
+      // ونستبعد التكرار (منتج ممكن يكون sale_ok و purchase_ok مع بعض)
+      const [saleProds, purchaseProds, taxesRes, accs] = await Promise.all([
         getProducts("sale"),
+        getProducts("purchase").catch(() => []),
         getTaxes().catch(() => []),
         getAccounts().catch(() => []),
       ]);
-      setProducts(prods);
+      const byId = new Map();
+      [...saleProds, ...purchaseProds].forEach((p) => byId.set(p.id, p));
+      setProducts([...byId.values()]);
       setTaxes(taxesRes);
       setAccounts(
         (accs || []).map((item) => ({

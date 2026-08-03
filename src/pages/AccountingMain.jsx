@@ -10,6 +10,10 @@ import {
   FileSpreadsheet,
   BadgePercent,
   ChevronDown,
+  Truck,
+  FileMinus,
+  Wallet,
+  UserCog,
 } from "lucide-react";
 
 import ChartOfAccounts from "./accounting/ChartOfAccounts";
@@ -23,6 +27,12 @@ import CustomerPayments from "./accounting/CustomerPayments";
 import Invoices from "./accounting/Invoices";
 import CreditNotes from "./accounting/CreditNotes";
 import Products from "./Products";
+
+import Vendors from "./accounting/Vendors";
+import Bills from "./accounting/Bills";
+import Refunds from "./accounting/Refunds";
+import VendorPayments from "./accounting/VendorPayments";
+import EmployeeExpenses from "./accounting/EmployeeExpenses";
 
 const TABS = [
   { id: "chart", label: "دليل الحسابات", icon: BookOpen },
@@ -40,15 +50,30 @@ const CUSTOMER_TABS = [
   { id: "products", label: "المنتجات", icon: BadgePercent },
 ];
 
+const VENDOR_TABS = [
+  { id: "bills", label: "الفواتير", icon: FileText },
+  { id: "refunds", label: "المرتجعات", icon: FileMinus },
+  { id: "vendor-payments", label: "الدفعات", icon: Wallet },
+  { id: "employee-expenses", label: "مصروفات الموظفين", icon: UserCog },
+  { id: "vendor-products", label: "المنتجات", icon: BadgePercent },
+  { id: "vendors", label: "الموردين", icon: Truck },
+];
+
 export default function AccountingMain() {
   const [activeTab, setActiveTab] = useState("chart");
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
+  const [vendorMenuOpen, setVendorMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 224 });
+  const [vendorMenuPos, setVendorMenuPos] = useState({ top: 0, left: 0, width: 224 });
 
   const customerBtnRef = useRef(null);
   const menuRef = useRef(null);
 
+  const vendorBtnRef = useRef(null);
+  const vendorMenuRef = useRef(null);
+
   const isCustomerTab = CUSTOMER_TABS.some((tab) => tab.id === activeTab);
+  const isVendorTab = VENDOR_TABS.some((tab) => tab.id === activeTab);
 
   // نحسب مكان الزرار فعليًا بالنسبة للـ viewport، عشان نستخدم position: fixed
   // ونفلت من أي overflow-x-auto بيقطع الـ dropdown
@@ -57,14 +82,31 @@ export default function AccountingMain() {
     const rect = customerBtnRef.current.getBoundingClientRect();
     setMenuPos({
       top: rect.bottom + 4,
-      left: rect.left, // RTL: هنثبت الحافة الشمال زي ما بتظهر في الصورة
+      left: rect.left,
+      width: Math.max(rect.width, 224),
+    });
+  }, []);
+
+  const updateVendorMenuPosition = useCallback(() => {
+    if (!vendorBtnRef.current) return;
+    const rect = vendorBtnRef.current.getBoundingClientRect();
+    setVendorMenuPos({
+      top: rect.bottom + 4,
+      left: rect.left,
       width: Math.max(rect.width, 224),
     });
   }, []);
 
   const toggleCustomerMenu = () => {
     if (!customerMenuOpen) updateMenuPosition();
+    setVendorMenuOpen(false);
     setCustomerMenuOpen((v) => !v);
+  };
+
+  const toggleVendorMenu = () => {
+    if (!vendorMenuOpen) updateVendorMenuPosition();
+    setCustomerMenuOpen(false);
+    setVendorMenuOpen((v) => !v);
   };
 
   // إعادة حساب المكان لو حصل scroll أو resize والقائمة مفتوحة
@@ -79,11 +121,23 @@ export default function AccountingMain() {
     };
   }, [customerMenuOpen, updateMenuPosition]);
 
-  // قفل القائمة لو كبست برا الزرار أو برا القائمة نفسها
   useEffect(() => {
-    if (!customerMenuOpen) return;
+    if (!vendorMenuOpen) return;
+    updateVendorMenuPosition();
+    window.addEventListener("scroll", updateVendorMenuPosition, true);
+    window.addEventListener("resize", updateVendorMenuPosition);
+    return () => {
+      window.removeEventListener("scroll", updateVendorMenuPosition, true);
+      window.removeEventListener("resize", updateVendorMenuPosition);
+    };
+  }, [vendorMenuOpen, updateVendorMenuPosition]);
+
+  // قفل القوائم لو كبست برا
+  useEffect(() => {
+    if (!customerMenuOpen && !vendorMenuOpen) return;
     const handleClickOutside = (e) => {
       if (
+        customerMenuOpen &&
         menuRef.current &&
         !menuRef.current.contains(e.target) &&
         customerBtnRef.current &&
@@ -91,10 +145,19 @@ export default function AccountingMain() {
       ) {
         setCustomerMenuOpen(false);
       }
+      if (
+        vendorMenuOpen &&
+        vendorMenuRef.current &&
+        !vendorMenuRef.current.contains(e.target) &&
+        vendorBtnRef.current &&
+        !vendorBtnRef.current.contains(e.target)
+      ) {
+        setVendorMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [customerMenuOpen]);
+  }, [customerMenuOpen, vendorMenuOpen]);
 
   return (
     <div className="flex flex-col h-full" dir="rtl">
@@ -107,6 +170,7 @@ export default function AccountingMain() {
               onClick={() => {
                 setActiveTab(tab.id);
                 setCustomerMenuOpen(false);
+                setVendorMenuOpen(false);
               }}
               className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === tab.id
@@ -118,6 +182,21 @@ export default function AccountingMain() {
               {tab.label}
             </button>
           ))}
+
+          {/* Vendors Dropdown trigger */}
+          <button
+            ref={vendorBtnRef}
+            onClick={toggleVendorMenu}
+            className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              isVendorTab
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Truck className="w-4 h-4" />
+            الموردين
+            <ChevronDown className={`w-4 h-4 transition-transform ${vendorMenuOpen ? "rotate-180" : ""}`} />
+          </button>
 
           {/* Customers Dropdown trigger */}
           <button
@@ -136,7 +215,32 @@ export default function AccountingMain() {
         </div>
       </div>
 
-      {/* Dropdown menu — fixed خارج أي overflow، فمش بيتقطع ومش بيقف ورا السايدبار */}
+      {/* Vendor Dropdown menu */}
+      {vendorMenuOpen && (
+        <div
+          ref={vendorMenuRef}
+          style={{ position: "fixed", top: vendorMenuPos.top, left: vendorMenuPos.left, width: vendorMenuPos.width, zIndex: 9999 }}
+          className="bg-white border border-border rounded-lg shadow-lg overflow-hidden"
+        >
+          {VENDOR_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setVendorMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-muted transition-colors ${
+                activeTab === tab.id ? "bg-primary/10 text-primary" : "text-foreground"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Customer Dropdown menu */}
       {customerMenuOpen && (
         <div
           ref={menuRef}
@@ -173,6 +277,12 @@ export default function AccountingMain() {
         {activeTab === "invoices" && <Invoices />}
         {activeTab === "credit-notes" && <CreditNotes />}
         {activeTab === "products" && <Products />}
+        {activeTab === "bills" && <Bills />}
+        {activeTab === "refunds" && <Refunds />}
+        {activeTab === "vendor-payments" && <VendorPayments />}
+        {activeTab === "employee-expenses" && <EmployeeExpenses />}
+        {activeTab === "vendor-products" && <Products />}
+        {activeTab === "vendors" && <Vendors />}
       </div>
     </div>
   );

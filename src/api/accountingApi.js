@@ -196,6 +196,36 @@ export async function uploadVoucherAttachment(id, file) {
 
 
 /* ===========================
+   Taxes & Products (قوائم مساعدة)
+=========================== */
+
+// جلب كل الضرائب
+export async function getTaxes() {
+  const res = await accountingApi.get("/accounting/taxes");
+  return res.data?.taxes || [];
+}
+
+// جلب كل المنتجات
+export async function getProducts(type = "sale") {
+  const res = await accountingApi.get("/accounting/products", {
+    params: { type },
+  });
+  return res.data?.products || [];
+}
+
+// إنشاء منتج جديد
+export async function createProduct(payload) {
+  const res = await accountingApi.post("/accounting/products", payload);
+  return res.data;
+}
+
+// تعديل منتج
+export async function updateProduct(id, payload) {
+  const res = await accountingApi.put(`/accounting/products/${id}`, payload);
+  return res.data;
+}
+
+/* ===========================
    Trial Balance (ميزان المراجعة)
 =========================== */
 

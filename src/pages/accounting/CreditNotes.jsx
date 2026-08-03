@@ -288,9 +288,9 @@ function CreditNoteDetail({ note, onBack, onChanged }) {
           <button onClick={handleSend} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل الإرسال" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Send className="w-4 h-4" /> إرسال
           </button>
-          <button onClick={handlePreview} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل المعاينة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          {/* <button onClick={handlePreview} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل المعاينة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Eye className="w-4 h-4" /> معاينة
-          </button>
+          </button> */}
           <button onClick={handlePrint} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل الطباعة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Printer className="w-4 h-4" /> طباعة
           </button>

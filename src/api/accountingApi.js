@@ -213,6 +213,18 @@ export async function getProducts(type = "sale") {
   return res.data?.products || [];
 }
 
+// إنشاء منتج جديد
+export async function createProduct(payload) {
+  const res = await accountingApi.post("/accounting/products", payload);
+  return res.data;
+}
+
+// تعديل منتج
+export async function updateProduct(id, payload) {
+  const res = await accountingApi.put(`/accounting/products/${id}`, payload);
+  return res.data;
+}
+
 /* ===========================
    Trial Balance (ميزان المراجعة)
 =========================== */

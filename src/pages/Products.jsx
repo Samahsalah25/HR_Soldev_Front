@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Package, Plus, X, Save } from "lucide-react";
 import { getProducts, createProduct, updateProduct, getTaxes, getAccounts } from "@/api/accountingApi";
+import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useToast } from "@/components/ui/use-toast";
 
 const fmt = (n) => (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -75,10 +76,10 @@ function ProductForm({ product, taxes, accounts, onSave, onDiscard }) {
       onSave();
     } catch (err) {
       console.error("خطأ أثناء حفظ المنتج:", err);
-      setError(err?.response?.data?.message || "حصل خطأ أثناء حفظ المنتج، حاول تاني.");
+      setError(extractApiErrorMessage(err, "حصل خطأ أثناء حفظ المنتج، حاول تاني."));
       toast({
         title: "تعذّر حفظ المنتج",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -287,7 +288,7 @@ export default function Products() {
       console.error("خطأ أثناء تحميل المنتجات:", err);
       toast({
         title: "تعذّر تحميل المنتجات",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {

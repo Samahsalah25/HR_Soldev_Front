@@ -14,6 +14,7 @@ import {
   BadgeInfo,
 } from "lucide-react";
 import { getCustomers, getCustomerById, createCustomer, updateCustomer } from "@/api/accountingApi";
+import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useToast } from "@/components/ui/use-toast";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -138,10 +139,10 @@ function CustomerForm({ customer, onBack, onSave }) {
       onSave();
     } catch (err) {
       console.error("خطأ أثناء حفظ العميل:", err);
-      setError(err?.response?.data?.message || "حصل خطأ أثناء حفظ العميل، حاول تاني.");
+      setError(extractApiErrorMessage(err, "حصل خطأ أثناء حفظ العميل، حاول تاني."));
       toast({
         title: "تعذّر حفظ العميل",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -293,7 +294,7 @@ export default function Customers() {
       console.error("خطأ أثناء تحميل العملاء:", err);
       toast({
         title: "تعذّر تحميل العملاء",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {

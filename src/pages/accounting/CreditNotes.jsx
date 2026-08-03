@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { extractApiErrorMessage } from "@/lib/apiErrors";
+import { extractApiErrorMessage, extractApiErrorMessageFromBlob } from "@/lib/apiErrors";
 import {
-  ReceiptText, ArrowRight, Send, Printer, RotateCcw, CreditCard, Ban, FileText,
+  ReceiptText, ArrowRight, Send, Printer, RotateCcw, CreditCard, Ban, FileText, Eye,
 } from "lucide-react";
 import {
   getInvoices,
@@ -10,10 +10,12 @@ import {
   cancelInvoice,
   registerInvoicePayment,
   downloadInvoicePDF,
+  previewInvoice,
   sendInvoiceEmail,
-  getJournals,
+  getPaymentJournals,
   getPaymentMethodsForJournal,
 } from "@/api/accountingApi";
+import { API_ORIGIN } from "@/api/axios";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -80,7 +82,10 @@ function PaymentModal({ note, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getJournals().then(setJournals).catch(() => setJournals([]));
+    getPaymentJournals().then((js) => {
+      setJournals(js);
+      if (js.length === 1) setJournalId(String(js[0].id));
+    }).catch(() => setJournals([]));
   }, []);
 
   useEffect(() => {
@@ -206,6 +211,23 @@ function CreditNoteDetail({ note, onBack, onChanged }) {
     run(() => cancelInvoice(note.id), "تم إلغاء الإشعار", "تعذّر إلغاء الإشعار");
   };
 
+  const handlePreview = async () => {
+    try {
+      setBusy(true);
+      const previewUrl = await previewInvoice(note.id);
+      window.open(`${API_ORIGIN}${previewUrl}`, "_blank");
+    } catch (err) {
+      console.error("تعذّر معاينة الإشعار:", err);
+      toast({
+        title: "تعذّر معاينة الإشعار",
+        description: extractApiErrorMessage(err),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handlePrint = async () => {
     try {
       setBusy(true);
@@ -213,7 +235,11 @@ function CreditNoteDetail({ note, onBack, onChanged }) {
       window.open(window.URL.createObjectURL(blob), "_blank");
     } catch (err) {
       console.error("تعذّر فتح الإشعار:", err);
-      toast({ title: "تعذّر فتح الإشعار", description: "حصل خطأ أثناء تحميل ملف PDF.", variant: "destructive" });
+      toast({
+        title: "تعذّر فتح الإشعار",
+        description: await extractApiErrorMessageFromBlob(err, "حصل خطأ أثناء تحميل ملف PDF."),
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
     }
@@ -226,7 +252,11 @@ function CreditNoteDetail({ note, onBack, onChanged }) {
       downloadBlob(blob, `${note.name || "credit-note"}.pdf`);
     } catch (err) {
       console.error("تعذّر تحميل الإشعار:", err);
-      toast({ title: "تعذّر تحميل الإشعار", description: "حصل خطأ أثناء تحميل ملف PDF.", variant: "destructive" });
+      toast({
+        title: "تعذّر تحميل الإشعار",
+        description: await extractApiErrorMessageFromBlob(err, "حصل خطأ أثناء تحميل ملف PDF."),
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
     }
@@ -255,13 +285,16 @@ function CreditNoteDetail({ note, onBack, onChanged }) {
               اعتماد
             </button>
           )}
-          <button onClick={handleSend} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          <button onClick={handleSend} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل الإرسال" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Send className="w-4 h-4" /> إرسال
           </button>
-          <button onClick={handlePrint} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          <button onClick={handlePreview} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل المعاينة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+            <Eye className="w-4 h-4" /> معاينة
+          </button>
+          <button onClick={handlePrint} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل الطباعة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Printer className="w-4 h-4" /> طباعة
           </button>
-          <button onClick={handleDownload} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          <button onClick={handleDownload} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الإشعار أولاً قبل تحميل PDF" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <FileText className="w-4 h-4" /> تحميل PDF
           </button>
           {isPosted && !isFullyPaid && (

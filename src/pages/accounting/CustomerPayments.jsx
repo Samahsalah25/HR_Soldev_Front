@@ -20,7 +20,9 @@ import {
   cancelVoucher,
   rejectVoucher,
   getCustomers,
+  getPaymentJournals,
 } from "@/api/accountingApi";
+import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -62,6 +64,11 @@ function PaymentForm({ payment, customers, onBack, onSave }) {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [journals, setJournals] = useState([]);
+
+  useEffect(() => {
+    getPaymentJournals().then(setJournals).catch(() => setJournals([]));
+  }, []);
 
   const change = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -87,10 +94,10 @@ function PaymentForm({ payment, customers, onBack, onSave }) {
       onSave();
     } catch (err) {
       console.error("خطأ أثناء حفظ سند الدفع:", err);
-      setError(err?.response?.data?.message || "حصل خطأ أثناء حفظ سند الدفع، حاول تاني.");
+      setError(extractApiErrorMessage(err, "حصل خطأ أثناء حفظ سند الدفع، حاول تاني."));
       toast({
         title: "تعذّر حفظ سند الدفع",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -112,7 +119,7 @@ function PaymentForm({ payment, customers, onBack, onSave }) {
       console.error(`${errorTitle}:`, err);
       toast({
         title: errorTitle,
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -206,9 +213,12 @@ function PaymentForm({ payment, customers, onBack, onSave }) {
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">رقم دفتر اليومية *</label>
-            <input type="number" dir="ltr" value={form.journal_id} onChange={(e) => change("journal_id", e.target.value)}
-              placeholder="4" className="w-full border rounded-lg p-2 text-sm bg-background" />
+            <label className="text-sm font-medium mb-1 block">دفتر اليومية (استلام الدفعة) *</label>
+            <select value={form.journal_id} onChange={(e) => change("journal_id", e.target.value)}
+              className="w-full border rounded-lg p-2 text-sm bg-background">
+              <option value="">اختر دفتر اليومية...</option>
+              {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
+            </select>
           </div>
 
           <div>
@@ -258,7 +268,7 @@ export default function CustomerPayments() {
       console.error("خطأ أثناء تحميل مدفوعات العملاء:", err);
       toast({
         title: "تعذّر تحميل مدفوعات العملاء",
-        description: err?.response?.data?.message || "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.",
+        description: extractApiErrorMessage(err),
         variant: "destructive",
       });
     } finally {

@@ -116,7 +116,7 @@ export async function uploadDailyEntryAttachment(id, file) {
 // جلب كل السندات + KPIs
 export async function getVouchers() {
   const res = await accountingApi.get("/accounting/vouchers");
-  return res.data; // { success, kpis, vouchers }
+  return res.data; // { success, kpis, receipt_vouchers, payment_vouchers }
 }
 
 // إنشاء سند قبض
@@ -332,6 +332,12 @@ export async function downloadInvoicePDF(id) {
     responseType: "blob",
   });
   return res.data;
+}
+
+// معاينة الفاتورة (رابط بوابة العميل بـ access token مؤقت)
+export async function previewInvoice(id) {
+  const res = await accountingApi.get(`/accounting/invoices/${id}/preview`);
+  return res.data?.preview_url;
 }
 
 // إرسال الفاتورة بالبريد الإلكتروني

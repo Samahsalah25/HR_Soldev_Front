@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { extractApiErrorMessage } from "@/lib/apiErrors";
+import { extractApiErrorMessage, extractApiErrorMessageFromBlob } from "@/lib/apiErrors";
 import {
   FileText, Plus, ArrowRight, Send, Printer, RotateCcw,
-  CreditCard, ReceiptText, X, Trash2, CheckCircle, Ban,
+  CreditCard, ReceiptText, X, Trash2, CheckCircle, Ban, Eye,
 } from "lucide-react";
 import {
   getInvoices,
@@ -14,6 +14,7 @@ import {
   registerInvoicePayment,
   creditNoteInvoice,
   downloadInvoicePDF,
+  previewInvoice,
   sendInvoiceEmail,
   getCustomers,
   getAccounts,
@@ -21,8 +22,10 @@ import {
   getPaymentTerms,
   getProducts,
   getJournals,
+  getPaymentJournals,
   getPaymentMethodsForJournal,
 } from "@/api/accountingApi";
+import { API_ORIGIN } from "@/api/axios";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -315,7 +318,10 @@ function PaymentModal({ invoice, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getJournals().then(setJournals).catch(() => setJournals([]));
+    getPaymentJournals().then((js) => {
+      setJournals(js);
+      if (js.length === 1) setJournalId(String(js[0].id));
+    }).catch(() => setJournals([]));
   }, []);
 
   useEffect(() => {
@@ -402,7 +408,8 @@ function CreditNoteModal({ invoice, onClose, onDone }) {
 
   useEffect(() => {
     getJournals().then((all) => {
-      setJournals(all);
+      const invoiceJournal = all.find((j) => j.id === invoice.journal_id);
+      setJournals(invoiceJournal ? all.filter((j) => j.type === invoiceJournal.type) : all);
       setJournalId(String(invoice.journal_id || ""));
     }).catch(() => setJournals([]));
   }, [invoice.journal_id]);
@@ -517,6 +524,23 @@ function InvoiceDetail({ invoice, onBack, onEdit, onChanged }) {
     run(() => cancelInvoice(invoice.id), "تم إلغاء الفاتورة", "تعذّر إلغاء الفاتورة");
   };
 
+  const handlePreview = async () => {
+    try {
+      setBusy(true);
+      const previewUrl = await previewInvoice(invoice.id);
+      window.open(`${API_ORIGIN}${previewUrl}`, "_blank");
+    } catch (err) {
+      console.error("تعذّر معاينة الفاتورة:", err);
+      toast({
+        title: "تعذّر معاينة الفاتورة",
+        description: extractApiErrorMessage(err),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handlePrint = async () => {
     try {
       setBusy(true);
@@ -524,7 +548,11 @@ function InvoiceDetail({ invoice, onBack, onEdit, onChanged }) {
       window.open(window.URL.createObjectURL(blob), "_blank");
     } catch (err) {
       console.error("تعذّر فتح الفاتورة:", err);
-      toast({ title: "تعذّر فتح الفاتورة", description: "حصل خطأ أثناء تحميل ملف PDF.", variant: "destructive" });
+      toast({
+        title: "تعذّر فتح الفاتورة",
+        description: await extractApiErrorMessageFromBlob(err, "حصل خطأ أثناء تحميل ملف PDF."),
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
     }
@@ -537,7 +565,11 @@ function InvoiceDetail({ invoice, onBack, onEdit, onChanged }) {
       downloadBlob(blob, `${invoice.name || "invoice"}.pdf`);
     } catch (err) {
       console.error("تعذّر تحميل الفاتورة:", err);
-      toast({ title: "تعذّر تحميل الفاتورة", description: "حصل خطأ أثناء تحميل ملف PDF.", variant: "destructive" });
+      toast({
+        title: "تعذّر تحميل الفاتورة",
+        description: await extractApiErrorMessageFromBlob(err, "حصل خطأ أثناء تحميل ملف PDF."),
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
     }
@@ -573,13 +605,16 @@ function InvoiceDetail({ invoice, onBack, onEdit, onChanged }) {
               <CheckCircle className="w-4 h-4" /> اعتماد
             </button>
           )}
-          <button onClick={handleSend} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          <button onClick={handleSend} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الفاتورة أولاً قبل الإرسال" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Send className="w-4 h-4" /> إرسال
           </button>
-          <button onClick={handlePrint} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          <button onClick={handlePreview} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الفاتورة أولاً قبل المعاينة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+            <Eye className="w-4 h-4" /> معاينة
+          </button>
+          <button onClick={handlePrint} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الفاتورة أولاً قبل الطباعة" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <Printer className="w-4 h-4" /> طباعة
           </button>
-          <button onClick={handleDownload} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+          <button onClick={handleDownload} disabled={busy || !isPosted} title={!isPosted ? "لازم تعتمد الفاتورة أولاً قبل تحميل PDF" : undefined} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
             <FileText className="w-4 h-4" /> تحميل PDF
           </button>
           {isPosted && !isFullyPaid && (
@@ -776,12 +811,27 @@ export default function Invoices() {
 
   if (selected) {
     return (
-      <InvoiceDetail
-        invoice={selected}
-        onBack={() => setSelected(null)}
-        onEdit={() => openEditForm(selected)}
-        onChanged={load}
-      />
+      <>
+        <InvoiceDetail
+          invoice={selected}
+          onBack={() => setSelected(null)}
+          onEdit={() => openEditForm(selected)}
+          onChanged={load}
+        />
+        {showForm && (
+          <InvoiceForm
+            invoice={editInvoice}
+            customers={customers}
+            accounts={accounts}
+            taxes={taxes}
+            paymentTerms={paymentTerms}
+            products={products}
+            journals={journals}
+            onSave={() => { closeForm(); load(); }}
+            onClose={closeForm}
+          />
+        )}
+      </>
     );
   }
 

@@ -28,3 +28,19 @@ export function extractApiErrorMessage(err, fallback = "حصل خطأ أثناء
 
   return fallback;
 }
+
+// زي extractApiErrorMessage، لكن لطلبات responseType: "blob" (زي تحميل PDF)
+// لأن رد الخطأ بيرجع كـ Blob مش JSON عادي، فلازم نقراه كنص الأول
+export async function extractApiErrorMessageFromBlob(err, fallback) {
+  const data = err?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      const parsed = JSON.parse(text);
+      return extractApiErrorMessage({ response: { data: parsed } }, fallback);
+    } catch (_) {
+      return fallback ?? "حصل خطأ أثناء الاتصال بالسيرفر، حاول تاني.";
+    }
+  }
+  return extractApiErrorMessage(err, fallback);
+}

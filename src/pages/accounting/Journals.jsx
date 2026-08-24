@@ -18,6 +18,8 @@ import {
   getGeneralPaymentMethods,
   getAllAccounts,
 } from "../../api/Journalsapi";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 /* ────────────────────────────────────────────────────────────────────────
    Config
@@ -686,6 +688,8 @@ export default function Journals() {
     loadJournals();
   };
 
+  const journalsPagination = usePagination(journals, 20);
+
   if (selectedId) {
     return (
       <JournalForm
@@ -760,7 +764,7 @@ export default function Journals() {
                 </td>
               </tr>
             ) : (
-              journals.map((j) => {
+              journalsPagination.pageItems.map((j) => {
                 const type = fromApiType(j.type);
                 return (
                   <tr
@@ -785,6 +789,13 @@ export default function Journals() {
             )}
           </tbody>
         </table>
+        <TablePagination
+          page={journalsPagination.page}
+          totalPages={journalsPagination.totalPages}
+          totalItems={journalsPagination.totalItems}
+          pageSize={journalsPagination.pageSize}
+          onPageChange={journalsPagination.setPage}
+        />
       </div>
     </div>
   );

@@ -240,6 +240,7 @@ export function getExpiryStatus(expiryDate) {
   if (!expiryDate) return null;
   const days = Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
   if (days < 0) return { label: "منتهية", color: "red", days };
+  if (days <= 7) return { label: `تنتهي خلال ${days} يوم`, color: "red", days, critical: true };
   if (days <= 30) return { label: `تنتهي خلال ${days} يوم`, color: "red", days };
   if (days <= 60) return { label: `تنتهي خلال ${days} يوم`, color: "amber", days };
   if (days <= 90) return { label: `تنتهي خلال ${days} يوم`, color: "yellow", days };

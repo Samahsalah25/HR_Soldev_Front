@@ -12,6 +12,8 @@ import {
 import api from "@/api/axios";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATE_LABELS = {
   draft: "مسودة",
@@ -387,6 +389,7 @@ export default function JournalEntries() {
   };
 
   const filtered = entries.filter(e => !filterStatus || e.state === filterStatus);
+  const entriesPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -434,7 +437,7 @@ export default function JournalEntries() {
               <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">لا توجد قيود</td></tr>
-            ) : filtered.map(e => (
+            ) : entriesPagination.pageItems.map(e => (
               <>
                 <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer"
                   onClick={() => setExpanded(expanded === e.id ? null : e.id)}>
@@ -509,6 +512,13 @@ export default function JournalEntries() {
             ))}
           </tbody>
         </table>
+        <TablePagination
+          page={entriesPagination.page}
+          totalPages={entriesPagination.totalPages}
+          totalItems={entriesPagination.totalItems}
+          pageSize={entriesPagination.pageSize}
+          onPageChange={entriesPagination.setPage}
+        />
       </div>
 
       {showForm && (

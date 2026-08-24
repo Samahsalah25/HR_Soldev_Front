@@ -15,6 +15,8 @@ import {
   markOpportunityLost,
 } from "@/api/crmOpportunitiesApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STAGE_COLOR_PALETTE = [
   "bg-gray-100 text-gray-600",
@@ -579,6 +581,7 @@ export default function StorageCRM() {
     if (!filterType) return true;
     return filterType === "company" ? l.is_company : !l.is_company;
   });
+  const leadsPagination = usePagination(visibleLeads, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -710,7 +713,7 @@ export default function StorageCRM() {
                 </td></tr>
               ) : visibleLeads.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا يوجد عملاء</td></tr>
-              ) : visibleLeads.map(l => (
+              ) : leadsPagination.pageItems.map(l => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -746,6 +749,13 @@ export default function StorageCRM() {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={leadsPagination.page}
+            totalPages={leadsPagination.totalPages}
+            totalItems={leadsPagination.totalItems}
+            pageSize={leadsPagination.pageSize}
+            onPageChange={leadsPagination.setPage}
+          />
         </div>
       )}
 

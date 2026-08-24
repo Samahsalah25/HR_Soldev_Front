@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Download, CheckCircle, FileText, Info } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { canDo } from "../lib/crudPermissions";
-import { calcPayslip, calcGOSI_Saudi, calcGOSI_NonSaudi, formatCurrency, EXPAT_LEVY } from "../lib/hrUtils";
+import { calcPayslip, formatCurrency, EXPAT_LEVY } from "../lib/hrUtils";
 import {
   getInsuranceKPIs,
   getInsuranceDashboard,
@@ -13,6 +12,8 @@ import {
 } from "@/api/financeApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 
 
@@ -79,6 +80,7 @@ const loadPayroll = async () => {
   const saudis = employees.filter(e => e.is_saudi);
   const nonSaudis = employees.filter(e => !e.is_saudi);
   const totalExpatLevy = nonSaudis.length * EXPAT_LEVY;
+  const payslipsPagination = usePagination(payslips, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -262,7 +264,7 @@ const loadPayroll = async () => {
               </td>
             </tr>
           ) : (
-            payslips.map((item) => (
+            payslipsPagination.pageItems.map((item) => (
               <tr
                 key={item.employee.id}
                 className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer"
@@ -359,6 +361,13 @@ const loadPayroll = async () => {
         </tfoot>
       </table>
     </div>
+    <TablePagination
+      page={payslipsPagination.page}
+      totalPages={payslipsPagination.totalPages}
+      totalItems={payslipsPagination.totalItems}
+      pageSize={payslipsPagination.pageSize}
+      onPageChange={payslipsPagination.setPage}
+    />
   </div>
 )}
 

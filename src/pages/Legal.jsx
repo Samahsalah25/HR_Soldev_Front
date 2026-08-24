@@ -7,6 +7,8 @@ import {
   createCase,
 } from "../api/casesApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 const CASE_STATUS_COLORS = {
   new: "bg-blue-100 text-blue-700",
   in_progress: "bg-amber-100 text-amber-700",
@@ -336,6 +338,8 @@ export default function Legal() {
     return days <= 30 && days >= 0;
   });
   const totalCaseValue = cases.reduce((s, c) => s + (c.estimated_value || 0), 0);
+  const casesPagination = usePagination(filteredCases, 20);
+  const contractsPagination = usePagination(filteredContracts, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -413,7 +417,7 @@ export default function Legal() {
             <tbody>
               {loading ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                 : filteredCases.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد قضايا</td></tr>
-                  : filteredCases.map(c => (
+                  : casesPagination.pageItems.map(c => (
                     <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{c.case_number}</td>
                       <td className="px-3 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{c.case_type_arabic}</span></td>
@@ -440,6 +444,13 @@ export default function Legal() {
                   ))}
             </tbody>
           </table>
+          <TablePagination
+            page={casesPagination.page}
+            totalPages={casesPagination.totalPages}
+            totalItems={casesPagination.totalItems}
+            pageSize={casesPagination.pageSize}
+            onPageChange={casesPagination.setPage}
+          />
         </div>
       )}
 
@@ -455,7 +466,7 @@ export default function Legal() {
             </thead>
             <tbody>
               {filteredContracts.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد عقود</td></tr>
-                : filteredContracts.map(c => {
+                : contractsPagination.pageItems.map(c => {
                   const daysLeft = c.end_date ? Math.ceil((new Date(c.end_date) - new Date()) / 86400000) : null;
                   return (
                     <tr key={c.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${daysLeft !== null && daysLeft <= 30 && daysLeft >= 0 ? "bg-amber-50/30" : ""}`}>
@@ -477,6 +488,13 @@ export default function Legal() {
                 })}
             </tbody>
           </table>
+          <TablePagination
+            page={contractsPagination.page}
+            totalPages={contractsPagination.totalPages}
+            totalItems={contractsPagination.totalItems}
+            pageSize={contractsPagination.pageSize}
+            onPageChange={contractsPagination.setPage}
+          />
         </div>
       )}
 

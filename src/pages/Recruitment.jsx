@@ -7,14 +7,16 @@ import {
   acceptJob,
   rejectJob as rejectJobApi,
 } from "@/api/jobsApi";
-import { getApplicants, updateApplicant, addApplicantMeeting, getMyMeetings, allMyMeetingsForanApplicant } from "@/api/applicantsApi";
+import { getApplicants, updateApplicant, addApplicantMeeting } from "@/api/applicantsApi";
 import { getBranches } from "@/api/branchesApi";
 import { getDepartments, getEmployees } from "@/api/departmentsApi";
 import { getCurrentUser } from "@/api/authApi";
-import { deleteMeeting as deleteMeetingApi, updateMeeting } from "@/api/meetingsApi";
+import { updateMeeting } from "@/api/meetingsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { API_ORIGIN } from "@/api/axios";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 // روابط الـ CV/المستندات ممكن ترجع من الـ API كمسار نسبي (مش رابط كامل) — نضيفله دومين السيرفر
 function resolveFileUrl(url) {
@@ -771,6 +773,9 @@ export default function Recruitment() {
     load();
   };
 
+  const jobsPagination = usePagination(jobs, 20);
+  const appsPagination = usePagination(displayedApps, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       <div className="flex items-center justify-between">
@@ -849,7 +854,7 @@ export default function Recruitment() {
               <tbody>
                 {loading ? <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                   : jobs.length === 0 ? <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">لا توجد وظائف</td></tr>
-                    : jobs.map(j => {
+                    : jobsPagination.pageItems.map(j => {
                       const appCount = applications.filter(a => a.recruitment_id === j.id).length;
                       return (
                         <tr key={j.id} className="border-b border-border last:border-0 hover:bg-muted/20">
@@ -885,6 +890,13 @@ export default function Recruitment() {
                     })}
               </tbody>
             </table>
+            <TablePagination
+              page={jobsPagination.page}
+              totalPages={jobsPagination.totalPages}
+              totalItems={jobsPagination.totalItems}
+              pageSize={jobsPagination.pageSize}
+              onPageChange={jobsPagination.setPage}
+            />
           </div>
         </div>
       )}
@@ -916,7 +928,7 @@ export default function Recruitment() {
               <tbody>
                 {displayedApps.length === 0
                   ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد طلبات</td></tr>
-                  : displayedApps.map(app => {
+                  : appsPagination.pageItems.map(app => {
                     const avgScore = app.interviews?.length > 0
                       ? (app.interviews.reduce((s, i) => s + (+i.score || 0), 0) / app.interviews.length).toFixed(1)
                       : null;
@@ -973,6 +985,13 @@ export default function Recruitment() {
                 }
               </tbody>
             </table>
+            <TablePagination
+              page={appsPagination.page}
+              totalPages={appsPagination.totalPages}
+              totalItems={appsPagination.totalItems}
+              pageSize={appsPagination.pageSize}
+              onPageChange={appsPagination.setPage}
+            />
           </div>
         </div>
       )}

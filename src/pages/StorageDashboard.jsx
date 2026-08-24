@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Warehouse, CheckCircle, Clock, TrendingUp, Bell, RefreshCw, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getStorageDashboard } from "@/api/storageUnitsApi";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 // ─── Alert badge حسب alert_level ─────────────────────────────────────────────
 function AlertBadge({ days, level }) {
@@ -61,6 +63,7 @@ export default function StorageDashboard() {
 
   const criticalCount = alerts.filter(a => a.days_left <= 7 || a.alert_level === "critical").length;
   const warningCount = alerts.filter(a => a.days_left <= 30 && a.days_left > 7).length;
+  const contractsPagination = usePagination(contracts, 20);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
@@ -284,7 +287,7 @@ export default function StorageDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {contracts.map(c => (
+                {contractsPagination.pageItems.map(c => (
                   <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-3 py-2.5 font-bold text-foreground">{c.unit_number}</td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">
@@ -311,6 +314,13 @@ export default function StorageDashboard() {
                 </tr>
               </tfoot>
             </table>
+            <TablePagination
+              page={contractsPagination.page}
+              totalPages={contractsPagination.totalPages}
+              totalItems={contractsPagination.totalItems}
+              pageSize={contractsPagination.pageSize}
+              onPageChange={contractsPagination.setPage}
+            />
           </div>
         )}
       </div>

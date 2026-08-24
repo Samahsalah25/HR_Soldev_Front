@@ -14,6 +14,8 @@ import {
   getBranches,
 } from "@/api/branchesApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
   "قيد الاعتماد": "bg-amber-100 text-amber-700", "معتمد": "bg-green-100 text-green-700",
@@ -530,6 +532,8 @@ export default function Transfers() {
     }
   };
 
+  const transfersPagination = usePagination(transfers, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
 
@@ -620,7 +624,7 @@ export default function Transfers() {
                 </td>
               </tr>
             ) : (
-              transfers.map((t) => (
+              transfersPagination.pageItems.map((t) => (
                 <tr key={t.id} className="border-b border-border hover:bg-muted/20">
 
                   <td className="px-4 py-3 font-medium">{t.employee_name}</td>
@@ -679,6 +683,13 @@ export default function Transfers() {
             )}
           </tbody>
         </table>
+        <TablePagination
+          page={transfersPagination.page}
+          totalPages={transfersPagination.totalPages}
+          totalItems={transfersPagination.totalItems}
+          pageSize={transfersPagination.pageSize}
+          onPageChange={transfersPagination.setPage}
+        />
       </div>
 
       {/* FORM */}

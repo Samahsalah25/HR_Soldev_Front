@@ -25,6 +25,8 @@ import {
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATE_LABELS = {
   draft: "مسودة",
@@ -278,6 +280,11 @@ export default function CustomerPayments() {
 
   useEffect(() => { load(); }, []);
 
+  const filtered = search
+    ? payments.filter((p) => p.partner_name?.includes(search) || p.voucher_number?.includes?.(search) || p.memo?.includes(search))
+    : payments;
+  const paymentsPagination = usePagination(filtered, 20);
+
   if (selected) {
     return (
       <PaymentForm
@@ -299,10 +306,6 @@ export default function CustomerPayments() {
       />
     );
   }
-
-  const filtered = search
-    ? payments.filter((p) => p.partner_name?.includes(search) || p.voucher_number?.includes?.(search) || p.memo?.includes(search))
-    : payments;
 
   const totalAmount = filtered.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
@@ -363,7 +366,7 @@ export default function CustomerPayments() {
               <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">جاري التحميل...</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">لا توجد مدفوعات بعد</td></tr>
-            ) : filtered.map((payment) => (
+            ) : paymentsPagination.pageItems.map((payment) => (
               <tr
                 key={payment.id}
                 onClick={() => setSelected(payment)}
@@ -389,6 +392,13 @@ export default function CustomerPayments() {
             ))}
           </tbody>
         </table>
+        <TablePagination
+          page={paymentsPagination.page}
+          totalPages={paymentsPagination.totalPages}
+          totalItems={paymentsPagination.totalItems}
+          pageSize={paymentsPagination.pageSize}
+          onPageChange={paymentsPagination.setPage}
+        />
 
         <div className="p-4 bg-muted/20 border-t flex justify-between items-center font-bold text-sm">
           <span>الإجمالي الكلي:</span>

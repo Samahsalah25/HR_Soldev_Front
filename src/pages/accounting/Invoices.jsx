@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { extractApiErrorMessage, extractApiErrorMessageFromBlob } from "@/lib/apiErrors";
 import {
   FileText, Plus, ArrowRight, Send, Printer, RotateCcw,
-  CreditCard, ReceiptText, X, Trash2, CheckCircle, Ban, Eye,
+  CreditCard, ReceiptText, X, Trash2, CheckCircle, Ban,
 } from "lucide-react";
 import {
   getInvoices,
@@ -28,6 +28,8 @@ import {
 import { API_ORIGIN } from "@/api/axios";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancel: "ملغي", cancelled: "ملغي" };
 
@@ -804,6 +806,7 @@ export default function Invoices() {
   useEffect(() => { load(); }, []);
 
   const total = invoices.reduce((s, i) => s + (i.amount_untaxed || 0), 0);
+  const invoicesPagination = usePagination(invoices, 20);
 
   const openCreate = () => { setEditInvoice(null); setShowForm(true); };
   const openEditForm = (inv) => { setEditInvoice(inv); setShowForm(true); };
@@ -863,7 +866,7 @@ export default function Invoices() {
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
             ) : invoices.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد فواتير بعد</td></tr>
-            ) : invoices.map((inv) => {
+            ) : invoicesPagination.pageItems.map((inv) => {
               const ps = PAYMENT_STATUS[inv.payment_state] || PAYMENT_STATUS.not_paid;
               return (
                 <tr key={inv.id} onClick={() => setSelected(inv)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
@@ -888,6 +891,13 @@ export default function Invoices() {
             </tr>
           </tfoot>
         </table>
+        <TablePagination
+          page={invoicesPagination.page}
+          totalPages={invoicesPagination.totalPages}
+          totalItems={invoicesPagination.totalItems}
+          pageSize={invoicesPagination.pageSize}
+          onPageChange={invoicesPagination.setPage}
+        />
       </div>
 
       {showForm && (

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Plus, CheckCircle, Clock, Search, X, Save, User } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 import {
   getTasks,
   createTask,
@@ -280,6 +282,7 @@ export default function Tasks() {
   };
 
   const isOverdue = (task) => task.due_date && new Date(task.due_date) < new Date() && task.status !== "مكتملة";
+  const tasksPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-5xl mx-auto" dir="rtl">
@@ -330,7 +333,7 @@ export default function Tasks() {
               <CheckCircle className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-30" />
               <p className="text-sm text-muted-foreground">لا توجد مهام</p>
             </div>
-          ) : filtered.map(task => (
+          ) : tasksPagination.pageItems.map(task => (
             <div key={task.id} className={`bg-card rounded-xl border p-4 flex items-start gap-3 ${isOverdue(task) ? "border-red-200 bg-red-50/30" : "border-border"}`}>
               <button onClick={() => toggleComplete(task)} className="mt-0.5 flex-shrink-0">
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${task.status === "مكتملة" ? "bg-green-500 border-green-500" : "border-muted-foreground"}`}>
@@ -364,6 +367,13 @@ export default function Tasks() {
             </div>
           ))}
       </div>
+      <TablePagination
+        page={tasksPagination.page}
+        totalPages={tasksPagination.totalPages}
+        totalItems={tasksPagination.totalItems}
+        pageSize={tasksPagination.pageSize}
+        onPageChange={tasksPagination.setPage}
+      />
 
       {showForm && <TaskForm task={editTask} employees={employees} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
     </div>

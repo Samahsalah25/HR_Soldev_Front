@@ -3,6 +3,8 @@ import { Package, Plus, X, Save } from "lucide-react";
 import { getProducts, createProduct, updateProduct, getTaxes, getAccounts } from "@/api/accountingApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const fmt = (n) => (n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -308,6 +310,8 @@ export default function Products() {
   const openEdit = (p) => { setEditing(p); setView("form"); };
   const closeForm = () => { setEditing(null); setView("list"); };
 
+  const productsPagination = usePagination(products, 20);
+
   if (view === "form") {
     return (
       <ProductForm
@@ -355,7 +359,7 @@ export default function Products() {
               <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
             ) : products.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد منتجات</td></tr>
-            ) : products.map((p) => (
+            ) : productsPagination.pageItems.map((p) => (
               <tr
                 key={p.id}
                 onClick={() => openEdit(p)}
@@ -370,6 +374,13 @@ export default function Products() {
             ))}
           </tbody>
         </table>
+        <TablePagination
+          page={productsPagination.page}
+          totalPages={productsPagination.totalPages}
+          totalItems={productsPagination.totalItems}
+          pageSize={productsPagination.pageSize}
+          onPageChange={productsPagination.setPage}
+        />
       </div>
     </div>
   );

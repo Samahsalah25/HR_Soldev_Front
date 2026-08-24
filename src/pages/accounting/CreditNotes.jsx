@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { extractApiErrorMessage, extractApiErrorMessageFromBlob } from "@/lib/apiErrors";
 import {
-  ReceiptText, ArrowRight, Send, Printer, RotateCcw, CreditCard, Ban, FileText, Eye,
+  ReceiptText, ArrowRight, Send, Printer, RotateCcw, CreditCard, Ban, FileText,
 } from "lucide-react";
 import {
   getInvoices,
@@ -18,6 +18,8 @@ import {
 import { API_ORIGIN } from "@/api/axios";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancel: "ملغي", cancelled: "ملغي" };
 
@@ -444,6 +446,7 @@ export default function CreditNotes() {
   useEffect(() => { load(); }, []);
 
   const total = notes.reduce((s, n) => s + (n.amount_untaxed || 0), 0);
+  const notesPagination = usePagination(notes, 20);
 
   if (selected) {
     return <CreditNoteDetail note={selected} onBack={() => setSelected(null)} onChanged={load} />;
@@ -474,7 +477,7 @@ export default function CreditNotes() {
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
             ) : notes.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد إشعارات دائن بعد — يتم إنشاؤها من داخل فاتورة عميل موجودة</td></tr>
-            ) : notes.map((n) => {
+            ) : notesPagination.pageItems.map((n) => {
               const ps = PAYMENT_STATUS[n.payment_state] || PAYMENT_STATUS.not_paid;
               return (
                 <tr key={n.id} onClick={() => setSelected(n)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
@@ -499,6 +502,13 @@ export default function CreditNotes() {
             </tr>
           </tfoot>
         </table>
+        <TablePagination
+          page={notesPagination.page}
+          totalPages={notesPagination.totalPages}
+          totalItems={notesPagination.totalItems}
+          pageSize={notesPagination.pageSize}
+          onPageChange={notesPagination.setPage}
+        />
       </div>
     </div>
   );

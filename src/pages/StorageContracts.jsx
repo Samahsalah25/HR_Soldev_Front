@@ -3,7 +3,6 @@ import { base44 } from "@/api/base44Client";
 import { FileText, RefreshCw, Search, Eye, StopCircle } from "lucide-react";
 import ContractView from "../components/storage/ContractView";
 import InvoiceView from "../components/storage/InvoiceView";
-import api from "../api/axios";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
    getContracts,
@@ -14,6 +13,8 @@ import {
   getInvoiceById,
   payInvoice,
 } from "@/api/storageInvoices";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 function createInvoice(contract, type = "تجديد") {
   const subtotal = contract.monthly_price * contract.contract_months;
@@ -143,6 +144,8 @@ const stopRenew = async (contract) => {
   const filteredContracts = contracts.filter(c => !search || c.customer_name?.includes(search) || c.contract_number?.includes(search) || c.unit_number?.includes(search));
   const filteredInvoices = invoices.filter(i => !search || i.customer_name?.includes(search) || i.invoice_number?.includes(search));
   const unpaid = invoices.filter(i => i.status === "غير مدفوعة").length;
+  const contractsPagination = usePagination(filteredContracts, 20);
+  const invoicesPagination = usePagination(filteredInvoices, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -208,7 +211,7 @@ const stopRenew = async (contract) => {
             </td>
           </tr>
         ) : (
-          filteredContracts.map((c) => {
+          contractsPagination.pageItems.map((c) => {
             const expiringSoon =
               c.contract_end_date &&
               c.contract_end_date <=
@@ -367,6 +370,13 @@ const stopRenew = async (contract) => {
         )}
       </tbody>
     </table>
+    <TablePagination
+      page={contractsPagination.page}
+      totalPages={contractsPagination.totalPages}
+      totalItems={contractsPagination.totalItems}
+      pageSize={contractsPagination.pageSize}
+      onPageChange={contractsPagination.setPage}
+    />
   </div>
 )}
 
@@ -403,7 +413,7 @@ const stopRenew = async (contract) => {
             </td>
           </tr>
         ) : (
-          filteredInvoices.map((inv) => (
+          invoicesPagination.pageItems.map((inv) => (
             <tr
               key={inv.id}
               className={`border-b border-border last:border-0 hover:bg-muted/20 ${
@@ -477,6 +487,13 @@ const stopRenew = async (contract) => {
         )}
       </tbody>
     </table>
+    <TablePagination
+      page={invoicesPagination.page}
+      totalPages={invoicesPagination.totalPages}
+      totalItems={invoicesPagination.totalItems}
+      pageSize={invoicesPagination.pageSize}
+      onPageChange={invoicesPagination.setPage}
+    />
   </div>
 )}
       {selectedContract && <ContractView contract={selectedContract} onClose={() => setSelectedContract(null)} />}

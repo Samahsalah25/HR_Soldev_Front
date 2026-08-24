@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import NotificationPanel from "./NotificationPanel";
 import { useLanguage } from "../lib/useLanguage";
-import { useRole } from "../lib/useRole";
+import { useRole, ROLE_LABELS } from "../lib/useRole";
 import { useNavigate } from "react-router-dom";
 import { logoutUser } from "@/api/authApi";
 
@@ -259,7 +259,7 @@ export default function Layout() {
               <Shield className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="text-sm font-medium text-foreground hidden sm:block">
-              {role === "dept_manager" ? "مدير قسم" : role === "hr" ? "HR" : role === "accountant" ? "محاسب" : role === "ceo" ? "CEO" : role === "general_manager" ? "مدير عام" : "مدير النظام"}
+              {ROLE_LABELS[role] || "مدير النظام"}
             </span>
           </div>
         </header>

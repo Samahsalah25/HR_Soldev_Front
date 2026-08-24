@@ -13,6 +13,8 @@ import {
 import { getEmployeesList } from "@/api/employeesApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 
 const STATUS_MAP = {
@@ -254,6 +256,11 @@ export default function Leaves() {
   const approved = leaves.filter(
     l => l.state === "validate"
   );
+
+  const leavesPagination = usePagination(filtered, 20);
+  const balancesPagination = usePagination(balances, 20);
+  const ticketsPagination = usePagination(tickets, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -321,7 +328,7 @@ export default function Leaves() {
                   <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد طلبات</td></tr>
-                ) : filtered.map(leave => (
+                ) : leavesPagination.pageItems.map(leave => (
                   <tr key={leave.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{leave.employee?.name_ar}</p>
@@ -405,6 +412,13 @@ export default function Leaves() {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={leavesPagination.page}
+            totalPages={leavesPagination.totalPages}
+            totalItems={leavesPagination.totalItems}
+            pageSize={leavesPagination.pageSize}
+            onPageChange={leavesPagination.setPage}
+          />
         </div>
       )}
 
@@ -420,7 +434,7 @@ export default function Leaves() {
                 </tr>
               </thead>
               <tbody>
-                {balances.map(emp => (
+                {balancesPagination.pageItems.map(emp => (
                   <tr key={emp.employee.id} className="border-b border-border hover:bg-muted/20">
 
                     <td className="px-4 py-3">
@@ -451,6 +465,13 @@ export default function Leaves() {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={balancesPagination.page}
+            totalPages={balancesPagination.totalPages}
+            totalItems={balancesPagination.totalItems}
+            pageSize={balancesPagination.pageSize}
+            onPageChange={balancesPagination.setPage}
+          />
         </div>
       )}
 
@@ -466,7 +487,7 @@ export default function Leaves() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map(emp => (
+                {ticketsPagination.pageItems.map(emp => (
                   <tr key={emp.employee.id} className="border-b border-border hover:bg-muted/20">
 
                     <td className="px-4 py-3">
@@ -505,6 +526,13 @@ export default function Leaves() {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={ticketsPagination.page}
+            totalPages={ticketsPagination.totalPages}
+            totalItems={ticketsPagination.totalItems}
+            pageSize={ticketsPagination.pageSize}
+            onPageChange={ticketsPagination.setPage}
+          />
         </div>
       )}
 

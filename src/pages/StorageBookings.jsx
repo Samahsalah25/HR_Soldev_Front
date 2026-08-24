@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { Search, Eye, X, FileText } from "lucide-react";
+import { Search, Eye, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   getRentals,
   RENTAL_STATE_AR,
 } from "@/api/storageRentalsApi";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
   draft: "bg-gray-100 text-gray-600",
@@ -96,6 +98,7 @@ export default function StorageBookings() {
 
   // الـ API بيعمل filter بـ state و search — بس نستخدم bookings مباشرة
   const filtered = bookings;
+  const bookingsPagination = usePagination(filtered, 20);
 
   const stats = Object.entries(RENTAL_STATE_AR).map(([k, v]) => ({
     key: k, label: v,
@@ -142,7 +145,7 @@ export default function StorageBookings() {
           <tbody>
             {loading ? <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد حجوزات</td></tr>
-                : filtered.map(b => (
+                : bookingsPagination.pageItems.map(b => (
                   <tr key={b.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3 font-mono text-xs">#{b.id}</td>
                     <td className="px-4 py-3">
@@ -165,6 +168,13 @@ export default function StorageBookings() {
                 ))}
           </tbody>
         </table>
+        <TablePagination
+          page={bookingsPagination.page}
+          totalPages={bookingsPagination.totalPages}
+          totalItems={bookingsPagination.totalItems}
+          pageSize={bookingsPagination.pageSize}
+          onPageChange={bookingsPagination.setPage}
+        />
       </div>
       {selected && <BookingDetail booking={selected} onClose={() => setSelected(null)} />}
     </div>

@@ -11,6 +11,8 @@ import {
 } from "@/api/departmentsApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
   "قيد الاعتماد": "bg-amber-100 text-amber-700",
@@ -426,6 +428,8 @@ const [selectedBonus, setSelectedBonus] = useState(null);
       ),
   };
 
+  const bonusesPagination = usePagination(displayed, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
       <div className="flex items-center justify-between">
@@ -489,7 +493,7 @@ const [selectedBonus, setSelectedBonus] = useState(null);
           <tbody>
             {loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : displayed.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مكافآت</td></tr>
-                : displayed.map(b => (
+                : bonusesPagination.pageItems.map(b => (
                   <tr key={b.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${b.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{b.employee_name || "—"}</p>
@@ -524,6 +528,13 @@ const [selectedBonus, setSelectedBonus] = useState(null);
                 ))}
           </tbody>
         </table>
+        <TablePagination
+          page={bonusesPagination.page}
+          totalPages={bonusesPagination.totalPages}
+          totalItems={bonusesPagination.totalItems}
+          pageSize={bonusesPagination.pageSize}
+          onPageChange={bonusesPagination.setPage}
+        />
       </div>
 {showPayConfirm && (
   <div

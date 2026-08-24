@@ -1,10 +1,11 @@
 import { useState, useEffect, Fragment } from "react";
-import { Shield, Search, Check, Save, RotateCcw, Loader2 } from "lucide-react";
+import { Shield, Search, Loader2 } from "lucide-react";
 import RolesBatchEditor from "../components/permissions/RolesBatchEditor";
 import CrudPermissionsEditor from "../components/permissions/CrudPermissionsEditor";
 import AuditLogViewer from "../components/permissions/AuditLogViewer";
-import { PERMISSION_MODULES } from "@/api/permissionsApi";
 import { getEmployeesList } from "@/api/employeesApi";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 // أدوار النظام بالظبط كما يرجعها الـ API
 const ROLE_OPTIONS = [
@@ -56,6 +57,7 @@ export default function Permissions() {
     const email = emp.work_email || emp.email || "";
     return name.includes(search) || email.includes(search);
   });
+  const employeesPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -132,7 +134,7 @@ export default function Permissions() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((emp) => {
+                  employeesPagination.pageItems.map((emp) => {
                     const empId = emp.id;
                     const empName = emp.name_ar || emp.name_en || emp.name || emp.full_name || "—";
                     const empEmail = emp.work_email || emp.email || "—";
@@ -207,6 +209,13 @@ export default function Permissions() {
                 )}
               </tbody>
             </table>
+            <TablePagination
+              page={employeesPagination.page}
+              totalPages={employeesPagination.totalPages}
+              totalItems={employeesPagination.totalItems}
+              pageSize={employeesPagination.pageSize}
+              onPageChange={employeesPagination.setPage}
+            />
           </div>
         </div>
       )}

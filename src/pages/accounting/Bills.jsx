@@ -22,6 +22,8 @@ import { getJournals, getPurchaseJournals, getPaymentJournals, getPaymentTerms, 
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancel: "ملغي", cancelled: "ملغي" };
 
@@ -779,6 +781,7 @@ export default function Bills() {
   useEffect(() => { load(); }, []);
 
   const total = bills.reduce((s, b) => s + (b.amount_untaxed || 0), 0);
+  const billsPagination = usePagination(bills, 20);
 
   const openCreate = () => { setEditBill(null); setShowForm(true); };
   const openEditForm = (fullBill) => {
@@ -842,7 +845,7 @@ export default function Bills() {
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
             ) : bills.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد فواتير موردين بعد</td></tr>
-            ) : bills.map((b) => {
+            ) : billsPagination.pageItems.map((b) => {
               const ps = PAYMENT_STATUS[b.payment_state] || PAYMENT_STATUS.not_paid;
               return (
                 <tr key={b.id} onClick={() => setSelectedId(b.id)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
@@ -867,6 +870,13 @@ export default function Bills() {
             </tr>
           </tfoot>
         </table>
+        <TablePagination
+          page={billsPagination.page}
+          totalPages={billsPagination.totalPages}
+          totalItems={billsPagination.totalItems}
+          pageSize={billsPagination.pageSize}
+          onPageChange={billsPagination.setPage}
+        />
       </div>
 
       {showForm && (

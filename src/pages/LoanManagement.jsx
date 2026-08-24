@@ -24,6 +24,8 @@ import {
 import {
   getEmployees,
 } from "@/api/departmentsApi";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 // ─── Employee View ───────────────────────────────────────────────────
 function EmployeeView({ employee, loans, applications }) {
@@ -34,6 +36,7 @@ function EmployeeView({ employee, loans, applications }) {
   const myLoans = loans.filter(l => l.employee_id === employee?.id);
   const activeLoans = myLoans.filter(l => l.status === "نشطة");
   const totalRemaining = activeLoans.reduce((s, l) => s + (l.remaining_amount || 0), 0);
+  const myAppsPagination = usePagination(myApps, 20);
 
   const openDetail = async (loan) => {
     const reps = await base44.entities.LoanRepayment.filter({ loan_id: loan.id });
@@ -115,7 +118,7 @@ function EmployeeView({ employee, loans, applications }) {
                 ))}
               </tr></thead>
               <tbody>
-                {myApps.map(a => (
+                {myAppsPagination.pageItems.map(a => (
                   <tr key={a.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-3 font-bold text-foreground">{formatCurrency(a.amount)}</td>
                     <td className="px-4 py-3 text-center text-muted-foreground">{a.installments}</td>
@@ -126,6 +129,13 @@ function EmployeeView({ employee, loans, applications }) {
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              page={myAppsPagination.page}
+              totalPages={myAppsPagination.totalPages}
+              totalItems={myAppsPagination.totalItems}
+              pageSize={myAppsPagination.pageSize}
+              onPageChange={myAppsPagination.setPage}
+            />
           </div>
         )}
       </div>
@@ -145,6 +155,7 @@ function ManagerView({ applications, employees, user, role, onAction }) {
     a.status === "انتظار موافقة المدير" ||
     (a.status === "قيد المراجعة")
   );
+  const pendingPagination = usePagination(pending, 20);
 
   return (
     <div className="space-y-4">
@@ -165,7 +176,7 @@ function ManagerView({ applications, employees, user, role, onAction }) {
               ))}
             </tr></thead>
             <tbody>
-              {pending.map(app => (
+              {pendingPagination.pageItems.map(app => (
                 <tr key={app.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">{app.employee_name}</p>
@@ -189,6 +200,13 @@ function ManagerView({ applications, employees, user, role, onAction }) {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={pendingPagination.page}
+            totalPages={pendingPagination.totalPages}
+            totalItems={pendingPagination.totalItems}
+            pageSize={pendingPagination.pageSize}
+            onPageChange={pendingPagination.setPage}
+          />
         </div>
       )}
     </div>
@@ -203,6 +221,9 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
   const activeLoans = loans.filter(l => l.status === "نشطة");
   const totalRemaining = activeLoans.reduce((s, l) => s + (l.remaining_amount || 0), 0);
   const totalMonthly = activeLoans.reduce((s, l) => s + (l.monthly_deduction || 0), 0);
+  const waitingFinancePagination = usePagination(waitingFinance, 20);
+  const approvedPagination = usePagination(approved, 20);
+  const activeLoansPagination = usePagination(activeLoans, 20);
 
   return (
     <div className="space-y-5">
@@ -232,7 +253,7 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
                 ))}
               </tr></thead>
               <tbody>
-                {waitingFinance.map(app => (
+                {waitingFinancePagination.pageItems.map(app => (
                   <tr key={app.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3"><p className="font-medium">{app.employee_name}</p><p className="text-xs text-muted-foreground">{app.department}</p></td>
                     <td className="px-4 py-3 font-bold">{formatCurrency(app.amount)}</td>
@@ -250,6 +271,13 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              page={waitingFinancePagination.page}
+              totalPages={waitingFinancePagination.totalPages}
+              totalItems={waitingFinancePagination.totalItems}
+              pageSize={waitingFinancePagination.pageSize}
+              onPageChange={waitingFinancePagination.setPage}
+            />
           </div>
         </div>
       )}
@@ -266,7 +294,7 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
                 ))}
               </tr></thead>
               <tbody>
-                {approved.map(app => (
+                {approvedPagination.pageItems.map(app => (
                   <tr key={app.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-3"><p className="font-medium">{app.employee_name}</p></td>
                     <td className="px-4 py-3 font-bold text-teal-600">{formatCurrency(app.amount)}</td>
@@ -279,6 +307,13 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              page={approvedPagination.page}
+              totalPages={approvedPagination.totalPages}
+              totalItems={approvedPagination.totalItems}
+              pageSize={approvedPagination.pageSize}
+              onPageChange={approvedPagination.setPage}
+            />
           </div>
         </div>
       )}
@@ -296,7 +331,7 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
             <tbody>
               {activeLoans.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">لا توجد سلف نشطة</td></tr>
-              ) : activeLoans.map(l => (
+              ) : activeLoansPagination.pageItems.map(l => (
                 <tr key={l.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3"><p className="font-medium">{l.employee_name}</p><p className="text-xs text-muted-foreground">{l.department}</p></td>
                   <td className="px-4 py-3 font-bold">{formatCurrency(l.amount)}</td>
@@ -307,6 +342,13 @@ function FinanceView({ applications, loans, onAction, onDisbUrse }) {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={activeLoansPagination.page}
+            totalPages={activeLoansPagination.totalPages}
+            totalItems={activeLoansPagination.totalItems}
+            pageSize={activeLoansPagination.pageSize}
+            onPageChange={activeLoansPagination.setPage}
+          />
         </div>
       </div>
     </div>
@@ -320,6 +362,8 @@ function FullView({ applications, loans, employees, user, role, onAction, onDisb
     .filter(a => !filterStatus || a.status === filterStatus)
     .filter(a => !search || a.employee_name?.includes(search) || a.loan_type_name?.includes(search));
   const activeLoans = loans.filter(l => l.status === "نشطة");
+  const filteredAppsPagination = usePagination(filteredApps, 20);
+  const activeLoansPagination = usePagination(activeLoans, 20);
 
   const [activeTab, setActiveTab] = useState("applications");
 
@@ -619,7 +663,7 @@ if (app.apiState === "draft") {
             <tbody>
               {filteredApps.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد طلبات</td></tr>
-              ) : filteredApps.map(app => {
+              ) : filteredAppsPagination.pageItems.map(app => {
                 
                 const actions = getActions(app);
                 return (
@@ -647,6 +691,13 @@ if (app.apiState === "draft") {
               })}
             </tbody>
           </table>
+          <TablePagination
+            page={filteredAppsPagination.page}
+            totalPages={filteredAppsPagination.totalPages}
+            totalItems={filteredAppsPagination.totalItems}
+            pageSize={filteredAppsPagination.pageSize}
+            onPageChange={filteredAppsPagination.setPage}
+          />
         </div>
       )}
 
@@ -665,7 +716,7 @@ if (app.apiState === "draft") {
             <tbody>
               {activeLoans.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد سلف نشطة</td></tr>
-              ) : activeLoans.map(l => {
+              ) : activeLoansPagination.pageItems.map(l => {
                 const progress = l.amount > 0 ? Math.round(((l.paid_amount || 0) / l.amount) * 100) : 0;
                 return (
                   <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
@@ -692,6 +743,13 @@ if (app.apiState === "draft") {
               })}
             </tbody>
           </table>
+          <TablePagination
+            page={activeLoansPagination.page}
+            totalPages={activeLoansPagination.totalPages}
+            totalItems={activeLoansPagination.totalItems}
+            pageSize={activeLoansPagination.pageSize}
+            onPageChange={activeLoansPagination.setPage}
+          />
         </div>
       )}
     </div>

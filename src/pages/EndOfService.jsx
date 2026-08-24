@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Calculator, TrendingDown, CheckCircle, Info } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, formatCurrency } from "../lib/hrUtils";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const TERMINATION_TYPES = [
   "إنهاء من صاحب العمل",
@@ -43,6 +45,9 @@ export default function EndOfService() {
       total,
     });
   };
+
+  const activeEmployees = employees.filter(e => e.status !== "مُنهي الخدمة");
+  const eosPagination = usePagination(activeEmployees, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-4xl mx-auto" dir="rtl">
@@ -176,7 +181,7 @@ export default function EndOfService() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-              ) : employees.filter(e => e.status !== "مُنهي الخدمة").map(emp => {
+              ) : eosPagination.pageItems.map(emp => {
                 const years = emp.join_date ? calcServiceYears(emp.join_date) : 0;
                 const totalEOS = (emp.basic_salary || 0) * years;
                 const monthlyProv = (emp.basic_salary || 0) / 12;
@@ -197,6 +202,13 @@ export default function EndOfService() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={eosPagination.page}
+          totalPages={eosPagination.totalPages}
+          totalItems={eosPagination.totalItems}
+          pageSize={eosPagination.pageSize}
+          onPageChange={eosPagination.setPage}
+        />
       </div>
     </div>
   );

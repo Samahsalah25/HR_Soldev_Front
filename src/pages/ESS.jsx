@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, CalendarDays, DollarSign, Clock, Send, FileText, AlertTriangle, CheckCircle, ShieldAlert, ExternalLink, BookOpen, Briefcase, CreditCard, ClipboardList, Lock, Eye, EyeOff  ,Download} from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { User, CalendarDays, DollarSign, Clock, FileText, AlertTriangle, CheckCircle, ShieldAlert, ExternalLink, BookOpen, Briefcase, CreditCard, ClipboardList, Lock, Download } from "lucide-react";
 import { formatCurrency, calcPayslip, getLeaveEntitlement, calcServiceYears, calcAutoLeaveBalance } from "../lib/hrUtils";
 import {
   getPortalOverview,
@@ -19,6 +18,8 @@ import {
                createPortalVacation ,
                changePassword
 } from "@/api/portalService";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 const LEAVE_TYPES_CONFIG = {
   "سنوية":      { usesBalance: true,  maxDays: null },
   "مرضية":      { usesBalance: false, maxDays: 120 },
@@ -387,6 +388,12 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
   }
 };
 
+  const leavesPagination = usePagination(myLeaves, 20);
+  const attendancePagination = usePagination(myAttendance, 20);
+  const custodiesPagination = usePagination(myCustodies, 20);
+  const requestsPagination = usePagination(myRequests, 20);
+  const violationsPagination = usePagination(myViolations, 20);
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -595,7 +602,7 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
               </td>
             </tr>
           ) : (
-            myLeaves.map((l) => (
+            leavesPagination.pageItems.map((l) => (
               <tr key={l.id} className="border-b border-border hover:bg-muted/20">
 
                 <td className="px-4 py-3 font-medium">
@@ -638,6 +645,13 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
           )}
         </tbody>
       </table>
+      <TablePagination
+        page={leavesPagination.page}
+        totalPages={leavesPagination.totalPages}
+        totalItems={leavesPagination.totalItems}
+        pageSize={leavesPagination.pageSize}
+        onPageChange={leavesPagination.setPage}
+      />
     </div>
 
   </div>
@@ -738,7 +752,7 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
             </td>
           </tr>
         ) : (
-          myAttendance.map((r) => (
+          attendancePagination.pageItems.map((r) => (
             <tr
               key={r.id}
               className="border-b border-border last:border-0 hover:bg-muted/20"
@@ -785,6 +799,13 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
         )}
       </tbody>
     </table>
+    <TablePagination
+      page={attendancePagination.page}
+      totalPages={attendancePagination.totalPages}
+      totalItems={attendancePagination.totalItems}
+      pageSize={attendancePagination.pageSize}
+      onPageChange={attendancePagination.setPage}
+    />
   </div>
 )}
 
@@ -894,7 +915,7 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
             </td>
           </tr>
         ) : (
-          myCustodies.map((c) => {
+          custodiesPagination.pageItems.map((c) => {
             const isActive = c.state === "used";
 
             return (
@@ -950,6 +971,13 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
         )}
       </tbody>
     </table>
+    <TablePagination
+      page={custodiesPagination.page}
+      totalPages={custodiesPagination.totalPages}
+      totalItems={custodiesPagination.totalItems}
+      pageSize={custodiesPagination.pageSize}
+      onPageChange={custodiesPagination.setPage}
+    />
   </div>
 )}
       {activeTab === "loans" && (
@@ -1042,7 +1070,7 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
             </td>
           </tr>
         ) : (
-          myRequests.map((r) => (
+          requestsPagination.pageItems.map((r) => (
             <tr
               key={r.id}
               className="border-b border-border last:border-0 hover:bg-muted/20"
@@ -1087,6 +1115,13 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
         )}
       </tbody>
     </table>
+    <TablePagination
+      page={requestsPagination.page}
+      totalPages={requestsPagination.totalPages}
+      totalItems={requestsPagination.totalItems}
+      pageSize={requestsPagination.pageSize}
+      onPageChange={requestsPagination.setPage}
+    />
   </div>
 )}
 
@@ -1113,7 +1148,7 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
         </thead>
 
         <tbody>
-          {myViolations.map(v => (
+          {violationsPagination.pageItems.map(v => (
             <tr
               key={v.id}
               className="border-b border-border last:border-0 hover:bg-muted/20"
@@ -1160,6 +1195,13 @@ const mappedLeaves = (lvs?.data || []).map((l) => ({
         </tbody>
       </table>
     )}
+    <TablePagination
+      page={violationsPagination.page}
+      totalPages={violationsPagination.totalPages}
+      totalItems={violationsPagination.totalItems}
+      pageSize={violationsPagination.pageSize}
+      onPageChange={violationsPagination.setPage}
+    />
   </div>
 )}
 {activeTab === "password" && (

@@ -50,12 +50,40 @@ export async function deleteJournal(id) {
 
 /**
  * GET /accounting/journals/:id/payment-methods
- * جلب طرق الدفع المتاحة لدفتر يومية معيّن (Incoming/Outgoing)
- * بترجع IDs تستخدم في inbound_payment_method_line_ids و outbound_payment_method_line_ids
+ * جلب طرق الدفع الخاصة بدفتر يومية معيّن (متسجل بالفعل وله ID حقيقي)
+ *
+ * شكل الرد:
+ * {
+ *   success: true,
+ *   data: {
+ *     inbound_methods: [{ id, name }],
+ *     outbound_methods: [{ id, name }]
+ *   }
+ * }
  */
 export async function getJournalPaymentMethods(journalId) {
   const res = await journalsApi.get(`/accounting/journals/${journalId}/payment-methods`);
-  return res.data?.payment_methods || res.data;
+  return {
+    inbound: res.data?.data?.inbound_methods || [],
+    outbound: res.data?.data?.outbound_methods || [],
+  };
+}
+
+/**
+ * GET /accounting/payment-methods
+ * طرق الدفع العامة على مستوى النظام (Manual Payment inbound/outbound...)
+ * تُستخدم للدفتر الجديد اللي لسه ماتسجلش (قبل ما يبقى له ID حقيقي)
+ *
+ * شكل الرد:
+ * { success: true, payment_methods: [{ id, name, code, payment_type: "inbound" | "outbound" }] }
+ */
+export async function getGeneralPaymentMethods() {
+  const res = await journalsApi.get("/accounting/payment-methods");
+  const all = res.data?.payment_methods || [];
+  return {
+    inbound: all.filter((m) => m.payment_type === "inbound"),
+    outbound: all.filter((m) => m.payment_type === "outbound"),
+  };
 }
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -76,42 +104,9 @@ export async function getAccounts(params = {}) {
 }
 
 /**
- * حسابات الإيرادات (account_type = income) — تُستخدم في:
- * - income_account (دفاتر المبيعات)
- * - profit_account (دفاتر النقدية/البنك)
- */
-export async function getIncomeAccounts(search = "") {
-  return getAccounts({ account_type: "income", search });
-}
-
-/**
- * حسابات المصروفات (account_type = expense) — تُستخدم في:
- * - expense_account (دفاتر المشتريات)
- * - loss_account (دفاتر النقدية/البنك)
- */
-export async function getExpenseAccounts(search = "") {
-  return getAccounts({ account_type: "expense", search });
-}
-
-/**
- * حسابات الأصول المتداولة (account_type = asset_current) — تُستخدم في:
- * - suspense_account (الحساب المعلق لدفاتر النقدية/البنك)
- */
-export async function getCurrentAssetAccounts(search = "") {
-  return getAccounts({ account_type: "asset_current", search });
-}
-
-/**
- * حسابات البنك/الصندوق (account_type = asset_cash) — تُستخدم في:
- * - cash_bank_account (حساب الدفتر نفسه لدفاتر cash/bank/credit_card)
- */
-export async function getBankAndCashAccounts(search = "") {
-  return getAccounts({ account_type: "asset_cash", search });
-}
-
-/**
- * كل الحسابات (بدون فلترة نوع) — تُستخدم في:
- * - allowed_accounts (Access Control) في تاب الإعدادات المتقدمة
+ * كل الحسابات (بدون فلترة نوع) — بنفلتر client-side جوه الفورم
+ * تُستخدم في: allowed_accounts (Access Control)، وأيضًا كمصدر عام لكل الـ dropdowns
+ * بما فيها حسابات "Outstanding Receipts/Payments" (account_type = asset_current)
  */
 export async function getAllAccounts(search = "") {
   return getAccounts({ search });

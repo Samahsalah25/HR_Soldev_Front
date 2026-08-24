@@ -24,10 +24,13 @@ export const PERMISSION_MODULES = [
     { key: "end_of_service", label: "إنهاء الخدمة", group: "الموارد البشرية" },
 
     // المالية
-    { key: "salaries", label: "الرواتب والتأمينات", group: "المالية" },
-    { key: "accounting", label: "نظام الحسابات", group: "المالية" },
-    { key: "financial_reports", label: "التقارير المالية", group: "المالية" },
+   // المالية
+{ key: "salaries", label: "الرواتب والتأمينات", group: "المالية" },
+{ key: "accounting", label: "نظام الحسابات", group: "المالية" },
+{ key: "financial_reports", label: "التقارير المالية", group: "المالية" },
 
+// إعدادات المالية
+{ key: "journals", label: "دفاتر اليومية", group: "إعدادات المالية" },
     // التشغيل
     { key: "tasks", label: "المهام", group: "التشغيل" },
     { key: "requests", label: "طلبات الموظفين", group: "التشغيل" },

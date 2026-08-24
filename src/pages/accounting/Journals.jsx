@@ -15,6 +15,7 @@ import {
   updateJournal,
   deleteJournal,
   getJournalPaymentMethods,
+  getGeneralPaymentMethods,
   getAllAccounts,
 } from "../../api/Journalsapi";
 
@@ -73,8 +74,9 @@ const EMPTY_JOURNAL = {
   auto_check_on_post: true,         // autocheck_on_post
   invoice_reference_type: "invoice",
   invoice_reference_model: "odoo",
-  inbound_payment_method_line_ids: [],
-  outbound_payment_method_line_ids: [],
+  // كل سطر: { payment_method_id, name, payment_account_id }
+  inbound_payment_lines: [],
+  outbound_payment_lines: [],
 };
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -108,8 +110,16 @@ function apiJournalToForm(j) {
     auto_check_on_post: j.autocheck_on_post ?? true,
     invoice_reference_type: j.invoice_reference_type || "invoice",
     invoice_reference_model: j.invoice_reference_model || "odoo",
-    inbound_payment_method_line_ids: (j.inbound_payment_methods || []).map((m) => m.id ?? m),
-    outbound_payment_method_line_ids: (j.outbound_payment_methods || []).map((m) => m.id ?? m),
+    inbound_payment_lines: (j.inbound_payment_methods || []).map((m) => ({
+      payment_method_id: m.payment_method_id ?? m.id,
+      name: m.name || "",
+      payment_account_id: m.payment_account_id || null,
+    })),
+    outbound_payment_lines: (j.outbound_payment_methods || []).map((m) => ({
+      payment_method_id: m.payment_method_id ?? m.id,
+      name: m.name || "",
+      payment_account_id: m.payment_account_id || null,
+    })),
   };
 }
 
@@ -147,8 +157,16 @@ function formToPayload(form) {
   if (hasPayments) {
     payload.payment_sequence = form.dedicated_sequence;
     payload.suspense_account_id = form.suspense_account_id || false;
-    payload.inbound_payment_method_line_ids = form.inbound_payment_method_line_ids;
-    payload.outbound_payment_method_line_ids = form.outbound_payment_method_line_ids;
+
+  payload.inbound_payment_method_line_ids = form.inbound_payment_lines.map((l) => ({
+  payment_method_id: l.payment_method_id,
+  payment_account_id: l.payment_account_id || false,
+}));
+
+payload.outbound_payment_method_line_ids = form.outbound_payment_lines.map((l) => ({
+  payment_method_id: l.payment_method_id,
+  payment_account_id: l.payment_account_id || false,
+}));
   }
 
   if (form.type === "cash") {
@@ -170,11 +188,21 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
-  const [paymentMethods, setPaymentMethods] = useState([]); // [{id, name, is_inbound/outbound...}]
+  const [paymentMethods, setPaymentMethods] = useState({ inbound: [], outbound: [] });
   const [tab, setTab] = useState("entries");
 
   const hasPayments = PAYMENT_CAPABLE_TYPES.includes(form.type);
   const isSaleOrPurchase = form.type === "sale" || form.type === "purchase";
+
+  const outstandingReceiptsAccounts = accounts.filter(
+  (a) => a.account_type === "asset_current"
+);
+
+const outstandingPaymentsAccounts = accounts.filter(
+  (a) =>
+    a.account_type === "asset_current" ||
+    a.account_type === "liability_current"
+);
 
   // جلب بيانات الدفتر عند التعديل
   useEffect(() => {
@@ -193,17 +221,20 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
     };
   }, [isEdit, journalId]);
 
-  // جلب طرق الدفع المتاحة لما الدفتر يدعم دفعات
+  // جلب طرق الدفع المتاحة (اللي ممكن تتضاف):
+  // - دفتر جديد (لسه ماتسجلش) → طرق الدفع العامة /accounting/payment-methods
+  // - دفتر متسجل بالفعل → طرق الدفع الخاصة بيه /journals/:id/payment-methods
   useEffect(() => {
     if (!hasPayments) return;
     let alive = true;
-    getJournalPaymentMethods(journalId || "new")
-      .then((res) => alive && setPaymentMethods(Array.isArray(res) ? res : res?.methods || []))
-      .catch(() => alive && setPaymentMethods([]));
+    const request = isEdit ? getJournalPaymentMethods(journalId) : getGeneralPaymentMethods();
+    request
+      .then((res) => alive && setPaymentMethods(res))
+      .catch(() => alive && setPaymentMethods({ inbound: [], outbound: [] }));
     return () => {
       alive = false;
     };
-  }, [hasPayments, journalId]);
+  }, [hasPayments, isEdit, journalId]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -215,10 +246,26 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
         : [...f.allowed_accounts, id],
     }));
 
-  const togglePaymentMethod = (key, id) =>
+  // إضافة/حذف/تعديل سطر طريقة دفع (Incoming أو Outgoing)
+  const addPaymentLine = (linesKey, method) =>
+    setForm((f) => {
+      if (f[linesKey].some((l) => l.payment_method_id === method.id)) return f;
+      return {
+        ...f,
+        [linesKey]: [
+          ...f[linesKey],
+          { payment_method_id: method.id, name: method.name, payment_account_id: null },
+        ],
+      };
+    });
+
+  const removePaymentLine = (linesKey, idx) =>
+    setForm((f) => ({ ...f, [linesKey]: f[linesKey].filter((_, i) => i !== idx) }));
+
+  const setPaymentLineAccount = (linesKey, idx, accId) =>
     setForm((f) => ({
       ...f,
-      [key]: f[key].includes(id) ? f[key].filter((x) => x !== id) : [...f[key], id],
+      [linesKey]: f[linesKey].map((l, i) => (i === idx ? { ...l, payment_account_id: accId } : l)),
     }));
 
   const tabs = [
@@ -276,6 +323,96 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
       </select>
     </div>
   );
+
+  // جدول طرق الدفع لتاب معيّن (Incoming أو Outgoing)
+  const renderPaymentMethodsTable = (tabId) => {
+    const linesKey = tabId === "incoming" ? "inbound_payment_lines" : "outbound_payment_lines";
+    const availableKey = tabId === "incoming" ? "inbound" : "outbound";
+    const available = paymentMethods[availableKey] || [];
+   const lines = form[linesKey];
+
+const notAdded = available.filter(
+  (m) => !lines.some((l) => l.payment_method_id === m.id)
+);
+
+const outstandingAccounts =
+  tabId === "incoming"
+    ? outstandingReceiptsAccounts
+    : outstandingPaymentsAccounts;
+    return (
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-right px-3 py-2 font-medium text-gray-500">طريقة الدفع</th>
+              <th className="text-right px-3 py-2 font-medium text-gray-500">
+                {tabId === "incoming" ? "حساب الإيصالات المعلقة" : "حساب الدفعات المعلقة"}
+              </th>
+              <th className="px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {lines.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="text-center py-4 text-gray-400">
+                  لا توجد طرق دفع مضافة
+                </td>
+              </tr>
+            ) : (
+              lines.map((l, i) => (
+                <tr key={l.payment_method_id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-3 py-2 text-gray-700">{l.name}</td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={l.payment_account_id ?? ""}
+                      onChange={(e) =>
+                        setPaymentLineAccount(linesKey, i, e.target.value ? Number(e.target.value) : null)
+                      }
+                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-200"
+                    >
+                      <option value="">اختر الحساب...</option>
+                      {outstandingAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {accountLabel(a)}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-2">
+                    <button
+                      onClick={() => removePaymentLine(linesKey, i)}
+                      className="p-1 hover:bg-red-50 text-red-400 rounded"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        {notAdded.length > 0 && (
+          <div className="px-3 py-2 border-t border-gray-100">
+            <select
+              value=""
+              onChange={(e) => {
+                const m = available.find((x) => x.id === Number(e.target.value));
+                if (m) addPaymentLine(linesKey, m);
+              }}
+              className="text-xs text-orange-600 font-medium border-0 bg-transparent focus:outline-none cursor-pointer"
+            >
+              <option value="">+ إضافة طريقة دفع...</option>
+              {notAdded.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -394,7 +531,11 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
                 )}
                 {form.type === "cash" && (
                   <>
-                    {accountSelect("حساب الأرباح", "profit_account_id", (a) => a.account_type === "income")}
+                    {accountSelect(
+                      "حساب الأرباح",
+                      "profit_account_id",
+                      (a) => a.account_type === "income" || a.account_type === "income_other"
+                    )}
                     {accountSelect("حساب الخسائر", "loss_account_id", (a) => a.account_type === "expense")}
                   </>
                 )}
@@ -428,32 +569,8 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
         )}
 
         {/* ── الدفعات الواردة / الصادرة ─────────────────────────── */}
-        {(tab === "incoming" || tab === "outgoing") && hasPayments && (
-          <div className="pt-2 space-y-2">
-            {paymentMethods.length === 0 ? (
-              <p className="text-sm text-gray-400">لا توجد طرق دفع متاحة</p>
-            ) : (
-              paymentMethods.map((m) => {
-                const key = tab === "incoming" ? "inbound_payment_method_line_ids" : "outbound_payment_method_line_ids";
-                const checked = form[key].includes(m.id);
-                return (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => togglePaymentMethod(key, m.id)}
-                      className="w-4 h-4 accent-orange-500"
-                    />
-                    <span className="text-sm text-gray-700">{m.name}</span>
-                  </label>
-                );
-              })
-            )}
-          </div>
-        )}
+        {tab === "incoming" && hasPayments && <div className="pt-2">{renderPaymentMethodsTable("incoming")}</div>}
+        {tab === "outgoing" && hasPayments && <div className="pt-2">{renderPaymentMethodsTable("outgoing")}</div>}
 
         {/* ── إعدادات متقدمة ────────────────────────────────────── */}
         {tab === "advanced" && (

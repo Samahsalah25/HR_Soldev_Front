@@ -173,11 +173,30 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
+  // TODO: راجع القيمتين دول لو عندك منطق حقيقي محتاج يتحط هنا لاحقاً
+  // isLoadingPublicSettings: كان بيتحقق من إعدادات عامة من base44 قبل كده.
+  // حاليًا مفيش إعدادات عامة بنجيبها من مكان تاني، فخليناها false دايمًا.
+  const [isLoadingPublicSettings] = useState(false);
+
+  // authError: بيتحدد لو حصل خطأ مصادقة (مثلاً توكن منتهي أو يوزر مش مسجل).
+  // حاليًا مفيش منطق فحص توكن تلقائي، فخليناها null دايمًا (الحماية الفعلية بتتم عن طريق ProtectedRoute.jsx)
+  const [authError] = useState(null);
+
+  // AuthProvider موجود برا <Router> في App.jsx، فمينفعش نستخدم useNavigate هنا.
+  // استخدمنا window.location.href بدل كده.
+  const navigateToLogin = () => {
+    window.location.href = "/login";
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
 
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (_) {
+        localStorage.removeItem("user");
+      }
     }
 
     setIsLoadingAuth(false);
@@ -195,7 +214,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoadingAuth }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isLoadingAuth,
+        isLoadingPublicSettings,
+        authError,
+        navigateToLogin,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Search, Package, History, CheckCircle, XCircle, Wrench, RotateCcw } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+
 import {
   getAssets, getEmployees, getCustodyRequests, getCustodyReturns,
   acceptCustodyRequest, rejectCustodyRequest,
@@ -9,6 +9,7 @@ import {
   requestStatusLabel, REQUEST_STATUS_COLORS,
 } from "@/api/assetsApi";
 import { useRole } from "../lib/useRole";
+import { useAuth } from "../lib/AuthContext";
 import AssetForm from "../components/assets/AssetForm";
 import AssetRequestModal from "../components/assets/AssetRequestModal";
 import AssetHistoryModal from "../components/assets/AssetHistoryModal";
@@ -32,7 +33,8 @@ const CONDITION_COLORS = {
 
 export default function AssetManagement() {
   const confirmDialog = useConfirm();
-  const { role } = useRole();
+const { role } = useRole();
+const { user, isLoadingAuth } = useAuth();
   const isAdminOrHR = ["admin", "hr"].includes(role);
 
   const [currentEmployee, setCurrentEmployee] = useState(null);
@@ -53,28 +55,30 @@ export default function AssetManagement() {
   const [receiveModal, setReceiveModal] = useState(null);
 
   // ── Load ────────────────────────────────────────────────────────────────────
-  const load = async () => {
-    setLoading(true);
-    try {
-      const me = await base44.auth.me();
-      const [a, reqs, rets, emps] = await Promise.all([
-        getAssets(),
-        getCustodyRequests(),
-        getCustodyReturns(),
-        getEmployees(),
-      ]);
-      const myEmp = emps.find(e => e.email === me?.email);
-      setCurrentEmployee(myEmp || null);
-      setAssets(Array.isArray(a) ? a : []);
-      setRequests(Array.isArray(reqs) ? reqs : []);
-      setReturns(Array.isArray(rets) ? rets : []);
-      setEmployees(emps);
-    } catch (err) {
-      console.error("Load assets error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const load = async () => {
+  setLoading(true);
+
+  try {
+    const [a, reqs, rets, emps] = await Promise.all([
+      getAssets(),
+      getCustodyRequests(),
+      getCustodyReturns(),
+      getEmployees(),
+    ]);
+
+    const myEmp = emps.find(e => e.email === user?.email);
+
+    setCurrentEmployee(myEmp || null);
+    setAssets(Array.isArray(a) ? a : []);
+    setRequests(Array.isArray(reqs) ? reqs : []);
+    setReturns(Array.isArray(rets) ? rets : []);
+    setEmployees(emps);
+  } catch (err) {
+    console.error("Load assets error:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { load(); }, []);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Save, AlertTriangle } from "lucide-react";
 import { createVacationRequest, getVacationYearlyBalance } from "@/api/requestsApi";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,6 +11,17 @@ const LEAVE_TYPES = {
   marriage: "زواج (حتى 5 أيام)",
   death: "وفاة (حتى 5 أيام)",
   plimsarage: "حج (حتى 10 أيام)",
+};
+
+// الحد الأقصى لكل نوع إجازة (حسب نظام العمل السعودي) — الإجازة السنوية ليها
+// رصيد خاص بالموظف بيتحقق منه لوحده، والإجازة بدون راتب مالهاش سقف أيام
+const LEAVE_TYPE_MAX_DAYS = {
+  sick_leaves: 120,
+  peternety: 70,
+  fatherly: 3,
+  marriage: 5,
+  death: 5,
+  plimsarage: 10,
 };
 
 export default function LeaveRequestModal({ employees, onSave, onClose }) {
@@ -33,7 +44,9 @@ export default function LeaveRequestModal({ employees, onSave, onClose }) {
     : 0;
 
   const isYearly = form.vacation_type === "yearly";
-  const overBalance = isYearly && leaveBalance !== null && days > leaveBalance;
+  const typeMaxDays = LEAVE_TYPE_MAX_DAYS[form.vacation_type] ?? null;
+  const overTypeCap = typeMaxDays !== null && days > typeMaxDays;
+  const overBalance = (isYearly && leaveBalance !== null && days > leaveBalance) || overTypeCap;
 
   // جلب رصيد الإجازة لما يختار موظف
   const handleEmpSelect = async (id) => {
@@ -73,6 +86,16 @@ export default function LeaveRequestModal({ employees, onSave, onClose }) {
   });
   return;
 }
+
+    // تحقق من الحد الأقصى لأنواع الإجازات الأخرى (مرضية/أمومة/أبوة/زواج/وفاة/حج)
+    if (overTypeCap) {
+      toast({
+        title: "تجاوز الحد الأقصى",
+        description: `الحد الأقصى لـ"${LEAVE_TYPES[form.vacation_type]}" هو ${typeMaxDays} يوم، والمطلوب ${days} يوم`,
+        variant: "destructive",
+      });
+      return;
+    }
 
 
     setSaving(true);
@@ -188,7 +211,14 @@ export default function LeaveRequestModal({ employees, onSave, onClose }) {
                   {days} يوم
                 </span>
               </div>
-              {overBalance && (
+              {overTypeCap ? (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                  <p className="text-xs text-red-600">
+                    الحد الأقصى لـ"{LEAVE_TYPES[form.vacation_type]}" هو {typeMaxDays} يوم
+                  </p>
+                </div>
+              ) : overBalance && (
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
                   <p className="text-xs text-red-600">

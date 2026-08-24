@@ -1,104 +1,122 @@
 import { useState, useEffect } from "react";
-import { Bell, X, AlertTriangle, FileWarning, CalendarDays, CheckCircle, UserX, CreditCard, Gift, MinusCircle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { Bell, X, AlertTriangle, FileWarning, CalendarDays, CheckCircle, CreditCard, Gift, MinusCircle } from "lucide-react";
+import { useRole } from "../lib/useRole";
 import { getExpiryStatus } from "../lib/hrUtils";
+import { getEmployeesList, normalizeEmployee } from "@/api/employeesApi";
+import { getAllVacationRequests } from "@/api/requestsApi";
+import { getUnderApprovalAdditions } from "@/api/additionsApi";
+import { getUnderApprovalDeductions } from "@/api/deductionsApi";
+import { getSalaryAdvances } from "@/api/salaryAdvancesApi";
 
-async function buildNotifications(role, userEmail) {
+// كل قسم بينفّذ لوحده جوّه try/catch — عشان فشل قسم واحد (زي endpoint لسه
+// مش متأكدين من شكله) ميوقفش باقي الإشعارات من الظهور
+async function buildNotifications(role, employeeId) {
   const notifs = [];
   const isHR = role === "admin" || role === "hr";
   const isManager = ["admin", "hr", "dept_manager", "general_manager", "ceo"].includes(role);
-  const isFinance = role === "admin" || role === "accountant";
-  const isIT = role === "admin" || role === "it";
   const isEmployee = role === "employee" || role === "user";
 
-  // ─── HR & Admin: وثائق منتهية + إجازات معلقة ───────────────────────
-  if (isHR) {
-    const [emps, leaves, terminations, loanApps, bonuses, deductions] = await Promise.all([
-      base44.entities.Employee.list(),
-      base44.entities.LeaveRequest.filter({ status: "قيد الانتظار" }),
-      base44.entities.TerminationRequest.list(),
-      base44.entities.LoanApplication.list(),
-      base44.entities.Bonus.filter({ status: "قيد الاعتماد" }),
-      base44.entities.Deduction.filter({ status: "قيد الاعتماد" }),
-    ]);
-
-    emps.forEach(emp => {
-      const idStatus = getExpiryStatus(emp.id_expiry);
-      if (idStatus && idStatus.days <= 90) {
-        notifs.push({ id: `id_${emp.id}`, type: idStatus.days <= 30 ? "danger" : "warning", icon: FileWarning, title: emp.is_saudi ? "هوية وطنية تستحق التجديد" : "إقامة تستحق التجديد", message: `${emp.full_name_ar} — ${idStatus.label}` });
-      }
-      const passStatus = getExpiryStatus(emp.passport_expiry);
-      if (passStatus && passStatus.days <= 90) {
-        notifs.push({ id: `pass_${emp.id}`, type: passStatus.days <= 30 ? "danger" : "warning", icon: FileWarning, title: "جواز سفر يستحق التجديد", message: `${emp.full_name_ar} — ${passStatus.label}` });
-      }
-      if (emp.contract_type === "محدد المدة" && emp.contract_end_date) {
-        const cStatus = getExpiryStatus(emp.contract_end_date);
-        if (cStatus && cStatus.days <= 60) {
-          notifs.push({ id: `contract_${emp.id}`, type: cStatus.days <= 30 ? "danger" : "warning", icon: AlertTriangle, title: "عقد عمل يقترب من الانتهاء", message: `${emp.full_name_ar} — ${cStatus.label}` });
+  // ─── وثائق منتهية (إقامة/هوية، جواز، عقود محددة المدة) — لكل الأدوار
+  // الإدارية (HR ومديرين) عشان محدش يفوّته ───────────────────────────
+  if (isManager) {
+    try {
+      const emps = (await getEmployeesList()).map(normalizeEmployee);
+      emps.forEach((emp) => {
+        const idStatus = getExpiryStatus(emp.id_expiry);
+        if (idStatus && idStatus.days <= 90) {
+          notifs.push({
+            id: `id_${emp.id}`,
+            type: idStatus.days <= 7 ? "danger" : idStatus.days <= 30 ? "danger" : "warning",
+            icon: FileWarning,
+            title: emp.is_saudi ? "هوية وطنية تستحق التجديد" : "إقامة تستحق التجديد",
+            message: `${emp.full_name_ar || emp.name} — ${idStatus.label}`,
+          });
         }
-      }
-    });
-
-    if (leaves.length > 0) notifs.push({ id: "pending_leaves", type: "info", icon: CalendarDays, title: "طلبات إجازة بانتظار الموافقة", message: `${leaves.length} طلب في قائمة الانتظار` });
-
-    const pendingTerminations = terminations.filter(t => ["Pending HR Review", "Final Approval"].includes(t.status));
-    if (pendingTerminations.length > 0) notifs.push({ id: "terminations_hr", type: "warning", icon: UserX, title: "طلبات إنهاء خدمة تنتظر HR", message: `${pendingTerminations.length} طلب يحتاج مراجعتك` });
-
-    const pendingLoans = loanApps.filter(a => a.status === "انتظار موافقة HR");
-    if (pendingLoans.length > 0) notifs.push({ id: "loans_hr", type: "info", icon: CreditCard, title: "طلبات سلفة تنتظر موافقة HR", message: `${pendingLoans.length} طلب` });
-
-    if (bonuses.length > 0) notifs.push({ id: "bonuses_pending", type: "info", icon: Gift, title: "مكافآت قيد الاعتماد", message: `${bonuses.length} مكافأة تحتاج موافقة` });
-    if (deductions.length > 0) notifs.push({ id: "deductions_pending", type: "warning", icon: MinusCircle, title: "خصومات قيد الاعتماد", message: `${deductions.length} خصم يحتاج مراجعة` });
+        const passStatus = getExpiryStatus(emp.passport_expiry);
+        if (passStatus && passStatus.days <= 90) {
+          notifs.push({
+            id: `pass_${emp.id}`,
+            type: passStatus.days <= 30 ? "danger" : "warning",
+            icon: FileWarning,
+            title: "جواز سفر يستحق التجديد",
+            message: `${emp.full_name_ar || emp.name} — ${passStatus.label}`,
+          });
+        }
+        if (emp.contract_type === "محدد المدة" && emp.contract_end_date) {
+          const cStatus = getExpiryStatus(emp.contract_end_date);
+          if (cStatus && cStatus.days <= 60) {
+            notifs.push({
+              id: `contract_${emp.id}`,
+              type: cStatus.days <= 30 ? "danger" : "warning",
+              icon: AlertTriangle,
+              title: "عقد عمل يقترب من الانتهاء",
+              message: `${emp.full_name_ar || emp.name} — ${cStatus.label}`,
+            });
+          }
+        }
+      });
+    } catch (err) {
+      console.error("تعذّر تحميل تنبيهات انتهاء الوثائق:", err);
+    }
   }
 
-  // ─── Manager: إجازات + سلف + إنهاء خدمة بانتظار الموافقة ─────────────
+  // ─── HR & Admin: إجازات + بدلات/مكافآت + خصومات قيد الاعتماد ────────
+  if (isHR) {
+    try {
+      const leavesRes = await getAllVacationRequests();
+      const pending = (leavesRes?.data || []).filter((l) => l.state === "waiting_manager_approval");
+      if (pending.length > 0) notifs.push({ id: "pending_leaves", type: "info", icon: CalendarDays, title: "طلبات إجازة بانتظار الموافقة", message: `${pending.length} طلب في قائمة الانتظار` });
+    } catch (err) {
+      console.error("تعذّر تحميل تنبيهات الإجازات:", err);
+    }
+
+    try {
+      const additionsRes = await getUnderApprovalAdditions();
+      const list = additionsRes?.data || [];
+      if (list.length > 0) notifs.push({ id: "bonuses_pending", type: "info", icon: Gift, title: "مكافآت/بدلات قيد الاعتماد", message: `${list.length} طلب يحتاج موافقة` });
+    } catch (err) {
+      console.error("تعذّر تحميل تنبيهات المكافآت:", err);
+    }
+
+    try {
+      const deductionsRes = await getUnderApprovalDeductions();
+      const list = deductionsRes?.data || [];
+      if (list.length > 0) notifs.push({ id: "deductions_pending", type: "warning", icon: MinusCircle, title: "خصومات قيد الاعتماد", message: `${list.length} خصم يحتاج مراجعة` });
+    } catch (err) {
+      console.error("تعذّر تحميل تنبيهات الخصومات:", err);
+    }
+  }
+
+  // ─── Manager (غير HR): إجازات + سلف بانتظار موافقته ─────────────────
   if (isManager && !isHR) {
-    const [leaves, loanApps, terminations] = await Promise.all([
-      base44.entities.LeaveRequest.filter({ status: "قيد الانتظار" }),
-      base44.entities.LoanApplication.filter({ status: "انتظار موافقة المدير" }),
-      base44.entities.TerminationRequest.filter({ status: "Pending Manager" }),
-    ]);
-    if (leaves.length > 0) notifs.push({ id: "leaves_mgr", type: "info", icon: CalendarDays, title: "طلبات إجازة بانتظار موافقتك", message: `${leaves.length} طلب` });
-    if (loanApps.length > 0) notifs.push({ id: "loans_mgr", type: "warning", icon: CreditCard, title: "طلبات سلفة بانتظار موافقتك", message: `${loanApps.length} طلب` });
-    if (terminations.length > 0) notifs.push({ id: "term_mgr", type: "danger", icon: UserX, title: "طلبات إنهاء خدمة تنتظر تأكيدك", message: `${terminations.length} طلب` });
-  }
+    try {
+      const leavesRes = await getAllVacationRequests();
+      const pending = (leavesRes?.data || []).filter((l) => l.state === "waiting_manager_approval");
+      if (pending.length > 0) notifs.push({ id: "leaves_mgr", type: "info", icon: CalendarDays, title: "طلبات إجازة بانتظار موافقتك", message: `${pending.length} طلب` });
+    } catch (err) {
+      console.error("تعذّر تحميل تنبيهات الإجازات:", err);
+    }
 
-  // ─── Finance: سلف + إنهاء خدمة + مكافآت للصرف ──────────────────────
-  if (isFinance && !isHR) {
-    const [loanApps, terminations, bonuses] = await Promise.all([
-      base44.entities.LoanApplication.filter({ status: "انتظار موافقة المالية" }),
-      base44.entities.TerminationRequest.filter({ status: "Pending Finance" }),
-      base44.entities.Bonus.filter({ status: "معتمدة" }),
-    ]);
-    const disburse = await base44.entities.LoanApplication.filter({ status: "معتمدة" }).catch(() => []);
-    if (loanApps.length > 0) notifs.push({ id: "loans_fin", type: "warning", icon: CreditCard, title: "سلف تنتظر موافقة المالية", message: `${loanApps.length} طلب` });
-    if (disburse.length > 0) notifs.push({ id: "disburse_fin", type: "danger", icon: CreditCard, title: "سلف معتمدة جاهزة للصرف", message: `${disburse.length} سلفة` });
-    if (terminations.length > 0) notifs.push({ id: "term_fin", type: "danger", icon: UserX, title: "إنهاء خدمة يحتاج تخليص مالي", message: `${terminations.length} طلب` });
-    if (bonuses.length > 0) notifs.push({ id: "bonus_pay", type: "info", icon: Gift, title: "مكافآت معتمدة للصرف", message: `${bonuses.length} مكافأة` });
-  }
-
-  // ─── IT: إنهاء خدمة يحتاج تخليص IT ──────────────────────────────────
-  if (isIT && !isHR) {
-    const terminations = await base44.entities.TerminationRequest.filter({ status: "Pending IT/Assets" });
-    if (terminations.length > 0) notifs.push({ id: "term_it", type: "danger", icon: UserX, title: "إنهاء خدمة يحتاج تخليص IT", message: `${terminations.length} طلب` });
+    try {
+      const loansRes = await getSalaryAdvances();
+      const pending = (loansRes?.data || []).filter((l) => l.state === "waiting_manager");
+      if (pending.length > 0) notifs.push({ id: "loans_mgr", type: "warning", icon: CreditCard, title: "طلبات سلفة بانتظار موافقتك", message: `${pending.length} طلب` });
+    } catch (err) {
+      console.error("تعذّر تحميل تنبيهات السلف:", err);
+    }
   }
 
   // ─── Employee: إشعاراته الشخصية فقط ──────────────────────────────────
-  if (isEmployee && userEmail) {
-    const [emps, myLeaves, myLoanApps] = await Promise.all([
-      base44.entities.Employee.list(),
-      base44.entities.LeaveRequest.list(),
-      base44.entities.LoanApplication.list(),
-    ]);
-    const myEmp = emps.find(e => e.email?.toLowerCase() === userEmail?.toLowerCase());
-    if (myEmp) {
-      const myPendingLeaves = myLeaves.filter(l => l.employee_id === myEmp.id && l.status === "قيد الانتظار");
-      const myApprovedLeaves = myLeaves.filter(l => l.employee_id === myEmp.id && l.status === "موافق عليها");
-      const myLoans = myLoanApps.filter(a => a.employee_id === myEmp.id);
-      const approvedLoan = myLoans.find(a => a.status === "معتمدة" || a.status === "مصروفة");
-      if (myPendingLeaves.length > 0) notifs.push({ id: "my_leave_pending", type: "info", icon: CalendarDays, title: "طلبات إجازتك قيد المراجعة", message: `${myPendingLeaves.length} طلب` });
-      if (myApprovedLeaves.length > 0) notifs.push({ id: "my_leave_approved", type: "success", icon: CheckCircle, title: "تمت الموافقة على إجازتك", message: `${myApprovedLeaves.length} طلب موافق عليه` });
-      if (approvedLoan) notifs.push({ id: "my_loan", type: "success", icon: CreditCard, title: "تم اعتماد طلب السلفة", message: `${approvedLoan.amount?.toLocaleString("ar-SA")} ر.س` });
+  if (isEmployee && employeeId) {
+    try {
+      const leavesRes = await getAllVacationRequests();
+      const myLeaves = (leavesRes?.data || []).filter((l) => l.employee?.id === employeeId);
+      const myPending = myLeaves.filter((l) => l.state === "waiting_manager_approval" || l.state === "confirm");
+      const myApproved = myLeaves.filter((l) => l.state === "validate");
+      if (myPending.length > 0) notifs.push({ id: "my_leave_pending", type: "info", icon: CalendarDays, title: "طلبات إجازتك قيد المراجعة", message: `${myPending.length} طلب` });
+      if (myApproved.length > 0) notifs.push({ id: "my_leave_approved", type: "success", icon: CheckCircle, title: "تمت الموافقة على إجازتك", message: `${myApproved.length} طلب موافق عليه` });
+    } catch (err) {
+      console.error("تعذّر تحميل إشعارات الموظف:", err);
     }
   }
 
@@ -113,15 +131,14 @@ const TYPE_STYLES = {
 };
 
 export default function NotificationPanel({ isOpen, onClose }) {
+  const { role, user } = useRole();
   const [notifications, setNotifications] = useState([]);
   const [dismissed, setDismissed] = useState([]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    base44.auth.me().then(user => {
-      buildNotifications(user?.role, user?.email).then(setNotifications);
-    });
-  }, [isOpen]);
+    if (!isOpen || !role) return;
+    buildNotifications(role, user?.employee_id).then(setNotifications);
+  }, [isOpen, role, user]);
 
   const visible = notifications.filter(n => !dismissed.includes(n.id));
 

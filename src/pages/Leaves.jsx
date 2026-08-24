@@ -36,6 +36,17 @@ const LEAVE_TYPES = {
   plimsarage: "حج (حتى 10 أيام)",
 };
 
+// الحد الأقصى لكل نوع إجازة (حسب نظام العمل السعودي) — الإجازة السنوية ليها
+// رصيد خاص بالموظف بيتحقق منه لوحده، والإجازة بدون راتب مالهاش سقف أيام
+const LEAVE_TYPE_MAX_DAYS = {
+  sick_leaves: 120,
+  peternety: 70,
+  fatherly: 3,
+  marriage: 5,
+  death: 5,
+  plimsarage: 10,
+};
+
 const STATUS_COLORS = {
   confirm: "bg-amber-100 text-amber-700",
   validate: "bg-green-100 text-green-700",
@@ -99,7 +110,33 @@ export default function Leaves() {
     setForm(f => ({ ...f, [key]: val }));
   };
 
+  const formDays = calcDays(form.from, form.to);
+  const isFormYearly = form.vacation_type === "yearly";
+  const formEmpBalance = form.employee_id
+    ? balances.find(b => String(b.employee_id) === String(form.employee_id))
+    : null;
+  const formYearlyBalance = formEmpBalance?.balance ?? formEmpBalance?.remaining ?? null;
+  const formOverBalance = isFormYearly && formYearlyBalance !== null && formDays > formYearlyBalance;
+  const formTypeMaxDays = LEAVE_TYPE_MAX_DAYS[form.vacation_type] ?? null;
+  const formOverTypeCap = formTypeMaxDays !== null && formDays > formTypeMaxDays;
+
   const handleSubmit = async () => {
+    if (formOverBalance) {
+      toast({
+        title: "رصيد غير كافٍ",
+        description: `رصيد الإجازة السنوية (${formYearlyBalance} يوم) غير كافٍ للأيام المطلوبة (${formDays} يوم)`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (formOverTypeCap) {
+      toast({
+        title: "تجاوز الحد الأقصى",
+        description: `الحد الأقصى لـ"${LEAVE_TYPES[form.vacation_type]}" هو ${formTypeMaxDays} يوم، والمطلوب ${formDays} يوم`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     try {
       await createVacationRequest({
@@ -521,10 +558,28 @@ export default function Leaves() {
                 </div>
               </div>
 
-              {/* عدد الأيام */}
-              {calcDays(form.from, form.to) > 0 && (
-                <div className="bg-primary/5 rounded-lg px-4 py-2 text-sm font-medium text-primary">
-                  عدد الأيام: {calcDays(form.from, form.to)} يوم
+              {/* رصيد الإجازة السنوية */}
+              {form.employee_id && isFormYearly && (
+                <div className={`rounded-lg px-4 py-2.5 flex items-center justify-between border text-sm
+                  ${formYearlyBalance === 0 ? "bg-red-50 border-red-200" : "bg-slate-50 border-border"}`}>
+                  <span className="text-muted-foreground">رصيد الإجازة السنوية</span>
+                  <span className={`font-bold text-lg ${formYearlyBalance === 0 ? "text-red-600" : "text-secondary"}`}>
+                    {formYearlyBalance ?? "—"} يوم
+                  </span>
+                </div>
+              )}
+
+              {/* عدد الأيام + تحذير التجاوز */}
+              {formDays > 0 && (
+                <div className={`rounded-lg px-4 py-2 text-sm font-medium
+                  ${formOverBalance || formOverTypeCap ? "bg-red-50 text-red-700 border border-red-200" : "bg-primary/5 text-primary"}`}>
+                  <div>عدد الأيام: {formDays} يوم</div>
+                  {formOverTypeCap && (
+                    <p className="text-xs font-normal mt-1">الحد الأقصى لـ"{LEAVE_TYPES[form.vacation_type]}" هو {formTypeMaxDays} يوم</p>
+                  )}
+                  {!formOverTypeCap && formOverBalance && (
+                    <p className="text-xs font-normal mt-1">رصيد الإجازة السنوية ({formYearlyBalance} يوم) غير كافٍ</p>
+                  )}
                 </div>
               )}
 

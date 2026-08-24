@@ -513,7 +513,8 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 const CASE_STATUS_COLORS = {
   new: "bg-blue-100 text-blue-700",
   in_progress: "bg-amber-100 text-amber-700",
@@ -705,6 +706,8 @@ export default function Legal() {
 
   const activeCases = cases.filter(c => !["won", "lost", "settled"].includes(c.state));
   const totalCaseValue = cases.reduce((s, c) => s + (c.estimated_value || 0), 0);
+  const casesPagination = usePagination(filteredCases, 20);
+  const contractsPagination = usePagination(filteredContracts, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -740,45 +743,99 @@ export default function Legal() {
           className="w-full max-w-sm pr-9 pl-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
       </div>
 
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/30 border-b border-border">
-              {["رقم القضية", "النوع", "العنوان", "الطرف الآخر", "المحكمة", "الجلسة القادمة", "القيمة", "المحامي", "الحالة", ...(canDelete ? ["حذف"] : [])].map(h => (
-                <th key={h} className="text-right px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
-              : filteredCases.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد قضايا</td></tr>
-                : filteredCases.map(c => (
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{c.case_number}</td>
-                    <td className="px-3 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{c.case_type_arabic}</span></td>
-                    <td className="px-3 py-3 font-medium text-foreground max-w-40 truncate">{c.case_title}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{c.other_party || "—"}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{c.court_agency || "—"}</td>
-                    <td className="px-3 py-3 text-xs">
-                      {c.next_session_date
-                        ? new Date(c.next_session_date).toLocaleDateString("ar-SA")
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-3 text-xs font-semibold text-purple-600">{c.estimated_value > 0 ? `${c.estimated_value?.toLocaleString("ar-SA")} ر.س` : "—"}</td>
-                    <td className="px-3 py-3 text-xs text-muted-foreground">{c.lawyer || "—"}</td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${CASE_STATUS_COLORS[c.state]}`}
-                      >
-                        {CASE_STATUS_LABELS[c.state] || c.state}
-                      </span>
-                    </td>
-                    {canDelete && <td className="px-3 py-3"><button onClick={() => handleDeleteCase(c.id)} className="text-xs text-red-500 hover:underline">حذف</button></td>}
-                  </tr>
+      {activeTab === "cases" && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/30 border-b border-border">
+                {["رقم القضية", "النوع", "العنوان", "الطرف الآخر", "المحكمة", "الجلسة القادمة", "القيمة", "المحامي", "الحالة", ...(canDelete ? ["حذف"] : [])].map(h => (
+                  <th key={h} className="text-right px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
-          </tbody>
-        </table>
-      </div>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                : filteredCases.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد قضايا</td></tr>
+                  : casesPagination.pageItems.map(c => (
+                    <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{c.case_number}</td>
+                      <td className="px-3 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{c.case_type_arabic}</span></td>
+                      <td className="px-3 py-3 font-medium text-foreground max-w-40 truncate">{c.case_title}</td>
+                      <td className="px-3 py-3 text-muted-foreground text-xs">{c.other_party || "—"}</td>
+                      <td className="px-3 py-3 text-muted-foreground text-xs">{c.court_agency || "—"}</td>
+                      <td className="px-3 py-3 text-xs">
+                        {c.next_session_date
+                          ? new Date(c.next_session_date).toLocaleDateString("ar-SA")
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-3 text-xs font-semibold text-purple-600">{c.estimated_value > 0 ? `${c.estimated_value?.toLocaleString("ar-SA")} ر.س` : "—"}</td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{c.lawyer || "—"}</td>
+                      <td className="px-3 py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${CASE_STATUS_COLORS[c.state]
+                            }`}
+                        >
+                          {CASE_STATUS_LABELS[c.state] || c.state}
+                        </span>
+                      </td>
+                      {canDelete && <td className="px-3 py-3"><button onClick={() => deleteCase(c.id)} className="text-xs text-red-500 hover:underline">حذف</button></td>}
+                    </tr>
+                  ))}
+            </tbody>
+          </table>
+          <TablePagination
+            page={casesPagination.page}
+            totalPages={casesPagination.totalPages}
+            totalItems={casesPagination.totalItems}
+            pageSize={casesPagination.pageSize}
+            onPageChange={casesPagination.setPage}
+          />
+        </div>
+      )}
+
+      {activeTab === "contracts" && (
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/30 border-b border-border">
+                {["رقم العقد", "النوع", "العنوان", "الطرف", "البدء", "الانتهاء", "القيمة", "الحالة", "الملف", ...(canDelete ? ["حذف"] : [])].map(h => (
+                  <th key={h} className="text-right px-3 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredContracts.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد عقود</td></tr>
+                : contractsPagination.pageItems.map(c => {
+                  const daysLeft = c.end_date ? Math.ceil((new Date(c.end_date) - new Date()) / 86400000) : null;
+                  return (
+                    <tr key={c.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${daysLeft !== null && daysLeft <= 30 && daysLeft >= 0 ? "bg-amber-50/30" : ""}`}>
+                      <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{c.contract_number}</td>
+                      <td className="px-3 py-3"><span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{c.contract_type}</span></td>
+                      <td className="px-3 py-3 font-medium text-foreground max-w-40 truncate">{c.title}</td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{c.party_name || "—"}</td>
+                      <td className="px-3 py-3 text-xs">{c.start_date ? new Date(c.start_date).toLocaleDateString("ar-SA") : "—"}</td>
+                      <td className="px-3 py-3 text-xs">
+                        {c.end_date ? new Date(c.end_date).toLocaleDateString("ar-SA") : "—"}
+                        {daysLeft !== null && daysLeft <= 30 && daysLeft >= 0 && <span className="text-amber-600 text-xs block">({daysLeft} يوم)</span>}
+                      </td>
+                      <td className="px-3 py-3 text-xs font-semibold text-green-600">{c.value > 0 ? `${c.value?.toLocaleString("ar-SA")} ر.س` : "—"}</td>
+                      <td className="px-3 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CONTRACT_STATUS_COLORS[c.status]}`}>{c.status}</span></td>
+                      <td className="px-3 py-3">{c.file_url ? <a href={c.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline">عرض</a> : "—"}</td>
+                      {canDelete && <td className="px-3 py-3"><button onClick={() => deleteContract(c.id)} className="text-xs text-red-500 hover:underline">حذف</button></td>}
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+          <TablePagination
+            page={contractsPagination.page}
+            totalPages={contractsPagination.totalPages}
+            totalItems={contractsPagination.totalItems}
+            pageSize={contractsPagination.pageSize}
+            onPageChange={contractsPagination.setPage}
+          />
+        </div>
+      )}
 
       {showCaseForm && <CaseForm employees={employees} onSave={() => { setShowCaseForm(false); load(); }} onClose={() => setShowCaseForm(false)} />}
     </div>

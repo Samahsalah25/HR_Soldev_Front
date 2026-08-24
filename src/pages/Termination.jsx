@@ -4,8 +4,10 @@ import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
 import { calcEndOfService, calcLeaveEncashment, calcServiceYears, calcTicketEncashment, formatCurrency } from "../lib/hrUtils";
 import { getEmployees } from "@/api/departmentsApi";
-import { createEndOfService, getEndOfService, eosAction, getDepartureReasons } from "@/api/endOfService"
+import { createEndOfService, getEndOfService, eosAction } from "@/api/endOfService"
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 const WORKFLOW_STEPS = [
   { key: "Pending Manager", label: "تأكيد المدير", icon: "👔" },
   { key: "Pending HR Review", label: "مراجعة HR", icon: "📋" },
@@ -797,6 +799,7 @@ export default function Termination() {
 
 
   const filtered = requests.filter(r => !filterStatus || r.status === filterStatus);
+  const requestsPagination = usePagination(filtered, 20);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
 
@@ -866,7 +869,7 @@ export default function Termination() {
               <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">
                 <UserX className="w-10 h-10 mx-auto mb-2 opacity-20" />لا توجد طلبات
               </td></tr>
-            ) : filtered.map(req => (
+            ) : requestsPagination.pageItems.map(req => (
               <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                 <td className="px-4 py-3">
                   <p className="font-medium text-foreground">{req.employee_name}</p>
@@ -896,6 +899,13 @@ export default function Termination() {
             ))}
           </tbody>
         </table>
+        <TablePagination
+          page={requestsPagination.page}
+          totalPages={requestsPagination.totalPages}
+          totalItems={requestsPagination.totalItems}
+          pageSize={requestsPagination.pageSize}
+          onPageChange={requestsPagination.setPage}
+        />
       </div>
 
       {showForm && <NewTerminationForm employees={employees.filter(e => e.active)} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}

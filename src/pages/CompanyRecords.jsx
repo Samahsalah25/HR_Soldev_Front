@@ -19,6 +19,8 @@ import {
 } from "../api/companyRecordsApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
   ساري: "bg-green-100 text-green-700",
@@ -533,6 +535,7 @@ const downloadRecord = async (id, filename) => {
         r.number?.includes(search)) &&
       (!filterType || r.category === filterType)
   );
+  const recordsPagination = usePagination(filtered, 20);
 
   return (
     <div
@@ -711,7 +714,7 @@ const downloadRecord = async (id, filename) => {
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => {
+              recordsPagination.pageItems.map((r) => {
                 const days = r.expiry_date
                   ? Math.ceil(
                       (new Date(r.expiry_date) -
@@ -829,6 +832,13 @@ const downloadRecord = async (id, filename) => {
             )}
           </tbody>
         </table>
+        <TablePagination
+          page={recordsPagination.page}
+          totalPages={recordsPagination.totalPages}
+          totalItems={recordsPagination.totalItems}
+          pageSize={recordsPagination.pageSize}
+          onPageChange={recordsPagination.setPage}
+        />
       </div>
 
       {showForm && (

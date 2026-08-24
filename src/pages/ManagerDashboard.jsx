@@ -11,6 +11,8 @@ import {
 } from "@/api/requestsApi";
 import { getViolations, updateViolation } from "@/api/violationApi";
 import { getBranches } from "@/api/branchesApi";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const LOAD_TIMEOUT_MS = 15000;
 
@@ -91,6 +93,9 @@ export default function ManagerDashboard() {
   const pendingRequests = requests.filter((r) => (r.state || r.status) === "waiting_manager_approval");
   const pendingLeaves = leaves.filter((l) => l.state === "waiting_manager_approval");
   const pendingViolations = violations.filter((v) => v.state === "under_review" || v.state === "draft");
+  const pendingRequestsPagination = usePagination(pendingRequests, 20);
+  const pendingLeavesPagination = usePagination(pendingLeaves, 20);
+  const pendingViolationsPagination = usePagination(pendingViolations, 20);
 
   const approveRequest = async (id) => {
     await apiManagerApprove(id);
@@ -246,7 +251,7 @@ export default function ManagerDashboard() {
               </tr></thead>
               <tbody>
                 {pendingRequests.length === 0 ? <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">✅ لا توجد طلبات معلقة</td></tr>
-                  : pendingRequests.map((req) => {
+                  : pendingRequestsPagination.pageItems.map((req) => {
                     const status = REQUEST_STATUS_LABELS[req.state || req.status] || (req.state || req.status);
                     return (
                       <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
@@ -271,6 +276,13 @@ export default function ManagerDashboard() {
                   })}
               </tbody>
             </table>
+            <TablePagination
+              page={pendingRequestsPagination.page}
+              totalPages={pendingRequestsPagination.totalPages}
+              totalItems={pendingRequestsPagination.totalItems}
+              pageSize={pendingRequestsPagination.pageSize}
+              onPageChange={pendingRequestsPagination.setPage}
+            />
           </div>
         )}
 
@@ -284,7 +296,7 @@ export default function ManagerDashboard() {
               </tr></thead>
               <tbody>
                 {pendingLeaves.length === 0 ? <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">✅ لا توجد إجازات قيد الانتظار</td></tr>
-                  : pendingLeaves.map((l) => (
+                  : pendingLeavesPagination.pageItems.map((l) => (
                     <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{l.employee?.name_ar || "—"}</p>
@@ -302,6 +314,13 @@ export default function ManagerDashboard() {
                   ))}
               </tbody>
             </table>
+            <TablePagination
+              page={pendingLeavesPagination.page}
+              totalPages={pendingLeavesPagination.totalPages}
+              totalItems={pendingLeavesPagination.totalItems}
+              pageSize={pendingLeavesPagination.pageSize}
+              onPageChange={pendingLeavesPagination.setPage}
+            />
           </div>
         )}
 
@@ -315,7 +334,7 @@ export default function ManagerDashboard() {
               </tr></thead>
               <tbody>
                 {pendingViolations.length === 0 ? <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">✅ لا توجد مخالفات قيد المراجعة</td></tr>
-                  : pendingViolations.map((v) => (
+                  : pendingViolationsPagination.pageItems.map((v) => (
                     <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{v.employee_name || "—"}</p>
@@ -335,6 +354,13 @@ export default function ManagerDashboard() {
                   ))}
               </tbody>
             </table>
+            <TablePagination
+              page={pendingViolationsPagination.page}
+              totalPages={pendingViolationsPagination.totalPages}
+              totalItems={pendingViolationsPagination.totalItems}
+              pageSize={pendingViolationsPagination.pageSize}
+              onPageChange={pendingViolationsPagination.setPage}
+            />
           </div>
         )}
       </div>

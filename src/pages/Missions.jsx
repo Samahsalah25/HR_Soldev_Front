@@ -11,6 +11,8 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_STYLES = {
 //   "قيد الانتظار": "bg-amber-100 text-amber-700",
 //   "موافق عليها": "bg-blue-100 text-blue-700",
@@ -235,6 +237,8 @@ export default function Missions() {
       }, 0),
   };
 
+  const missionsPagination = usePagination(missions, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -314,7 +318,7 @@ export default function Missions() {
                   </td>
                 </tr>
               ) : (
-                missions.map((m) => {
+                missionsPagination.pageItems.map((m) => {
                   const days =
                     m.from_date && m.to_date
                       ? Math.ceil(
@@ -449,6 +453,13 @@ export default function Missions() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={missionsPagination.page}
+          totalPages={missionsPagination.totalPages}
+          totalItems={missionsPagination.totalItems}
+          pageSize={missionsPagination.pageSize}
+          onPageChange={missionsPagination.setPage}
+        />
       </div>
 
       {/* Form Modal */}

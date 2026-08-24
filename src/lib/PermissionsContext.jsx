@@ -19,6 +19,27 @@ import { getCurrentUser } from "../api/authApi";
 import { getEmployeePermissions, getPermissionRoles } from "../api/permissionsApi";
 import { getEffectiveCrudPermissions } from "./crudPermissions";
 
+// ─── Backend role string → internal snake_case role key ────────────────────
+// الباك إند بيرجع الرول كنص وصفي (زي "Department manager" أو "General Manager")
+// مش بصيغة الـ key اللي باقي الكود بيستخدمها (dept_manager, general_manager...).
+// لازم نطابقهم هنا صراحة — مجرد .toLowerCase() مش كفاية لأن فيه مسافات
+// وفروق تسمية ("Department" مقابل "dept").
+const BACKEND_ROLE_TO_KEY = {
+    "admin": "admin",
+    "ceo": "ceo",
+    "general manager": "general_manager",
+    "hr": "hr",
+    "department manager": "dept_manager",
+    "accountant": "accountant",
+    "employee": "employee",
+    "user": "user",
+};
+
+function normalizeRole(rawRole) {
+    const normalized = (rawRole || "").toLowerCase().trim();
+    return BACKEND_ROLE_TO_KEY[normalized] || normalized;
+}
+
 // ─── API key → sidebar nav path ─────────────────────────────────────────────
 
 const PERMISSION_KEY_TO_NAV = {
@@ -160,7 +181,7 @@ export function PermissionsProvider({ children }) {
 
             setUser(u);
             const rawRole = u?.role || "Employee";
-            const normRole = rawRole.toLowerCase().trim();
+            const normRole = normalizeRole(rawRole);
             setRole(normRole);
 
             // 2. صلاحيات الدور من API

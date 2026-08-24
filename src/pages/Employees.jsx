@@ -9,6 +9,8 @@ import AddEmployeeDropdown from "../components/employees/AddEmployeeDropdown";
 import { useRole } from "../lib/useRole";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
   "نشط": "bg-green-100 text-green-700",
@@ -125,6 +127,8 @@ const { toast } = useToast();
     const matchStatus = !filterStatus || e.status === filterStatus;
     return matchSearch && matchDept && matchNat && matchStatus;
   });
+
+  const employeesPagination = usePagination(filtered, 20);
 
   // بيفتح المودال بدل ما ينفذ الحذف على طول
   const handleDeleteClick = (emp) => {
@@ -252,7 +256,7 @@ const { toast } = useToast();
                 </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">لا توجد نتائج</td></tr>
-              ) : filtered.map(emp => {
+              ) : employeesPagination.pageItems.map(emp => {
                 const idStatus = getExpiryStatus(emp.id_expiry);
                 const years = emp.join_date ? calcServiceYears(emp.join_date) : 0;
                 return (
@@ -320,9 +324,13 @@ const { toast } = useToast();
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-border text-sm text-muted-foreground bg-muted/20">
-          عرض {filtered.length} من {employees.length} موظف
-        </div>
+        <TablePagination
+          page={employeesPagination.page}
+          totalPages={employeesPagination.totalPages}
+          totalItems={employeesPagination.totalItems}
+          pageSize={employeesPagination.pageSize}
+          onPageChange={employeesPagination.setPage}
+        />
       </div>
 
       {/* Modals */}

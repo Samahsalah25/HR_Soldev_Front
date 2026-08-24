@@ -11,6 +11,8 @@ import {
 import UnitPhoto from "@/components/storage/UnitPhoto";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
   "متاحة": "bg-green-100 text-green-700",
@@ -304,6 +306,8 @@ const { toast } = useToast();
       u.branch?.includes(search)
     );
 
+  const unitsPagination = usePagination(filtered, 24);
+
   const stats = {
     total: units.length,
     available: units.filter(u => u.status === "متاحة").length,
@@ -390,8 +394,9 @@ const { toast } = useToast();
       ) : filtered.length === 0 ? (
         <p className="text-center py-16 text-muted-foreground">لا توجد وحدات</p>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(u => (
+          {unitsPagination.pageItems.map(u => (
             <div key={u.id}
               className="bg-card rounded-xl border border-border overflow-hidden hover:shadow-md transition-shadow">
               <UnitPhoto unit={u} />
@@ -433,6 +438,14 @@ const { toast } = useToast();
             </div>
           ))}
         </div>
+        <TablePagination
+          page={unitsPagination.page}
+          totalPages={unitsPagination.totalPages}
+          totalItems={unitsPagination.totalItems}
+          pageSize={unitsPagination.pageSize}
+          onPageChange={unitsPagination.setPage}
+        />
+        </>
       )}
 
       {/* Form Modal */}

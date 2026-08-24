@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, Search, FileText, AlertTriangle, DollarSign, Briefcase, Package, CreditCard, Receipt } from "lucide-react";
+import { CheckCircle, XCircle, Search, FileText, AlertTriangle, DollarSign, Receipt } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import LeaveRequestModal from "../components/requests/LeaveRequestModal";
 import ComplaintModal from "../components/requests/ComplaintModal";
@@ -13,6 +13,8 @@ import {getSalaryAdvances} from "@/api/salaryAdvancesApi";
 import {getCustodyRequests} from "@/api/assetsApi"; 
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const REQUEST_TYPES = [
   { type: "طلب إجازة", icon: FileText, color: "bg-blue-50 text-blue-700 border-blue-200", modal: "leave" },
@@ -218,6 +220,10 @@ const activeCustodies = custodies.filter(
 
 const activeLoans = loans;
 
+  const requestsPagination = usePagination(filtered, 20);
+  const custodiesPagination = usePagination(activeCustodies, 20);
+  const loansPagination = usePagination(activeLoans, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       <div>
@@ -287,7 +293,7 @@ const activeLoans = loans;
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا توجد بيانات</td></tr>
                 ) :
-                  filtered.map(req => {
+                  requestsPagination.pageItems.map(req => {
                     const status = req._normalizedStatus || normalizeStatus(req.state || req.status || "");
 
                     return (
@@ -395,6 +401,13 @@ const activeLoans = loans;
                 }
               </tbody>
             </table>
+            <TablePagination
+              page={requestsPagination.page}
+              totalPages={requestsPagination.totalPages}
+              totalItems={requestsPagination.totalItems}
+              pageSize={requestsPagination.pageSize}
+              onPageChange={requestsPagination.setPage}
+            />
           </div>
         </>
       )}
@@ -412,7 +425,7 @@ const activeLoans = loans;
             <tbody>
               {activeCustodies.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد عهد نشطة</td></tr>
-              ) : activeCustodies.map(c => (
+              ) : custodiesPagination.pageItems.map(c => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">{c.employee_name}</p>
@@ -435,6 +448,13 @@ const activeLoans = loans;
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={custodiesPagination.page}
+            totalPages={custodiesPagination.totalPages}
+            totalItems={custodiesPagination.totalItems}
+            pageSize={custodiesPagination.pageSize}
+            onPageChange={custodiesPagination.setPage}
+          />
         </div>
       )}
 
@@ -451,7 +471,7 @@ const activeLoans = loans;
             <tbody>
               {activeLoans.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد سلف نشطة</td></tr>
-              ) : activeLoans.map(l => (
+              ) : loansPagination.pageItems.map(l => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">{l.employee_name}</p>
@@ -483,6 +503,13 @@ const activeLoans = loans;
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={loansPagination.page}
+            totalPages={loansPagination.totalPages}
+            totalItems={loansPagination.totalItems}
+            pageSize={loansPagination.pageSize}
+            onPageChange={loansPagination.setPage}
+          />
         </div>
       )}
 

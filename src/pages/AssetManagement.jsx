@@ -16,6 +16,8 @@ import AssetHistoryModal from "../components/assets/AssetHistoryModal";
 import CustodyDeliverModal from "../components/assets/CustodyDeliverModal";
 import CustodyReceiveModal from "../components/assets/CustodyReceiveModal";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 // State badge colours — in_use treated same as assigned
 const STATUS_COLORS = {
@@ -166,6 +168,10 @@ const load = async () => {
       String(r.employee_id) === String(currentEmployee?.id)
     );
 
+  const assetsPagination = usePagination(filteredAssets, 20);
+  const requestsPagination = usePagination(myRequests, 20);
+  const returnsPagination = usePagination(returnRequests, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
       {/* Header */}
@@ -282,7 +288,7 @@ const load = async () => {
                   <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
                 ) : filteredAssets.length === 0 ? (
                   <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد أصول</td></tr>
-                ) : filteredAssets.map(asset => (
+                ) : assetsPagination.pageItems.map(asset => (
                   <tr key={asset.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3 font-medium text-foreground">{asset.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{categoryTypeLabel(asset.category_type)}</td>
@@ -326,6 +332,13 @@ const load = async () => {
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              page={assetsPagination.page}
+              totalPages={assetsPagination.totalPages}
+              totalItems={assetsPagination.totalItems}
+              pageSize={assetsPagination.pageSize}
+              onPageChange={assetsPagination.setPage}
+            />
           </div>
         </>
       )}
@@ -344,7 +357,7 @@ const load = async () => {
             <tbody>
               {myRequests.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا توجد طلبات</td></tr>
-              ) : myRequests.map(req => {
+              ) : requestsPagination.pageItems.map(req => {
                 const statusKey = req.state || req.status || "";
                 const isPending = statusKey === "pending" || statusKey === "under_review";
                 const isAccepted = statusKey === "accepted" || statusKey === "approved";
@@ -426,6 +439,13 @@ const load = async () => {
               })}
             </tbody>
           </table>
+          <TablePagination
+            page={requestsPagination.page}
+            totalPages={requestsPagination.totalPages}
+            totalItems={requestsPagination.totalItems}
+            pageSize={requestsPagination.pageSize}
+            onPageChange={requestsPagination.setPage}
+          />
         </div>
       )}
 
@@ -443,7 +463,7 @@ const load = async () => {
             <tbody>
               {returnRequests.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">لا توجد إعادات</td></tr>
-              ) : returnRequests.map(ret => {
+              ) : returnsPagination.pageItems.map(ret => {
                 const statusKey = ret.state || ret.status || "";
                 const isPendingReturn = statusKey === "pending" || statusKey === "under_review";
                 return (
@@ -481,6 +501,13 @@ const load = async () => {
               })}
             </tbody>
           </table>
+          <TablePagination
+            page={returnsPagination.page}
+            totalPages={returnsPagination.totalPages}
+            totalItems={returnsPagination.totalItems}
+            pageSize={returnsPagination.pageSize}
+            onPageChange={returnsPagination.setPage}
+          />
         </div>
       )}
 

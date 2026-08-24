@@ -16,6 +16,8 @@ import {
 import { getCustomers, getCustomerById, createCustomer, updateCustomer } from "@/api/accountingApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s-]{7,20}$/;
@@ -304,6 +306,8 @@ export default function Customers() {
 
   useEffect(() => { load(); }, []);
 
+  const customersPagination = usePagination(customers, 24);
+
   const openEdit = async (customer) => {
     try {
       const full = await getCustomerById(customer.id);
@@ -364,8 +368,9 @@ export default function Customers() {
           <p className="text-sm">لا يوجد عملاء بعد — ابدأ بإضافة عميل جديد</p>
         </div>
       ) : (
+        <>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {customers.map((customer) => (
+          {customersPagination.pageItems.map((customer) => (
             <div
               key={customer.id}
               onClick={() => openEdit(customer)}
@@ -405,6 +410,14 @@ export default function Customers() {
             </div>
           ))}
         </div>
+        <TablePagination
+          page={customersPagination.page}
+          totalPages={customersPagination.totalPages}
+          totalItems={customersPagination.totalItems}
+          pageSize={customersPagination.pageSize}
+          onPageChange={customersPagination.setPage}
+        />
+        </>
       )}
     </div>
   );

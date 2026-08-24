@@ -392,6 +392,8 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const Field = ({ label, children }) => (
   <div className="space-y-1.5">
@@ -955,6 +957,8 @@ export default function BranchesDepartments() {
     }
   };
 
+  const departmentsPagination = usePagination(departments, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
       <div>
@@ -1198,7 +1202,7 @@ export default function BranchesDepartments() {
                     </td>
                   </tr>
                 ) : (
-                  departments.map((d) => (
+                  departmentsPagination.pageItems.map((d) => (
                     <tr
                       key={d.id}
                       className="border-b border-border last:border-0 hover:bg-muted/20"
@@ -1268,6 +1272,13 @@ export default function BranchesDepartments() {
                 )}
               </tbody>
             </table>
+            <TablePagination
+              page={departmentsPagination.page}
+              totalPages={departmentsPagination.totalPages}
+              totalItems={departmentsPagination.totalItems}
+              pageSize={departmentsPagination.pageSize}
+              onPageChange={departmentsPagination.setPage}
+            />
           </div>
         </div>
       )}

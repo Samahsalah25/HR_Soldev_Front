@@ -17,6 +17,8 @@ import {
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/api/axios";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 // ملاحظة: الباك إند مش راجع قايمة documented لكل الـ states الممكنة،
 // فالماب دي أفضل تخمين حسب أسامي الإجراءات المتاحة (post/validate/mark-as-sent/reset-to-draft/cancel/reject)
@@ -191,6 +193,8 @@ export default function Vouchers() {
   const [editVoucher, setEditVoucher] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const confirmDialog = useConfirm();
+  const receiptsPagination = usePagination(receipts, 20);
+  const paymentsPagination = usePagination(payments, 20);
 
   const load = async () => {
     try {
@@ -279,7 +283,7 @@ export default function Vouchers() {
     setEditVoucher(null);
   };
 
-  const renderTable = (items, type) => (
+  const renderTable = (items, type, pagination) => (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <table className="w-full text-sm">
         <thead><tr className="bg-muted/30 border-b border-border">
@@ -292,7 +296,7 @@ export default function Vouchers() {
             <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
           ) : items.length === 0 ? (
             <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">لا توجد سندات</td></tr>
-          ) : items.map(v => (
+          ) : pagination.pageItems.map(v => (
             <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/20">
               <td className="px-4 py-3 font-mono text-xs text-primary font-medium">{v.voucher_number || "—"}</td>
               <td className="px-4 py-3 text-xs text-muted-foreground">{v.date ? new Date(v.date).toLocaleDateString("ar-SA") : "—"}</td>
@@ -367,6 +371,13 @@ export default function Vouchers() {
           ))}
         </tbody>
       </table>
+      <TablePagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalItems}
+        pageSize={pagination.pageSize}
+        onPageChange={pagination.setPage}
+      />
     </div>
   );
 
@@ -413,8 +424,8 @@ export default function Vouchers() {
         ))}
       </div>
 
-      {activeTab === "receipts" && renderTable(receipts, "receipt")}
-      {activeTab === "payments" && renderTable(payments, "payment")}
+      {activeTab === "receipts" && renderTable(receipts, "receipt", receiptsPagination)}
+      {activeTab === "payments" && renderTable(payments, "payment", paymentsPagination)}
 
       {showForm && (
         <VoucherForm

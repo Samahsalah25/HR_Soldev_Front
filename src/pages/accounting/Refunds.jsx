@@ -16,6 +16,8 @@ import { getPaymentJournals, getPaymentMethodsForJournal } from "@/api/accountin
 import { extractErrorMessage } from "@/utils/errorUtils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = { draft: "مسودة", posted: "مرحل", cancel: "ملغي", cancelled: "ملغي" };
 
@@ -424,6 +426,7 @@ export default function Refunds() {
   useEffect(() => { load(); }, []);
 
   const total = refunds.reduce((s, r) => s + (r.amount_untaxed || 0), 0);
+  const refundsPagination = usePagination(refunds, 20);
 
   if (selectedId) {
     return <RefundDetail refundId={selectedId} onBack={() => setSelectedId(null)} onChanged={load} />;
@@ -454,7 +457,7 @@ export default function Refunds() {
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
             ) : refunds.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد مرتجعات بعد — يتم إنشاؤها من داخل فاتورة مورد موجودة</td></tr>
-            ) : refunds.map((r) => {
+            ) : refundsPagination.pageItems.map((r) => {
               const ps = PAYMENT_STATUS[r.payment_state] || PAYMENT_STATUS.not_paid;
               return (
                 <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
@@ -479,6 +482,13 @@ export default function Refunds() {
             </tr>
           </tfoot>
         </table>
+        <TablePagination
+          page={refundsPagination.page}
+          totalPages={refundsPagination.totalPages}
+          totalItems={refundsPagination.totalItems}
+          pageSize={refundsPagination.pageSize}
+          onPageChange={refundsPagination.setPage}
+        />
       </div>
     </div>
   );

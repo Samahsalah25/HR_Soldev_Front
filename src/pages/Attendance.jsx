@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Plus, MapPin, CheckCircle, LogIn, LogOut, AlertCircle, Clock, Users } from "lucide-react";
 import { useRole } from "../lib/useRole";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 import {
   getAttendance,
@@ -233,6 +235,7 @@ export default function Attendance() {
   };
   const totalOT = kpis?.total_extra_hours ?? records.reduce((s, r) => s + (r.overtime_hours || 0), 0);
   const totalLate = records.reduce((s, r) => s + (r.late_minutes || 0), 0);
+  const attendancePagination = usePagination(records, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -316,7 +319,7 @@ export default function Attendance() {
                       <Clock className="w-10 h-10 mx-auto mb-2 opacity-20" />
                       لا توجد سجلات لهذا اليوم
                     </td></tr>
-                  ) : records.map(rec => {
+                  ) : attendancePagination.pageItems.map(rec => {
                     // غائب/إجازة: الأوقات الجاية من الـ EOD job وقت وهمي مش حضور حقيقي
                     const hasRealAttendance = !["غائب", "اجازة"].includes(rec.status);
                     return (
@@ -341,6 +344,13 @@ export default function Attendance() {
                 </tbody>
               </table>
             </div>
+            <TablePagination
+              page={attendancePagination.page}
+              totalPages={attendancePagination.totalPages}
+              totalItems={attendancePagination.totalItems}
+              pageSize={attendancePagination.pageSize}
+              onPageChange={attendancePagination.setPage}
+            />
           </div>
         </>
       )}

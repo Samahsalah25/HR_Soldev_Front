@@ -16,7 +16,6 @@ import {
   Camera,
   Loader2,
   AlertCircle,
-  Trash2,
 } from "lucide-react";
 
 import {
@@ -28,6 +27,8 @@ import {
 import { extractErrorMessage } from "../../utils/errorUtils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s-]{7,20}$/;
@@ -425,6 +426,8 @@ export default function Vendors() {
     loadVendors();
   };
 
+  const vendorsPagination = usePagination(vendors, 24);
+
   const handleDelete = async (e, id) => {
     e.stopPropagation();
     const ok = await confirmDialog({ title: "حذف المورد", message: "متأكد من حذف هذا المورد؟", confirmText: "حذف", variant: "destructive" });
@@ -491,8 +494,9 @@ export default function Vendors() {
       )}
 
       {!loading && !error && vendors.length > 0 && (
+        <>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {vendors.map((vendor) => (
+          {vendorsPagination.pageItems.map((vendor) => (
             <div
               key={vendor.id}
               onClick={() => setSelected(vendor)}
@@ -548,6 +552,14 @@ export default function Vendors() {
             </div>
           ))}
         </div>
+        <TablePagination
+          page={vendorsPagination.page}
+          totalPages={vendorsPagination.totalPages}
+          totalItems={vendorsPagination.totalItems}
+          pageSize={vendorsPagination.pageSize}
+          onPageChange={vendorsPagination.setPage}
+        />
+        </>
       )}
     </div>
   );

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { getUsers, inviteEmployee, changeUserRole } from "@/api/usersApi";
 import { UserPlus, Shield, Search, Edit2, Check, X, Mail } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const ROLES = [
   { value: "admin", label: "مدير النظام", color: "bg-red-100 text-red-700" },
@@ -97,6 +99,7 @@ export default function UserManagement() {
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
   );
+  const usersPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto" dir="rtl">
@@ -195,7 +198,7 @@ export default function UserManagement() {
                 </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-10 text-muted-foreground">لا توجد نتائج</td></tr>
-              ) : filtered.map(u => (
+              ) : usersPagination.pageItems.map(u => (
                 <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
@@ -241,6 +244,13 @@ export default function UserManagement() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={usersPagination.page}
+          totalPages={usersPagination.totalPages}
+          totalItems={usersPagination.totalItems}
+          pageSize={usersPagination.pageSize}
+          onPageChange={usersPagination.setPage}
+        />
       </div>
     </div>
   );

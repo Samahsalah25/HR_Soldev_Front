@@ -10,6 +10,8 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = {
   draft: "قيد المراجعة",
@@ -352,6 +354,7 @@ export default function Violations() {
         getViolationLabel(v.violation_type_name)?.includes(search)
     );
 
+  const violationsPagination = usePagination(filtered, 20);
 
   // ================= UI =================
   return (
@@ -459,7 +462,7 @@ export default function Violations() {
                 </td>
               </tr>
             ) : (
-              filtered.map((v) => (
+              violationsPagination.pageItems.map((v) => (
                 <tr key={v.id} className="border-b hover:bg-muted/20">
                   <td className="p-3">
                     <div className="font-medium">{v.employee_name}</div>
@@ -525,6 +528,13 @@ export default function Violations() {
             )}
           </tbody>
         </table>
+        <TablePagination
+          page={violationsPagination.page}
+          totalPages={violationsPagination.totalPages}
+          totalItems={violationsPagination.totalItems}
+          pageSize={violationsPagination.pageSize}
+          onPageChange={violationsPagination.setPage}
+        />
       </div>
 
       {/* FORM */}

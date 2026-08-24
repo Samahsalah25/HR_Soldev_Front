@@ -8,6 +8,8 @@ import {
   updateDeduction,
 } from "@/api/deductionsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { usePagination } from "@/lib/usePagination";
+import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_COLORS = {
 //   "قيد الاعتماد": "bg-amber-100 text-amber-700",
 //   "معتمد": "bg-blue-100 text-blue-700",
@@ -283,6 +285,8 @@ export default function Deductions() {
       .reduce((s, d) => s + (Number(d.amount) || 0), 0),
   };
 
+  const deductionsPagination = usePagination(filtered, 20);
+
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
       <div className="flex items-center justify-between">
@@ -351,7 +355,7 @@ export default function Deductions() {
           <tbody>
             {loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد خصومات</td></tr>
-                : filtered.map(d => (
+                : deductionsPagination.pageItems.map(d => (
                   <tr key={d.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${d.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{d.employee_name}</p>
@@ -377,6 +381,13 @@ export default function Deductions() {
                 ))}
           </tbody>
         </table>
+        <TablePagination
+          page={deductionsPagination.page}
+          totalPages={deductionsPagination.totalPages}
+          totalItems={deductionsPagination.totalItems}
+          pageSize={deductionsPagination.pageSize}
+          onPageChange={deductionsPagination.setPage}
+        />
       </div>
 
       {showForm && <DeductionForm employees={employees} violations={violations} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}

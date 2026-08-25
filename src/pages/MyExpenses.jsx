@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Wallet, Plus, Save, Trash2, Paperclip, Send } from "lucide-react";
+import { Wallet, Plus, Save, Trash2, Paperclip } from "lucide-react";
 import { getExpenses, deleteExpense } from "@/api/expensesApi";
 import { getProducts } from "@/api/accountingApi";
 import { getEmployees } from "@/api/departmentsApi";
@@ -11,7 +11,6 @@ import { usePagination } from "@/lib/usePagination";
 import TablePagination from "@/components/ui/TablePagination";
 import ExpenseForm from "@/components/expenses/ExpenseForm";
 import AttachReceiptModal from "@/components/expenses/AttachReceiptModal";
-import SubmitReportModal from "@/components/expenses/SubmitReportModal";
 
 const EXPENSE_STATE_LABELS = { draft: "مسودة", reported: "مُقدَّم", done: "مُعتمد", refused: "مرفوض" };
 const EXPENSE_STATE_COLORS = {
@@ -24,16 +23,15 @@ const EXPENSE_STATE_COLORS = {
 const fmt = (n) => (n || 0).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /* ────────────────────────────────────────────────────────────────────────
-   الصفحة الرئيسية — مصروفاتي (Self-Service)
-   التقارير (عرض/اعتماد/رفض/دفع) موجودة بس في صفحة "مصروفات الموظفين"
-   بالمحاسبة — هنا بس تسجيل المصروف الشخصي وتقديمه كتقرير.
+   الصفحة الرئيسية — مصروفات
+   إنشاء/تعديل/حذف المصروفات بس — التقديم كتقرير والاعتماد/الرفض/الدفع
+   موجودين في صفحة "مصروفات الموظفين" بالمحاسبة.
    ──────────────────────────────────────────────────────────────────── */
 export default function MyExpenses() {
   const { toast } = useToast();
   const confirmDialog = useConfirm();
   const { user } = useAuth();
 
-  const [myEmployee, setMyEmployee] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [products, setProducts] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -42,8 +40,6 @@ export default function MyExpenses() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [receiptExpense, setReceiptExpense] = useState(null);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [showSubmitReport, setShowSubmitReport] = useState(false);
 
   const load = async () => {
     try {
@@ -53,14 +49,11 @@ export default function MyExpenses() {
         getProducts("expense").catch(() => []),
         getEmployees().catch(() => ({ data: [] })),
       ]);
-      const employeesList = emps?.data || emps || [];
-      const me = employeesList.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase());
-      setMyEmployee(me || null);
       setExpenses(expRes?.expenses || []);
       setProducts(prods);
-      setEmployees(employeesList);
+      setEmployees(emps?.data || emps || []);
     } catch (err) {
-      console.error("خطأ أثناء تحميل مصروفاتي:", err);
+      console.error("خطأ أثناء تحميل المصروفات:", err);
       toast({
         title: "تعذّر تحميل المصروفات",
         description: extractApiErrorMessage(err),
@@ -73,18 +66,9 @@ export default function MyExpenses() {
 
   useEffect(() => { if (user) load(); }, [user]);
 
-  // مصروفات الموظف الحالي فقط — فلترة client-side احتياطية سواء الباك إند
-  // بيرجع بيانات الكل أو بيانات الموظف نفسه بس
-  const myExpenses = myEmployee
-    ? expenses.filter((e) => String(e.employee_id) === String(myEmployee.id) || e.employee_name === myEmployee.name)
-    : expenses;
-
   const openCreate = () => { setEditExpense(null); setShowExpenseForm(true); };
   const openEdit = (exp) => { setEditExpense(exp); setShowExpenseForm(true); };
   const closeForm = () => { setShowExpenseForm(false); setEditExpense(null); };
-
-  const toggleSelect = (id) =>
-    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
 
   const handleDelete = async (exp) => {
     const ok = await confirmDialog({
@@ -97,7 +81,6 @@ export default function MyExpenses() {
     try {
       await deleteExpense(exp.id);
       toast({ title: "تم حذف المصروف" });
-      setSelectedIds((ids) => ids.filter((i) => i !== exp.id));
       load();
     } catch (err) {
       console.error("خطأ أثناء حذف المصروف:", err);
@@ -109,37 +92,27 @@ export default function MyExpenses() {
     }
   };
 
-  const selectedExpenses = myExpenses.filter((e) => selectedIds.includes(e.id));
-  const expensesPagination = usePagination(myExpenses, 20);
+  const expensesPagination = usePagination(expenses, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-primary" /> مصروفاتي
+            <Wallet className="w-6 h-6 text-primary" /> مصروفات
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">سجّل مصروفاتك الشخصية وقدّمها للاعتماد والتعويض</p>
+          <p className="text-sm text-muted-foreground mt-0.5">سجّل المصروفات وقدّمها للاعتماد والتعويض</p>
         </div>
-        <div className="flex gap-2">
-          {selectedIds.length > 0 && (
-            <button onClick={() => setShowSubmitReport(true)}
-              className="flex items-center gap-2 px-4 py-2.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5">
-              <Send className="w-4 h-4" /> تقديم كتقرير ({selectedIds.length})
-            </button>
-          )}
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
-            <Plus className="w-4 h-4" /> مصروف جديد
-          </button>
-        </div>
+        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
+          <Plus className="w-4 h-4" /> مصروف جديد
+        </button>
       </div>
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/30 border-b border-border">
-              <th className="w-10 px-4 py-3" />
-              {["الوصف", "النوع", "التاريخ", "المبلغ", "الحالة", "إجراءات"].map((h) => (
+              {["الوصف", "الموظف", "النوع", "التاريخ", "المبلغ", "الحالة", "إجراءات"].map((h) => (
                 <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -147,17 +120,12 @@ export default function MyExpenses() {
           <tbody>
             {loading ? (
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-            ) : myExpenses.length === 0 ? (
+            ) : expenses.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد مصروفات بعد</td></tr>
             ) : expensesPagination.pageItems.map((exp) => (
               <tr key={exp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                <td className="px-4 py-3">
-                  {!exp.sheet_id && (
-                    <input type="checkbox" checked={selectedIds.includes(exp.id)} onChange={() => toggleSelect(exp.id)}
-                      className="w-4 h-4 accent-primary" />
-                  )}
-                </td>
                 <td className="px-4 py-3 font-medium text-foreground">{exp.name}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{exp.employee_name || "—"}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">{exp.product_name || "—"}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">{exp.date}</td>
                 <td className="px-4 py-3 font-semibold">{fmt(exp.total_amount)} ر.س</td>
@@ -203,11 +171,6 @@ export default function MyExpenses() {
       {receiptExpense && (
         <AttachReceiptModal expense={receiptExpense} onClose={() => setReceiptExpense(null)}
           onDone={() => { setReceiptExpense(null); load(); }} />
-      )}
-      {showSubmitReport && (
-        <SubmitReportModal selectedExpenses={selectedExpenses}
-          onClose={() => setShowSubmitReport(false)}
-          onDone={() => { setShowSubmitReport(false); setSelectedIds([]); load(); }} />
       )}
     </div>
   );

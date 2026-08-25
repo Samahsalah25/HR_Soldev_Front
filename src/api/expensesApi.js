@@ -40,6 +40,14 @@ export async function attachExpenseReceipt(id, file, fileName) {
   return res.data;
 }
 
+// جلب مرفق مصروف (الإيصال المرفوع) — بيرجع الملف نفسه (blob)
+export async function getExpenseAttachment(id) {
+  const res = await api.get(`/expenses/${id}/attachment`, {
+    responseType: "blob",
+  });
+  return res.data;
+}
+
 /* ===========================
    Expense Reports (تقارير المصروفات)
 =========================== */

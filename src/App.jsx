@@ -258,6 +258,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Payroll from './pages/Payroll';
+import MyExpenses from './pages/MyExpenses';
 import Leaves from './pages/Leaves';
 import Attendance from './pages/Attendance';
 import EndOfService from './pages/EndOfService';
@@ -421,6 +422,7 @@ const AuthenticatedApp = () => {
           <Route path="/home-dashboard" element={<RoleDashboard />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/payroll" element={<Payroll />} />
+          <Route path="/expenses" element={<MyExpenses />} />
           {/* new */}
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/credit-notes" element={<CreditNotes />} />

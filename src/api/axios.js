@@ -7,7 +7,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
-
+//test
 // دومين السيرفر بدون /api/v1 — يستخدم لبناء روابط ملفات (CV، مستندات...) الراجعة كمسار نسبي من الـ API
 export const API_ORIGIN = api.defaults.baseURL.replace(/\/api\/v1\/?$/, "");
 

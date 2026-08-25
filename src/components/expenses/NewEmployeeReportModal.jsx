@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus, X, ArrowRight, Send } from "lucide-react";
+import { UserPlus, X, Send } from "lucide-react";
 import { submitExpenseReport } from "@/api/expensesApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useToast } from "@/components/ui/use-toast";
@@ -7,28 +7,28 @@ import { useToast } from "@/components/ui/use-toast";
 const fmt = (n) => (n || 0).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /* ────────────────────────────────────────────────────────────────────────
-   بوب-أب واحد بيجمع: اختيار الموظف → اختيار مصروفاته → تسميتها كتقرير وتقديمه
+   بوب-أب واحد — نفس أسلوب فورم "مصروف جديد": حقل اختيار الموظف (select) في الأعلى،
+   وبمجرد الاختيار تظهر مصروفاته تحته في نفس الشاشة (من غير خطوات/رجوع).
    ──────────────────────────────────────────────────────────────────── */
 export default function NewEmployeeReportModal({ employees, expenses, onClose, onDone }) {
   const { toast } = useToast();
-  const [step, setStep] = useState("employee"); // "employee" | "expenses"
-  const [search, setSearch] = useState("");
-  const [employee, setEmployee] = useState(null);
+  const [employeeId, setEmployeeId] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [reportName, setReportName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const filteredEmployees = employees.filter((e) => !search || (e.name || "").toLowerCase().includes(search.toLowerCase()));
+  const employee = employees.find((e) => String(e.id) === String(employeeId)) || null;
 
-  const pickEmployee = (emp) => {
-    setEmployee(emp);
+  const handlePickEmployee = (id) => {
+    setEmployeeId(id);
     setSelectedIds([]);
     setReportName("");
-    setStep("expenses");
   };
 
+  // الباك إند بيرفض تقديم أي مصروف مش في حالة "draft" — مثال رسالة الخطأ المؤكدة:
+  // "No valid draft expenses found for this employee"
   const employeeExpenses = employee
-    ? expenses.filter((e) => !e.sheet_id && (String(e.employee_id) === String(employee.id) || e.employee_name === employee.name))
+    ? expenses.filter((e) => e.state === "draft" && !e.sheet_id && (String(e.employee_id) === String(employee.id) || e.employee_name === employee.name))
     : [];
 
   const toggleSelect = (id) =>
@@ -63,39 +63,23 @@ export default function NewEmployeeReportModal({ employees, expenses, onClose, o
       <div className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h3 className="font-bold text-foreground flex items-center gap-2">
-            {step === "expenses" && (
-              <button onClick={() => setStep("employee")} className="text-muted-foreground hover:text-foreground">
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            )}
-            <UserPlus className="w-5 h-5 text-primary" />
-            {step === "employee" ? "اختر الموظف" : `مصروفات ${employee?.name}`}
+            <UserPlus className="w-5 h-5 text-primary" /> مصروف موظف جديد
           </h3>
           <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
 
-        {step === "employee" ? (
-          <>
-            <div className="p-4 border-b border-border">
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم..."
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {filteredEmployees.length === 0 ? (
-                <p className="text-center py-8 text-sm text-muted-foreground">لا يوجد موظفون</p>
-              ) : (
-                filteredEmployees.map((emp) => (
-                  <button key={emp.id} onClick={() => pickEmployee(emp)}
-                    className="w-full text-right px-4 py-3 text-sm hover:bg-muted border-b border-border last:border-0 text-foreground">
-                    {emp.name || emp.name_ar}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">الموظف *</label>
+            <select value={employeeId} onChange={(e) => handlePickEmployee(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+              <option value="">اختر الموظف...</option>
+              {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name || emp.name_ar}</option>)}
+            </select>
+          </div>
+
+          {employee && (
+            <>
               {employeeExpenses.length === 0 ? (
                 <p className="text-center py-8 text-sm text-muted-foreground">لا توجد مصروفات غير مُقدَّمة لهذا الموظف</p>
               ) : (
@@ -139,16 +123,17 @@ export default function NewEmployeeReportModal({ employees, expenses, onClose, o
                   </div>
                 </>
               )}
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
-              <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-              <button onClick={submit} disabled={saving || selectedIds.length === 0 || !reportName.trim()}
-                className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
-                <Send className="w-4 h-4" />{saving ? "جاري التقديم..." : "تقديم التقرير"}
-              </button>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
+          <button onClick={submit} disabled={saving || selectedIds.length === 0 || !reportName.trim()}
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
+            <Send className="w-4 h-4" />{saving ? "جاري التقديم..." : "تقديم التقرير"}
+          </button>
+        </div>
       </div>
     </div>
   );

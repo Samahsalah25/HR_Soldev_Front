@@ -23,22 +23,35 @@ import RegisterPaymentModal from "@/components/expenses/RegisterPaymentModal";
 // ⚠️ مفيش عينة رد فيها تقرير فعلي من الـ API (الرد كان فاضي: reports: [])،
 // فالـ labels دي افتراضية مبنية على تدفق Odoo القياسي (draft → submitted → approved → posted → paid)
 // ولازم تتأكد من القيم الحقيقية اللي بترجع من الباك إند وتتعدّل هنا لو مختلفة.
+// ضفنا كذا alias لاحتمالات تسمية مختلفة (زي "submitted" اللي طلعت هي القيمة الحقيقية للمصروفات مش "reported")
 const REPORT_STATE_LABELS = {
   draft: "مسودة",
+  submit: "بانتظار الاعتماد",
   submitted: "بانتظار الاعتماد",
+  approve: "معتمد",
   approved: "معتمد",
+  done: "معتمد",
+  post: "مُرحَّل للمحاسب",
   posted: "مُرحَّل للمحاسب",
   paid: "مدفوع",
+  refuse: "مرفوض",
   refused: "مرفوض",
+  cancel: "ملغي",
   cancelled: "ملغي",
 };
 const REPORT_STATE_COLORS = {
   draft: "bg-gray-100 text-gray-600",
+  submit: "bg-amber-100 text-amber-700",
   submitted: "bg-amber-100 text-amber-700",
+  approve: "bg-blue-100 text-blue-700",
   approved: "bg-blue-100 text-blue-700",
+  done: "bg-blue-100 text-blue-700",
+  post: "bg-purple-100 text-purple-700",
   posted: "bg-purple-100 text-purple-700",
   paid: "bg-green-100 text-green-700",
+  refuse: "bg-red-100 text-red-600",
   refused: "bg-red-100 text-red-600",
+  cancel: "bg-gray-100 text-gray-500",
   cancelled: "bg-gray-100 text-gray-500",
 };
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Wallet, Plus, Save, Trash2, Paperclip } from "lucide-react";
-import { getExpenses, deleteExpense } from "@/api/expensesApi";
+import { Wallet, Plus, Save, Trash2, Paperclip, Eye } from "lucide-react";
+import { getExpenses, deleteExpense, getExpenseAttachment } from "@/api/expensesApi";
 import { getProducts } from "@/api/accountingApi";
 import { getEmployees } from "@/api/departmentsApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
@@ -12,12 +12,18 @@ import TablePagination from "@/components/ui/TablePagination";
 import ExpenseForm from "@/components/expenses/ExpenseForm";
 import AttachReceiptModal from "@/components/expenses/AttachReceiptModal";
 
-const EXPENSE_STATE_LABELS = { draft: "مسودة", reported: "مُقدَّم", done: "مُعتمد", refused: "مرفوض" };
+// ⚠️ "submitted" اتأكدت من بيانات حقيقية إنها القيمة الفعلية اللي الباك إند بيرجعها
+// (مش "reported" زي ما كنت مخمّن الأول) — سايبين "reported" كـ fallback احتياطي بس.
+const EXPENSE_STATE_LABELS = { draft: "مسودة", submitted: "مُقدَّم", reported: "مُقدَّم", done: "مُعتمد", approved: "مُعتمد", refused: "مرفوض", cancel: "ملغي", cancelled: "ملغي" };
 const EXPENSE_STATE_COLORS = {
   draft: "bg-gray-100 text-gray-600",
+  submitted: "bg-amber-100 text-amber-700",
   reported: "bg-amber-100 text-amber-700",
   done: "bg-green-100 text-green-700",
+  approved: "bg-green-100 text-green-700",
   refused: "bg-red-100 text-red-600",
+  cancel: "bg-gray-100 text-gray-500",
+  cancelled: "bg-gray-100 text-gray-500",
 };
 
 const fmt = (n) => (n || 0).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -92,6 +98,20 @@ export default function MyExpenses() {
     }
   };
 
+  const handleViewAttachment = async (exp) => {
+    try {
+      const blob = await getExpenseAttachment(exp.id);
+      window.open(window.URL.createObjectURL(blob), "_blank");
+    } catch (err) {
+      console.error("خطأ أثناء عرض المرفق:", err);
+      toast({
+        title: "تعذّر عرض المرفق",
+        description: extractApiErrorMessage(err),
+        variant: "destructive",
+      });
+    }
+  };
+
   const expensesPagination = usePagination(expenses, 20);
 
   return (
@@ -136,6 +156,11 @@ export default function MyExpenses() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
+                    {exp.message_main_attachment_id && (
+                      <button onClick={() => handleViewAttachment(exp)} title="عرض المرفق" className="p-1.5 hover:bg-muted rounded text-muted-foreground">
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button onClick={() => setReceiptExpense(exp)} title="رفع إيصال" className="p-1.5 hover:bg-muted rounded text-muted-foreground">
                       <Paperclip className="w-3.5 h-3.5" />
                     </button>

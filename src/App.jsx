@@ -307,7 +307,8 @@ import CreditNotes from './pages/accounting/CreditNotes.jsx';
 import Customers from './pages/accounting/Customers.jsx';
 import CustomerPayments from './pages/accounting/CustomerPayments.jsx';
 import Journals from './pages/accounting/Journals.jsx';
-
+import paymentTerms from './pages/accounting/paymentTerms.jsx';
+import PaymentTerms from './pages/accounting/paymentTerms.jsx';
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 
@@ -427,6 +428,7 @@ const AuthenticatedApp = () => {
           <Route path="/customer" element={<Customers />} />
           <Route path="/customer-payments" element={<CustomerPayments />} />
           <Route path="/journals" element={<Journals />} />
+         <Route path="/payment-terms" element={<PaymentTerms/>} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/end-of-service" element={<EndOfService />} />

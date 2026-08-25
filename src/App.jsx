@@ -307,7 +307,7 @@ import CreditNotes from './pages/accounting/CreditNotes.jsx';
 import Customers from './pages/accounting/Customers.jsx';
 import CustomerPayments from './pages/accounting/CustomerPayments.jsx';
 import Journals from './pages/accounting/Journals.jsx';
-import PaymentTerms from './pages/accounting/PaymentTerms.jsx';
+import PaymentTerms from './pages/accounting/Paymentterms.jsx';
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 

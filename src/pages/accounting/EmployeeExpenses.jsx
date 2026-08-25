@@ -1,37 +1,24 @@
 import { useState, useEffect } from "react";
 import {
-  UserCog, Save, Trash2, Paperclip, ArrowRight, X, Send, UserPlus,
+  UserCog, ArrowRight, UserPlus,
   CheckCircle, XCircle, CreditCard, FileCheck,
 } from "lucide-react";
 import NewEmployeeReportModal from "@/components/expenses/NewEmployeeReportModal";
 import {
   getExpenses,
-  deleteExpense,
   getExpenseReports,
   getExpenseReport,
   approveExpenseReport,
   postExpenseReportToAccountant,
 } from "@/api/expensesApi";
-import { getProducts } from "@/api/accountingApi";
 import { getEmployees } from "@/api/departmentsApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { usePagination } from "@/lib/usePagination";
 import TablePagination from "@/components/ui/TablePagination";
-import ExpenseForm from "@/components/expenses/ExpenseForm";
-import AttachReceiptModal from "@/components/expenses/AttachReceiptModal";
-import SubmitReportModal from "@/components/expenses/SubmitReportModal";
 import RefuseReportModal from "@/components/expenses/RefuseReportModal";
 import RegisterPaymentModal from "@/components/expenses/RegisterPaymentModal";
-
-const EXPENSE_STATE_LABELS = { draft: "مسودة", reported: "مُقدَّم", done: "مُعتمد", refused: "مرفوض" };
-const EXPENSE_STATE_COLORS = {
-  draft: "bg-gray-100 text-gray-600",
-  reported: "bg-amber-100 text-amber-700",
-  done: "bg-green-100 text-green-700",
-  refused: "bg-red-100 text-red-600",
-};
 
 // ⚠️ مفيش عينة رد فيها تقرير فعلي من الـ API (الرد كان فاضي: reports: [])،
 // فالـ labels دي افتراضية مبنية على تدفق Odoo القياسي (draft → submitted → approved → posted → paid)
@@ -200,39 +187,29 @@ function ReportDetail({ reportId, onBack, onChanged }) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
-   الصفحة الرئيسية
+   الصفحة الرئيسية — تقارير المصروفات (مع زرار "مصروف موظف جديد" لإنشاء تقرير)
    ──────────────────────────────────────────────────────────────────── */
 export default function EmployeeExpenses() {
   const { toast } = useToast();
-  const confirmDialog = useConfirm();
 
-  const [activeTab, setActiveTab] = useState("expenses");
   const [expenses, setExpenses] = useState([]);
   const [reports, setReports] = useState([]);
-  const [products, setProducts] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [editExpense, setEditExpense] = useState(null);
-  const [receiptExpense, setReceiptExpense] = useState(null);
   const [selectedReportId, setSelectedReportId] = useState(null);
-  const [filterEmployee, setFilterEmployee] = useState(null);
-  const [reportExpense, setReportExpense] = useState(null);
   const [showEmployeePicker, setShowEmployeePicker] = useState(false);
 
   const load = async () => {
     try {
       setLoading(true);
-      const [expRes, repRes, prods, emps] = await Promise.all([
+      const [expRes, repRes, emps] = await Promise.all([
         getExpenses(),
         getExpenseReports(),
-        getProducts("expense").catch(() => []),
         getEmployees().catch(() => ({ data: [] })),
       ]);
       setExpenses(expRes?.expenses || []);
       setReports(repRes?.reports || []);
-      setProducts(prods);
       setEmployees(emps?.data || emps || []);
     } catch (err) {
       console.error("خطأ أثناء تحميل المصروفات:", err);
@@ -248,36 +225,6 @@ export default function EmployeeExpenses() {
 
   useEffect(() => { load(); }, []);
 
-  const openEdit = (exp) => { setEditExpense(exp); setShowExpenseForm(true); };
-  const closeForm = () => { setShowExpenseForm(false); setEditExpense(null); };
-
-  const handleDelete = async (exp) => {
-    const ok = await confirmDialog({
-      title: "حذف المصروف",
-      message: "هل أنت متأكد من حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء.",
-      confirmText: "حذف",
-      variant: "destructive",
-    });
-    if (!ok) return;
-    try {
-      await deleteExpense(exp.id);
-      toast({ title: "تم حذف المصروف" });
-      load();
-    } catch (err) {
-      console.error("خطأ أثناء حذف المصروف:", err);
-      toast({
-        title: "تعذّر حذف المصروف",
-        description: extractApiErrorMessage(err),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const displayedExpenses = filterEmployee
-    ? expenses.filter((e) => String(e.employee_id) === String(filterEmployee.id) || e.employee_name === filterEmployee.name)
-    : expenses;
-
-  const expensesPagination = usePagination(displayedExpenses, 20);
   const reportsPagination = usePagination(reports, 20);
 
   if (selectedReportId) {
@@ -299,162 +246,55 @@ export default function EmployeeExpenses() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">تسجيل مصروفات الموظفين وتقديمها للاعتماد والسداد</p>
         </div>
-        {activeTab === "expenses" && (
-          <button onClick={() => setShowEmployeePicker(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
-            <UserPlus className="w-4 h-4" /> New
-          </button>
-        )}
+        <button onClick={() => setShowEmployeePicker(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
+          <UserPlus className="w-4 h-4" /> مصروف موظف جديد
+        </button>
       </div>
 
-      <div className="flex gap-1 border-b border-border">
-        {[
-          { id: "expenses", label: `المصروفات (${expenses.length})` },
-          { id: "reports", label: `تقارير المصروفات (${reports.length})` },
-        ].map((t) => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === "expenses" && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          {filterEmployee && (
-            <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-border">
-              <span className="text-sm text-foreground">
-                مصروفات: <span className="font-semibold">{filterEmployee.name}</span>
-              </span>
-              <button onClick={() => setFilterEmployee(null)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                <X className="w-3.5 h-3.5" /> عرض الكل
-              </button>
-            </div>
-          )}
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/30 border-b border-border">
-                {["الوصف", "الموظف", "النوع", "التاريخ", "المبلغ", "الحالة", "إجراءات"].map((h) => (
-                  <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-              ) : displayedExpenses.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد مصروفات بعد</td></tr>
-              ) : expensesPagination.pageItems.map((exp) => (
-                <tr key={exp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium text-foreground">{exp.name}</td>
-                  <td className="px-4 py-3 text-xs">
-                    {exp.employee_name ? (
-                      <button onClick={() => setFilterEmployee({ id: exp.employee_id, name: exp.employee_name })}
-                        className="text-primary hover:underline">
-                        {exp.employee_name}
-                      </button>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{exp.product_name || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{exp.date}</td>
-                  <td className="px-4 py-3 font-semibold">{fmt(exp.total_amount)} ر.س</td>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/30 border-b border-border">
+              {["اسم التقرير", "الموظف", "الإجمالي", "الحالة", ""].map((h) => (
+                <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+            ) : reports.length === 0 ? (
+              <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">لا توجد تقارير مصروفات بعد</td></tr>
+            ) : reportsPagination.pageItems.map((r) => {
+              const state = r.state || r.status || "draft";
+              return (
+                <tr key={r.id} onClick={() => setSelectedReportId(r.id)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
+                  <td className="px-4 py-3 font-medium text-foreground">{r.name}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.employee_name || "—"}</td>
+                  <td className="px-4 py-3 font-semibold">{fmt(r.total_amount)} ر.س</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${EXPENSE_STATE_COLORS[exp.state] || "bg-muted text-muted-foreground"}`}>
-                      {EXPENSE_STATE_LABELS[exp.state] || exp.state}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${REPORT_STATE_COLORS[state] || "bg-muted text-muted-foreground"}`}>
+                      {REPORT_STATE_LABELS[state] || state}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <button onClick={() => setReceiptExpense(exp)} title="رفع إيصال" className="p-1.5 hover:bg-muted rounded text-muted-foreground">
-                        <Paperclip className="w-3.5 h-3.5" />
-                      </button>
-                      {!exp.sheet_id && (
-                        <>
-                          <button onClick={() => setReportExpense(exp)} title="تحويل لتقرير" className="p-1.5 hover:bg-primary/10 rounded text-primary">
-                            <Send className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => openEdit(exp)} title="تعديل" className="p-1.5 hover:bg-muted rounded text-muted-foreground">
-                            <Save className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => handleDelete(exp)} title="حذف" className="p-1.5 hover:bg-red-50 rounded text-red-500">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
-                    </div>
+                  <td className="px-4 py-3 text-left">
+                    <ArrowRight className="w-4 h-4 text-muted-foreground rotate-180" />
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <TablePagination
-            page={expensesPagination.page}
-            totalPages={expensesPagination.totalPages}
-            totalItems={expensesPagination.totalItems}
-            pageSize={expensesPagination.pageSize}
-            onPageChange={expensesPagination.setPage}
-          />
-        </div>
-      )}
+              );
+            })}
+          </tbody>
+        </table>
+        <TablePagination
+          page={reportsPagination.page}
+          totalPages={reportsPagination.totalPages}
+          totalItems={reportsPagination.totalItems}
+          pageSize={reportsPagination.pageSize}
+          onPageChange={reportsPagination.setPage}
+        />
+      </div>
 
-      {activeTab === "reports" && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/30 border-b border-border">
-                {["اسم التقرير", "الموظف", "الإجمالي", "الحالة", ""].map((h) => (
-                  <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-              ) : reports.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">لا توجد تقارير مصروفات بعد</td></tr>
-              ) : reportsPagination.pageItems.map((r) => {
-                const state = r.state || r.status || "draft";
-                return (
-                  <tr key={r.id} onClick={() => setSelectedReportId(r.id)} className="border-b border-border last:border-0 hover:bg-muted/20 cursor-pointer">
-                    <td className="px-4 py-3 font-medium text-foreground">{r.name}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{r.employee_name || "—"}</td>
-                    <td className="px-4 py-3 font-semibold">{fmt(r.total_amount)} ر.س</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${REPORT_STATE_COLORS[state] || "bg-muted text-muted-foreground"}`}>
-                        {REPORT_STATE_LABELS[state] || state}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-left">
-                      <ArrowRight className="w-4 h-4 text-muted-foreground rotate-180" />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <TablePagination
-            page={reportsPagination.page}
-            totalPages={reportsPagination.totalPages}
-            totalItems={reportsPagination.totalItems}
-            pageSize={reportsPagination.pageSize}
-            onPageChange={reportsPagination.setPage}
-          />
-        </div>
-      )}
-
-      {showExpenseForm && (
-        <ExpenseForm expense={editExpense} products={products} employees={employees} showEmployeeField
-          onSave={() => { closeForm(); load(); }} onClose={closeForm} />
-      )}
-      {receiptExpense && (
-        <AttachReceiptModal expense={receiptExpense} onClose={() => setReceiptExpense(null)}
-          onDone={() => { setReceiptExpense(null); load(); }} />
-      )}
-      {reportExpense && (
-        <SubmitReportModal selectedExpenses={[reportExpense]}
-          onClose={() => setReportExpense(null)}
-          onDone={() => { setReportExpense(null); load(); }} />
-      )}
       {showEmployeePicker && (
         <NewEmployeeReportModal employees={employees} expenses={expenses}
           onClose={() => setShowEmployeePicker(false)}

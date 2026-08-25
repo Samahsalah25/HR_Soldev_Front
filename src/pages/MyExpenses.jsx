@@ -36,6 +36,7 @@ export default function MyExpenses() {
   const [myEmployee, setMyEmployee] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [products, setProducts] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -57,6 +58,7 @@ export default function MyExpenses() {
       setMyEmployee(me || null);
       setExpenses(expRes?.expenses || []);
       setProducts(prods);
+      setEmployees(employeesList);
     } catch (err) {
       console.error("خطأ أثناء تحميل مصروفاتي:", err);
       toast({
@@ -195,7 +197,7 @@ export default function MyExpenses() {
       </div>
 
       {showExpenseForm && (
-        <ExpenseForm expense={editExpense} products={products}
+        <ExpenseForm expense={editExpense} products={products} employees={employees} showEmployeeField
           onSave={() => { closeForm(); load(); }} onClose={closeForm} />
       )}
       {receiptExpense && (

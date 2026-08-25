@@ -15,7 +15,7 @@ import {
   createPaymentTerm,
   updatePaymentTerm,
   deletePaymentTerm,
-} from "@/api/paymentTermsApi";
+} from "@/api/Paymenttermsapi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";

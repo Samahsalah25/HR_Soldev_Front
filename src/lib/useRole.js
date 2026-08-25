@@ -30,19 +30,19 @@ export const ROLE_LABELS = {
 
 export const ROLE_ACCESS = {
   employee: {
-    nav: ["ess", "leaves", "attendance", "violations", "deductions", "bonuses", "tasks", "requests", "meetings", "assets", "loan-management"],
+    nav: ["ess", "leaves", "attendance", "violations", "deductions", "bonuses", "tasks", "requests", "meetings", "assets", "loan-management", "expenses"],
     canSeePayroll: false, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: false, isEmployee: true,
   },
   dept_manager: {
-    nav: ["dashboard", "employees", "leaves", "attendance", "missions", "violations", "deductions", "bonuses", "tasks", "requests", "meetings", "transfers", "recruitment", "ess", "assets", "loan-management"],
+    nav: ["dashboard", "employees", "leaves", "attendance", "missions", "violations", "deductions", "bonuses", "tasks", "requests", "meetings", "transfers", "recruitment", "ess", "assets", "loan-management", "expenses"],
     canSeePayroll: false, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: false, isDeptManager: true,
   },
   hr: {
-    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management"],
+    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses"],
     canSeePayroll: true, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: true, isHR: true,
   },
   general_manager: {
-    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management"],
+    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses"],
     canSeePayroll: true, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: true, isGM: true,
   },
   ceo: {
@@ -50,7 +50,7 @@ export const ROLE_ACCESS = {
     canSeePayroll: true, canSeeAccounting: true, canSeeSettings: true, canSeeAllEmployees: true, isCEO: true,
   },
   accountant: {
-    nav: ["accounting", "financial-reports", "assets", "loan-management"],
+    nav: ["accounting", "financial-reports", "assets", "loan-management", "expenses"],
     canSeePayroll: false, canSeeAccounting: true, canSeeSettings: false, canSeeAllEmployees: false, isAccountant: true,
   },
   admin: {
@@ -58,7 +58,7 @@ export const ROLE_ACCESS = {
     canSeePayroll: true, canSeeAccounting: true, canSeeSettings: true, canSeeAllEmployees: true, isAdmin: true,
   },
   user: {
-    nav: ["ess", "assets"],
+    nav: ["ess", "assets", "expenses"],
     canSeePayroll: false, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: false, isEmployee: true,
   },
 };

@@ -467,11 +467,12 @@ import {
   Calendar,
   CreditCard,
   UserX,
+  Wallet,
 } from "lucide-react";
 
 import NotificationPanel from "./NotificationPanel";
 import { useLanguage } from "../lib/useLanguage";
-import { useRole, ROLE_LABELS } from "../lib/useRole";
+import { useRole } from "../lib/useRole";
 import { useNavigate } from "react-router-dom";
 import { logoutUser } from "@/api/authApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -570,6 +571,11 @@ const ALL_NAV_GROUPS = [
         path: "/payroll",
         icon: DollarSign,
         label: "الرواتب والتأمينات",
+      },
+      {
+        path: "/expenses",
+        icon: Wallet,
+        label: "المصروفات",
       },
       {
         path: "/accounting",

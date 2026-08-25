@@ -1,37 +1,30 @@
 import { useState, useEffect } from "react";
 import {
-  UserCog, Plus, X, Save, Trash2, Paperclip, ArrowRight,
-  CheckCircle, XCircle, Send, CreditCard, FileCheck,
+  UserCog, Save, Trash2, Paperclip, ArrowRight, X, Send, UserPlus,
+  CheckCircle, XCircle, CreditCard, FileCheck,
 } from "lucide-react";
+import NewEmployeeReportModal from "@/components/expenses/NewEmployeeReportModal";
 import {
   getExpenses,
-  createExpense,
-  updateExpense,
   deleteExpense,
-  attachExpenseReceipt,
   getExpenseReports,
   getExpenseReport,
-  submitExpenseReport,
   approveExpenseReport,
-  refuseExpenseReport,
   postExpenseReportToAccountant,
-  registerExpenseReportPayment,
 } from "@/api/expensesApi";
-import { getProducts, getPaymentJournals } from "@/api/accountingApi";
+import { getProducts } from "@/api/accountingApi";
+import { getEmployees } from "@/api/departmentsApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { usePagination } from "@/lib/usePagination";
 import TablePagination from "@/components/ui/TablePagination";
+import ExpenseForm from "@/components/expenses/ExpenseForm";
+import AttachReceiptModal from "@/components/expenses/AttachReceiptModal";
+import SubmitReportModal from "@/components/expenses/SubmitReportModal";
+import RefuseReportModal from "@/components/expenses/RefuseReportModal";
+import RegisterPaymentModal from "@/components/expenses/RegisterPaymentModal";
 
-// ملاحظة: "own_account" و"company_account" دي القيم القياسية لحقل payment_mode في Odoo hr_expense.
-const PAYMENT_MODES = [
-  { value: "own_account", label: "على حساب الموظف (تعويض لاحقًا)" },
-  { value: "company_account", label: "على حساب الشركة مباشرة" },
-];
-
-// ⚠️ مفيش قائمة قيم مؤكدة من الباك إند لـ expense_category غير "travel" (من عينة الـ Postman)،
-// فالحقل ده نص حر بدل dropdown لحد ما تتأكد القيم المسموح بيها.
 const EXPENSE_STATE_LABELS = { draft: "مسودة", reported: "مُقدَّم", done: "مُعتمد", refused: "مرفوض" };
 const EXPENSE_STATE_COLORS = {
   draft: "bg-gray-100 text-gray-600",
@@ -63,387 +56,6 @@ const REPORT_STATE_COLORS = {
 };
 
 const fmt = (n) => (n || 0).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/* ────────────────────────────────────────────────────────────────────────
-   فورم إنشاء / تعديل مصروف
-   ──────────────────────────────────────────────────────────────────── */
-function ExpenseForm({ expense, products, onSave, onClose }) {
-  const { toast } = useToast();
-  const isEdit = Boolean(expense?.id);
-
-  const [form, setForm] = useState({
-    name: expense?.name || "",
-    total_amount: expense?.total_amount ?? "",
-    product_id: expense?.product_id || "",
-    date: expense?.date || new Date().toISOString().slice(0, 10),
-    payment_mode: expense?.payment_mode || "own_account",
-    expense_category: expense?.expense_category || "",
-    receipt_number: expense?.receipt_number || "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const handleSave = async () => {
-    setError("");
-    try {
-      setSaving(true);
-      const payload = {
-        name: form.name,
-        total_amount: Number(form.total_amount) || 0,
-        product_id: form.product_id ? Number(form.product_id) : undefined,
-        date: form.date,
-        payment_mode: form.payment_mode,
-        expense_category: form.expense_category || undefined,
-        receipt_number: form.receipt_number || undefined,
-      };
-
-      if (isEdit) {
-        await updateExpense(expense.id, payload);
-      } else {
-        await createExpense(payload);
-      }
-
-      onSave();
-    } catch (err) {
-      console.error("خطأ أثناء حفظ المصروف:", err);
-      setError(extractApiErrorMessage(err, "حصل خطأ أثناء حفظ المصروف، حاول تاني."));
-      toast({
-        title: "تعذّر حفظ المصروف",
-        description: extractApiErrorMessage(err),
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" dir="rtl">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h3 className="font-bold flex items-center gap-2">
-            <UserCog className="w-5 h-5 text-primary" />
-            {isEdit ? "تعديل مصروف" : "مصروف جديد"}
-          </h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg border border-red-200">{error}</div>
-          )}
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">وصف المصروف *</label>
-            <input value={form.name} onChange={(e) => set("name", e.target.value)}
-              placeholder="مثال: غداء عمل مع عميل"
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">المنتج / نوع المصروف</label>
-              <select value={form.product_id} onChange={(e) => set("product_id", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                <option value="">اختر...</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">المبلغ *</label>
-              <input type="number" min={0} dir="ltr" value={form.total_amount}
-                onChange={(e) => set("total_amount", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">التاريخ *</label>
-              <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">طريقة الدفع</label>
-              <select value={form.payment_mode} onChange={(e) => set("payment_mode", e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-                {PAYMENT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">تصنيف المصروف</label>
-              <input value={form.expense_category} onChange={(e) => set("expense_category", e.target.value)}
-                placeholder="مثال: travel"
-                dir="ltr"
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">رقم الإيصال</label>
-              <input value={form.receipt_number} onChange={(e) => set("receipt_number", e.target.value)}
-                dir="ltr"
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={handleSave} disabled={saving || !form.name || !form.total_amount || !form.date}
-            className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50">
-            <Save className="w-4 h-4" />{saving ? "جاري الحفظ..." : "حفظ"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   مودال رفع إيصال
-   ──────────────────────────────────────────────────────────────────── */
-function AttachReceiptModal({ expense, onClose, onDone }) {
-  const { toast } = useToast();
-  const [file, setFile] = useState(null);
-  const [fileName, setFileName] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const submit = async () => {
-    if (!file) return;
-    try {
-      setSaving(true);
-      await attachExpenseReceipt(expense.id, file, fileName || file.name);
-      toast({ title: "تم رفع الإيصال بنجاح ✅" });
-      onDone();
-    } catch (err) {
-      console.error("خطأ أثناء رفع الإيصال:", err);
-      toast({
-        title: "تعذّر رفع الإيصال",
-        description: extractApiErrorMessage(err),
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-foreground flex items-center gap-2"><Paperclip className="w-5 h-5 text-primary" />رفع إيصال</h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">الملف *</label>
-          <input type="file" onChange={(e) => {
-            const f = e.target.files[0];
-            setFile(f || null);
-            if (f && !fileName) setFileName(f.name);
-          }} className="w-full text-sm" />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">اسم الملف</label>
-          <input value={fileName} onChange={(e) => setFileName(e.target.value)} dir="ltr"
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-        </div>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={submit} disabled={saving || !file} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
-            {saving ? "جاري الرفع..." : "رفع"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   مودال تقديم تقرير مصروفات جديد
-   ──────────────────────────────────────────────────────────────────── */
-function SubmitReportModal({ selectedExpenses, onClose, onDone }) {
-  const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const total = selectedExpenses.reduce((s, e) => s + (e.total_amount || 0), 0);
-
-  const submit = async () => {
-    try {
-      setSaving(true);
-      await submitExpenseReport({
-        name: name.trim(),
-        expense_ids: selectedExpenses.map((e) => e.id),
-      });
-      toast({ title: "تم تقديم تقرير المصروفات بنجاح ✅" });
-      onDone();
-    } catch (err) {
-      console.error("خطأ أثناء تقديم التقرير:", err);
-      toast({
-        title: "تعذّر تقديم التقرير",
-        description: extractApiErrorMessage(err),
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-foreground flex items-center gap-2"><Send className="w-5 h-5 text-primary" />تقديم تقرير مصروفات</h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          هيتم تجميع {selectedExpenses.length} مصروف بإجمالي {fmt(total)} ر.س في تقرير واحد.
-        </p>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">اسم التقرير *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)}
-            placeholder="مثال: مصروفات سفر أغسطس"
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-        </div>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={submit} disabled={saving || !name.trim()} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
-            {saving ? "جاري التقديم..." : "تقديم"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   مودال رفض تقرير
-   ──────────────────────────────────────────────────────────────────── */
-function RefuseReportModal({ report, onClose, onDone }) {
-  const { toast } = useToast();
-  const [reason, setReason] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const submit = async () => {
-    try {
-      setSaving(true);
-      await refuseExpenseReport(report.id, reason.trim());
-      toast({ title: "تم رفض التقرير" });
-      onDone();
-    } catch (err) {
-      console.error("خطأ أثناء رفض التقرير:", err);
-      toast({
-        title: "تعذّر رفض التقرير",
-        description: extractApiErrorMessage(err),
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-foreground flex items-center gap-2"><XCircle className="w-5 h-5 text-red-500" />رفض التقرير</h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">سبب الرفض *</label>
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none" />
-        </div>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={submit} disabled={saving || !reason.trim()} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg disabled:opacity-50">
-            {saving ? "جاري الرفض..." : "تأكيد الرفض"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────────
-   مودال تسجيل دفعة سداد لتقرير
-   ──────────────────────────────────────────────────────────────────── */
-function RegisterPaymentModal({ report, onClose, onDone }) {
-  const { toast } = useToast();
-  const [journals, setJournals] = useState([]);
-  const [journalId, setJournalId] = useState("");
-  const [amount, setAmount] = useState(report.total_amount ?? "");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    getPaymentJournals().then((js) => {
-      setJournals(js);
-      if (js.length === 1) setJournalId(String(js[0].id));
-    }).catch(() => setJournals([]));
-  }, []);
-
-  const submit = async () => {
-    try {
-      setSaving(true);
-      await registerExpenseReportPayment(report.id, {
-        journal_id: Number(journalId),
-        amount: Number(amount) || 0,
-        payment_date: paymentDate,
-      });
-      toast({ title: "تم تسجيل الدفعة بنجاح ✅" });
-      onDone();
-    } catch (err) {
-      console.error("خطأ أثناء تسجيل الدفعة:", err);
-      toast({
-        title: "تعذّر تسجيل الدفعة",
-        description: extractApiErrorMessage(err),
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" dir="rtl">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-foreground flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" />تسجيل دفعة</h3>
-          <button onClick={onClose}><X className="w-5 h-5 text-muted-foreground" /></button>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">ادفع من (دفتر اليومية) *</label>
-          <select value={journalId} onChange={(e) => setJournalId(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
-            <option value="">اختر دفتر اليومية...</option>
-            {journals.map((j) => <option key={j.id} value={j.id}>{j.name} ({j.code})</option>)}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">المبلغ *</label>
-          <input type="number" dir="ltr" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">تاريخ الدفع</label>
-          <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none" />
-        </div>
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted">إلغاء</button>
-          <button onClick={submit} disabled={saving || !journalId || !amount} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
-            {saving ? "جاري التسجيل..." : "تسجيل الدفعة"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ────────────────────────────────────────────────────────────────────────
    تفاصيل تقرير مصروفات
@@ -598,26 +210,30 @@ export default function EmployeeExpenses() {
   const [expenses, setExpenses] = useState([]);
   const [reports, setReports] = useState([]);
   const [products, setProducts] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [receiptExpense, setReceiptExpense] = useState(null);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [showSubmitReport, setShowSubmitReport] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState(null);
+  const [filterEmployee, setFilterEmployee] = useState(null);
+  const [reportExpense, setReportExpense] = useState(null);
+  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
 
   const load = async () => {
     try {
       setLoading(true);
-      const [expRes, repRes, prods] = await Promise.all([
+      const [expRes, repRes, prods, emps] = await Promise.all([
         getExpenses(),
         getExpenseReports(),
         getProducts("expense").catch(() => []),
+        getEmployees().catch(() => ({ data: [] })),
       ]);
       setExpenses(expRes?.expenses || []);
       setReports(repRes?.reports || []);
       setProducts(prods);
+      setEmployees(emps?.data || emps || []);
     } catch (err) {
       console.error("خطأ أثناء تحميل المصروفات:", err);
       toast({
@@ -632,12 +248,8 @@ export default function EmployeeExpenses() {
 
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setEditExpense(null); setShowExpenseForm(true); };
   const openEdit = (exp) => { setEditExpense(exp); setShowExpenseForm(true); };
   const closeForm = () => { setShowExpenseForm(false); setEditExpense(null); };
-
-  const toggleSelect = (id) =>
-    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
 
   const handleDelete = async (exp) => {
     const ok = await confirmDialog({
@@ -650,7 +262,6 @@ export default function EmployeeExpenses() {
     try {
       await deleteExpense(exp.id);
       toast({ title: "تم حذف المصروف" });
-      setSelectedIds((ids) => ids.filter((i) => i !== exp.id));
       load();
     } catch (err) {
       console.error("خطأ أثناء حذف المصروف:", err);
@@ -662,9 +273,11 @@ export default function EmployeeExpenses() {
     }
   };
 
-  const selectedExpenses = expenses.filter((e) => selectedIds.includes(e.id));
+  const displayedExpenses = filterEmployee
+    ? expenses.filter((e) => String(e.employee_id) === String(filterEmployee.id) || e.employee_name === filterEmployee.name)
+    : expenses;
 
-  const expensesPagination = usePagination(expenses, 20);
+  const expensesPagination = usePagination(displayedExpenses, 20);
   const reportsPagination = usePagination(reports, 20);
 
   if (selectedReportId) {
@@ -687,17 +300,10 @@ export default function EmployeeExpenses() {
           <p className="text-sm text-muted-foreground mt-0.5">تسجيل مصروفات الموظفين وتقديمها للاعتماد والسداد</p>
         </div>
         {activeTab === "expenses" && (
-          <div className="flex gap-2">
-            {selectedIds.length > 0 && (
-              <button onClick={() => setShowSubmitReport(true)}
-                className="flex items-center gap-2 px-4 py-2.5 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5">
-                <Send className="w-4 h-4" /> تقديم كتقرير ({selectedIds.length})
-              </button>
-            )}
-            <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
-              <Plus className="w-4 h-4" /> مصروف جديد
-            </button>
-          </div>
+          <button onClick={() => setShowEmployeePicker(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
+            <UserPlus className="w-4 h-4" /> New
+          </button>
         )}
       </div>
 
@@ -715,10 +321,19 @@ export default function EmployeeExpenses() {
 
       {activeTab === "expenses" && (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
+          {filterEmployee && (
+            <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-border">
+              <span className="text-sm text-foreground">
+                مصروفات: <span className="font-semibold">{filterEmployee.name}</span>
+              </span>
+              <button onClick={() => setFilterEmployee(null)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" /> عرض الكل
+              </button>
+            </div>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
-                <th className="w-10 px-4 py-3" />
                 {["الوصف", "الموظف", "النوع", "التاريخ", "المبلغ", "الحالة", "إجراءات"].map((h) => (
                   <th key={h} className="text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
                 ))}
@@ -726,19 +341,20 @@ export default function EmployeeExpenses() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-              ) : expenses.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد مصروفات بعد</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+              ) : displayedExpenses.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد مصروفات بعد</td></tr>
               ) : expensesPagination.pageItems.map((exp) => (
                 <tr key={exp.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3">
-                    {!exp.sheet_id && (
-                      <input type="checkbox" checked={selectedIds.includes(exp.id)} onChange={() => toggleSelect(exp.id)}
-                        className="w-4 h-4 accent-primary" />
-                    )}
-                  </td>
                   <td className="px-4 py-3 font-medium text-foreground">{exp.name}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{exp.employee_name || "—"}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {exp.employee_name ? (
+                      <button onClick={() => setFilterEmployee({ id: exp.employee_id, name: exp.employee_name })}
+                        className="text-primary hover:underline">
+                        {exp.employee_name}
+                      </button>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{exp.product_name || "—"}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{exp.date}</td>
                   <td className="px-4 py-3 font-semibold">{fmt(exp.total_amount)} ر.س</td>
@@ -754,6 +370,9 @@ export default function EmployeeExpenses() {
                       </button>
                       {!exp.sheet_id && (
                         <>
+                          <button onClick={() => setReportExpense(exp)} title="تحويل لتقرير" className="p-1.5 hover:bg-primary/10 rounded text-primary">
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
                           <button onClick={() => openEdit(exp)} title="تعديل" className="p-1.5 hover:bg-muted rounded text-muted-foreground">
                             <Save className="w-3.5 h-3.5" />
                           </button>
@@ -824,17 +443,22 @@ export default function EmployeeExpenses() {
       )}
 
       {showExpenseForm && (
-        <ExpenseForm expense={editExpense} products={products}
+        <ExpenseForm expense={editExpense} products={products} employees={employees} showEmployeeField
           onSave={() => { closeForm(); load(); }} onClose={closeForm} />
       )}
       {receiptExpense && (
         <AttachReceiptModal expense={receiptExpense} onClose={() => setReceiptExpense(null)}
           onDone={() => { setReceiptExpense(null); load(); }} />
       )}
-      {showSubmitReport && (
-        <SubmitReportModal selectedExpenses={selectedExpenses}
-          onClose={() => setShowSubmitReport(false)}
-          onDone={() => { setShowSubmitReport(false); setSelectedIds([]); load(); }} />
+      {reportExpense && (
+        <SubmitReportModal selectedExpenses={[reportExpense]}
+          onClose={() => setReportExpense(null)}
+          onDone={() => { setReportExpense(null); load(); }} />
+      )}
+      {showEmployeePicker && (
+        <NewEmployeeReportModal employees={employees} expenses={expenses}
+          onClose={() => setShowEmployeePicker(false)}
+          onDone={() => { setShowEmployeePicker(false); load(); }} />
       )}
     </div>
   );

@@ -804,7 +804,6 @@ if (group.label === "المالية" && navKey === "payment_terms") {
   return (canSee("payroll") || canSee("accounting") || canSee("financial-reports"));
 }
                 
-
                 return canSee(navKey);
               });
 

@@ -598,6 +598,11 @@ const ALL_NAV_GROUPS = [
             icon: BookText,
             label: "دفاتر اليومية",
           },
+           {
+            path: "/payment_terms",
+            icon: BookText,
+            label: "شروط الدفع",
+          },
         ],
       },
     ],
@@ -792,16 +797,13 @@ function SidebarContent({
 
                 // دفاتر اليومية تظهر داخل إعدادات المالية
                 // إذا كان المستخدم يستطيع رؤية المالية.
-                if (
-                  group.label === "المالية" &&
-                  navKey === "journals"
-                ) {
-                  return (
-                    canSee("payroll") ||
-                    canSee("accounting") ||
-                    canSee("financial-reports")
-                  );
-                }
+            if (group.label === "المالية" && navKey === "journals") {
+  return (canSee("payroll") || canSee("accounting") || canSee("financial-reports"));
+}
+if (group.label === "المالية" && navKey === "payment_terms") {
+  return (canSee("payroll") || canSee("accounting") || canSee("financial-reports"));
+}
+                
 
                 return canSee(navKey);
               });

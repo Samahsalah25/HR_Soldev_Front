@@ -60,7 +60,7 @@ const fmt = (n) => (n || 0).toLocaleString("ar-SA", { minimumFractionDigits: 2, 
 /* ────────────────────────────────────────────────────────────────────────
    تفاصيل تقرير مصروفات
    ──────────────────────────────────────────────────────────────────── */
-function ReportDetail({ reportId, onBack, onChanged }) {
+function ReportDetail({ reportId, onBack, onChanged, expenses }) {
   const { toast } = useToast();
   const confirmDialog = useConfirm();
   const [report, setReport] = useState(null);
@@ -116,7 +116,19 @@ function ReportDetail({ reportId, onBack, onChanged }) {
   }
 
   const state = report.state || report.status || "draft";
-  const expenseLines = report.expenses || report.expense_lines || report.lines || [];
+  // بعض الردود بترجع بنود كاملة (report.expenses)، وبعضها بيرجع expense_line_ids
+  // (IDs بس، زي ما اتأكد من بيانات حقيقية) فبنكمّلها من قائمة المصروفات المحمّلة مسبقًا.
+  const expenseLines =
+    report.expenses || report.expense_lines || report.lines ||
+    (report.expense_line_ids || []).map((id) => expenses.find((e) => e.id === id)).filter(Boolean);
+
+  // الأزرار اللي تظهر حسب حالة التقرير: قبل الاعتماد يظهر اعتماد/رفض،
+  // بعد الاعتماد يظهر ترحيل للمحاسب، بعد الترحيل تظهر تسجيل دفعة،
+  // ولو التقرير مرفوض/ملغي كل الأزرار بتتشال خالص.
+  const isApproved = ["approve", "approved", "done", "post", "posted", "paid"].includes(state);
+  const isPosted = ["post", "posted", "paid"].includes(state);
+  const isTerminal = ["refuse", "refused", "cancel", "cancelled"].includes(state);
+  const showActions = !isTerminal;
 
   return (
     <div className="p-6 space-y-4 max-w-4xl mx-auto" dir="rtl">
@@ -130,18 +142,26 @@ function ReportDetail({ reportId, onBack, onChanged }) {
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex flex-wrap gap-2">
-          <button onClick={handleApprove} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-            <CheckCircle className="w-4 h-4" /> اعتماد
-          </button>
-          <button onClick={() => setShowRefuse(true)} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50">
-            <XCircle className="w-4 h-4" /> رفض
-          </button>
-          <button onClick={handlePost} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
-            <FileCheck className="w-4 h-4" /> ترحيل للمحاسب
-          </button>
-          <button onClick={() => setShowPayment(true)} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
-            <CreditCard className="w-4 h-4" /> تسجيل دفعة
-          </button>
+          {showActions && !isApproved && (
+            <>
+              <button onClick={handleApprove} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                <CheckCircle className="w-4 h-4" /> اعتماد
+              </button>
+              <button onClick={() => setShowRefuse(true)} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50">
+                <XCircle className="w-4 h-4" /> رفض
+              </button>
+            </>
+          )}
+          {showActions && isApproved && !isPosted && (
+            <button onClick={handlePost} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+              <FileCheck className="w-4 h-4" /> ترحيل للمحاسب
+            </button>
+          )}
+          {showActions && isPosted && state !== "paid" && (
+            <button onClick={() => setShowPayment(true)} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted disabled:opacity-50">
+              <CreditCard className="w-4 h-4" /> تسجيل دفعة
+            </button>
+          )}
         </div>
         <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${REPORT_STATE_COLORS[state] || "bg-muted text-muted-foreground"}`}>
           {REPORT_STATE_LABELS[state] || state}
@@ -246,6 +266,7 @@ export default function EmployeeExpenses() {
         reportId={selectedReportId}
         onBack={() => setSelectedReportId(null)}
         onChanged={load}
+        expenses={expenses}
       />
     );
   }

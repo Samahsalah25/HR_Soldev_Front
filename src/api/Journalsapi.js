@@ -111,3 +111,8 @@ export async function getAccounts(params = {}) {
 export async function getAllAccounts(search = "") {
   return getAccounts({ search });
 }
+
+export async function getBankAccounts() {
+  const res = await journalsApi.get("/accounting/bank-accounts");
+  return res.data?.bank_accounts || [];
+}

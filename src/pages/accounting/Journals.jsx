@@ -48,6 +48,8 @@
 // };
 
 // const PAYMENT_CAPABLE_TYPES = ["cash", "bank", "credit_card"];
+// // الأنواع اللي فيها "مصدر كشف الحساب" (bank_statement_source): البنك وبطاقة الائتمان فقط
+// const STATEMENT_SOURCE_TYPES = ["bank", "credit_card"];
 
 // const REFERENCE_TYPE_OPTIONS = [
 //   { value: "invoice", label: "بناءً على الفاتورة" },
@@ -59,6 +61,13 @@
 //   { value: "euro", label: "Euro" },
 // ];
 
+// // خيارات مصدر كشف الحساب البنكي (bank_statement_source) - مطابقة لخيارات Odoo القياسية
+// const BANK_STATEMENT_SOURCE_OPTIONS = [
+//   { value: "undefined", label: "بدون مزامنة" },
+//   { value: "file_import", label: "استيراد ملف (CAMT, CODA, CSV, OFX, QIF)" },
+//   { value: "online_sync", label: "مزامنة بنكية آلية" },
+// ];
+
 // const EMPTY_JOURNAL = {
 //   name: "",
 //   type: "sale",
@@ -67,10 +76,12 @@
 //   income_account_id: null,   // used when type === sale (default_account_id)
 //   expense_account_id: null,  // used when type === purchase (default_account_id)
 //   cash_bank_account_id: null,// used when hasPayments (default_account_id)
+//   general_account_id: null,  // used when type === general (default_account_id)
 //   suspense_account_id: null,
 //   profit_account_id: null,
 //   loss_account_id: null,
-//   dedicated_sequence: true,        // refund_sequence / payment_sequence
+//  refund_sequence: true,
+// payment_sequence: true,       // refund_sequence / payment_sequence
 //   allowed_accounts: [],             // account_control_ids
 //   secure_posted_entries: false,     // restrict_mode_hash_table
 //   auto_check_on_post: true,         // autocheck_on_post
@@ -79,6 +90,10 @@
 //   // كل سطر: { payment_method_id, name, payment_account_id }
 //   inbound_payment_lines: [],
 //   outbound_payment_lines: [],
+//   // Bank / Credit Card فقط
+//   bank_statement_source: "undefined",
+//   // Bank فقط - لا يوجد له endpoint في الـ backend حتى الآن، جاهز للربط لاحقًا
+//   bank_account_id: "",
 // };
 
 // /* ────────────────────────────────────────────────────────────────────────
@@ -103,10 +118,12 @@
 //     expense_account_id: j.type === "purchase" ? j.default_account_id || null : null,
 //     cash_bank_account_id:
 //       ["cash", "bank", "credit"].includes(j.type) ? j.default_account_id || null : null,
+//     general_account_id: j.type === "general" ? j.default_account_id || null : null,
 //     suspense_account_id: j.suspense_account_id || null,
 //     profit_account_id: j.profit_account_id || null,
 //     loss_account_id: j.loss_account_id || null,
-//     dedicated_sequence: j.refund_sequence ?? j.payment_sequence ?? true,
+// refund_sequence: j.refund_sequence ?? true,
+// payment_sequence: j.payment_sequence ?? true,
 //     allowed_accounts: j.account_control_ids || [],
 //     secure_posted_entries: j.restrict_mode_hash_table || false,
 //     auto_check_on_post: j.autocheck_on_post ?? true,
@@ -122,6 +139,9 @@
 //       name: m.name || "",
 //       payment_account_id: m.payment_account_id || null,
 //     })),
+//     // يتم تحميلها من رد الـ API لو موجودة، وإلا تاخد القيمة الافتراضية
+//     bank_statement_source: j.bank_statement_source || "undefined",
+//     bank_account_id: j.bank_account_id || "",
 //   };
 // }
 
@@ -135,6 +155,8 @@
 //       ? form.income_account_id
 //       : form.type === "purchase"
 //       ? form.expense_account_id
+//       : form.type === "general"
+//       ? form.general_account_id
 //       : hasPayments
 //       ? form.cash_bank_account_id
 //       : null;
@@ -149,31 +171,44 @@
 //     autocheck_on_post: form.auto_check_on_post,
 //     account_control_ids: [[6, 0, form.allowed_accounts]],
 //   };
+// if (isSaleOrPurchase) {
+//   payload.refund_sequence = form.refund_sequence;
+// }
 
-//   if (isSaleOrPurchase) {
-//     payload.refund_sequence = form.dedicated_sequence;
+//   if (form.type === "sale") {
 //     payload.invoice_reference_type = form.invoice_reference_type;
 //     payload.invoice_reference_model = form.invoice_reference_model;
 //   }
 
 //   if (hasPayments) {
-//     payload.payment_sequence = form.dedicated_sequence;
+//     payload.payment_sequence = form.payment_sequence;
 //     payload.suspense_account_id = form.suspense_account_id || false;
 
-//   payload.inbound_payment_method_line_ids = form.inbound_payment_lines.map((l) => ({
-//   payment_method_id: l.payment_method_id,
-//   payment_account_id: l.payment_account_id || false,
-// }));
+//     payload.inbound_payment_method_line_ids = form.inbound_payment_lines.map((l) => ({
+//       payment_method_id: l.payment_method_id,
+//       payment_account_id: l.payment_account_id || false,
+//     }));
 
-// payload.outbound_payment_method_line_ids = form.outbound_payment_lines.map((l) => ({
-//   payment_method_id: l.payment_method_id,
-//   payment_account_id: l.payment_account_id || false,
-// }));
+//     payload.outbound_payment_method_line_ids = form.outbound_payment_lines.map((l) => ({
+//       payment_method_id: l.payment_method_id,
+//       payment_account_id: l.payment_account_id || false,
+//     }));
 //   }
 
-//   if (form.type === "cash") {
-//     payload.profit_account_id = form.profit_account_id || false;
-//     payload.loss_account_id = form.loss_account_id || false;
+//  if (form.type === "cash" || form.type === "bank") {
+//   payload.profit_account_id = form.profit_account_id || false;
+//   payload.loss_account_id = form.loss_account_id || false;
+// }
+
+//   // Bank و Credit Card: مصدر كشف الحساب البنكي
+//   if (STATEMENT_SOURCE_TYPES.includes(form.type)) {
+//     payload.bank_statement_source = form.bank_statement_source || false;
+//   }
+
+//   // Bank فقط: رقم الحساب البنكي - لا يوجد endpoint خاص به في الـ backend بعد،
+//   // بيتبعت جاهز ضمن نفس الـ payload عشان يبقى سهل الربط لاحقًا بدون كسر الـ API الحالي
+//   if (form.type === "bank") {
+//     payload.bank_account_id = form.bank_account_id || false;
 //   }
 
 //   return payload;
@@ -195,6 +230,11 @@
 
 //   const hasPayments = PAYMENT_CAPABLE_TYPES.includes(form.type);
 //   const isSaleOrPurchase = form.type === "sale" || form.type === "purchase";
+//   const isSale = form.type === "sale";
+//   const isBank = form.type === "bank";
+//   const isCreditCard = form.type === "credit_card";
+//   const isGeneral = form.type === "general";
+//   const hasStatementSource = STATEMENT_SOURCE_TYPES.includes(form.type);
 
 //   const outstandingReceiptsAccounts = accounts.filter(
 //   (a) => a.account_type === "asset_current"
@@ -519,6 +559,9 @@
 //             {form.type === "purchase" &&
 //               accountSelect("حساب المصروف الافتراضي", "expense_account_id", (a) => a.account_type === "expense")}
 
+//             {isGeneral &&
+//               accountSelect("الحساب الافتراضي للدفتر", "general_account_id", () => true)}
+
 //             {hasPayments && (
 //               <>
 //                 {accountSelect(
@@ -531,30 +574,73 @@
 //                   "suspense_account_id",
 //                   (a) => a.account_type === "asset_current"
 //                 )}
-//                 {form.type === "cash" && (
-//                   <>
-//                     {accountSelect(
-//                       "حساب الأرباح",
-//                       "profit_account_id",
-//                       (a) => a.account_type === "income" || a.account_type === "income_other"
-//                     )}
-//                     {accountSelect("حساب الخسائر", "loss_account_id", (a) => a.account_type === "expense")}
-//                   </>
+
+//                 {hasStatementSource && (
+//                   <div className="space-y-1.5 col-span-2 sm:col-span-1">
+//                     <label className="text-sm font-medium text-gray-700">مصدر كشف الحساب البنكي</label>
+//                     <select
+//                       value={form.bank_statement_source}
+//                       onChange={(e) => set("bank_statement_source", e.target.value)}
+//                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+//                     >
+//                       {BANK_STATEMENT_SOURCE_OPTIONS.map((o) => (
+//                         <option key={o.value} value={o.value}>
+//                           {o.label}
+//                         </option>
+//                       ))}
+//                     </select>
+//                   </div>
 //                 )}
+
+//                 {isBank && (
+//                   <div className="space-y-1.5 col-span-2 sm:col-span-1">
+//                     <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 flex-wrap">
+//                       رقم الحساب البنكي
+//                       <span className="text-[10px] font-normal text-gray-400">
+//                         (حقل مؤقت — بانتظار ربطه بالـ backend)
+//                       </span>
+//                     </label>
+//                     <input
+//                       value={form.bank_account_id}
+//                       onChange={(e) => set("bank_account_id", e.target.value)}
+//                       placeholder="مثال: EG00 0000 0000 0000 0000 0000"
+//                       dir="ltr"
+//                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+//                     />
+//                   </div>
+//                 )}
+
+//               {(form.type === "cash" || form.type === "bank") && (
+//   <>
+//     {accountSelect(
+//       "حساب الأرباح",
+//       "profit_account_id",
+//       (a) => a.account_type === "income" || a.account_type === "income_other"
+//     )}
+
+//     {accountSelect(
+//       "حساب الخسائر",
+//       "loss_account_id",
+//       (a) => a.account_type === "expense"
+//     )}
+//   </>
+// )}
 //               </>
 //             )}
 
-//             <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
-//               <input
-//                 type="checkbox"
-//                 checked={form.dedicated_sequence}
-//                 onChange={(e) => set("dedicated_sequence", e.target.checked)}
-//                 className="w-4 h-4 accent-orange-500"
-//               />
-//               <label className="text-sm font-medium text-gray-700">
-//                 {isSaleOrPurchase ? "ترقيم مستقل لإشعارات الدائن" : "ترقيم مستقل للدفعات"}
-//               </label>
-//             </div>
+//             {(isSaleOrPurchase || hasPayments) && (
+//               <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+//               <input 
+//   type="checkbox" 
+//   checked={form.payment_sequence} 
+//   onChange={(e) => set("payment_sequence", e.target.checked)} 
+//   className="w-4 h-4 accent-orange-500" 
+// />
+//                 <label className="text-sm font-medium text-gray-700">
+//                   {isSaleOrPurchase ? "ترقيم مستقل لإشعارات الدائن" : "ترقيم مستقل للدفعات"}
+//                 </label>
+//               </div>
+//             )}
 
 //             <div className="space-y-1.5 col-span-2 sm:col-span-1">
 //               <label className="text-sm font-medium text-gray-700">الكود المختصر</label>
@@ -598,7 +684,7 @@
 //                   ))}
 //                 </div>
 //               </div>
-//               {isSaleOrPurchase && (
+//               {(isSaleOrPurchase || isGeneral) && (
 //                 <div className="flex items-center gap-2">
 //                   <input
 //                     type="checkbox"
@@ -620,7 +706,7 @@
 //               </div>
 //             </div>
 
-//             {isSaleOrPurchase && (
+//             {isSale && (
 //               <div className="space-y-3 col-span-2 sm:col-span-1">
 //                 <p className="text-xs font-bold text-gray-400 uppercase">التواصل بخصوص الدفع</p>
 //                 <div className="space-y-1.5">
@@ -800,6 +886,7 @@
 //     </div>
 //   );
 // }
+
 import { useState, useEffect } from "react";
 import {
   BookText,
@@ -819,6 +906,7 @@ import {
   getJournalPaymentMethods,
   getGeneralPaymentMethods,
   getAllAccounts,
+  getBankAccounts,
 } from "../../api/Journalsapi";
 import { usePagination } from "@/lib/usePagination";
 import TablePagination from "@/components/ui/TablePagination";
@@ -894,7 +982,7 @@ payment_sequence: true,       // refund_sequence / payment_sequence
   outbound_payment_lines: [],
   // Bank / Credit Card فقط
   bank_statement_source: "undefined",
-  // Bank فقط - لا يوجد له endpoint في الـ backend حتى الآن، جاهز للربط لاحقًا
+  // Bank فقط
   bank_account_id: "",
 };
 
@@ -1007,8 +1095,7 @@ if (isSaleOrPurchase) {
     payload.bank_statement_source = form.bank_statement_source || false;
   }
 
-  // Bank فقط: رقم الحساب البنكي - لا يوجد endpoint خاص به في الـ backend بعد،
-  // بيتبعت جاهز ضمن نفس الـ payload عشان يبقى سهل الربط لاحقًا بدون كسر الـ API الحالي
+  // Bank فقط: رقم/حساب البنك المختار من قايمة الحسابات البنكية المتاحة
   if (form.type === "bank") {
     payload.bank_account_id = form.bank_account_id || false;
   }
@@ -1028,6 +1115,8 @@ function JournalForm({ journalId, accounts, onBack, onSaved, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState({ inbound: [], outbound: [] });
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [bankAccountsLoading, setBankAccountsLoading] = useState(false);
   const [tab, setTab] = useState("entries");
 
   const hasPayments = PAYMENT_CAPABLE_TYPES.includes(form.type);
@@ -1079,6 +1168,20 @@ const outstandingPaymentsAccounts = accounts.filter(
       alive = false;
     };
   }, [hasPayments, isEdit, journalId]);
+
+  // جلب الحسابات/الأرقام البنكية المتاحة (لدفتر من نوع "بنك" فقط)
+  useEffect(() => {
+    if (!isBank) return;
+    let alive = true;
+    setBankAccountsLoading(true);
+    getBankAccounts()
+      .then((res) => alive && setBankAccounts(res))
+      .catch(() => alive && setBankAccounts([]))
+      .finally(() => alive && setBankAccountsLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [isBank]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -1398,17 +1501,25 @@ const outstandingAccounts =
                   <div className="space-y-1.5 col-span-2 sm:col-span-1">
                     <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5 flex-wrap">
                       رقم الحساب البنكي
-                      <span className="text-[10px] font-normal text-gray-400">
-                        (حقل مؤقت — بانتظار ربطه بالـ backend)
-                      </span>
                     </label>
-                    <input
-                      value={form.bank_account_id}
+                    <select
+                      value={form.bank_account_id || ""}
                       onChange={(e) => set("bank_account_id", e.target.value)}
-                      placeholder="مثال: EG00 0000 0000 0000 0000 0000"
-                      dir="ltr"
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
-                    />
+                    >
+                      <option value="">بدون اختيار...</option>
+                      {bankAccounts.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.acc_number || b.name || `حساب #${b.id}`}
+                        </option>
+                      ))}
+                    </select>
+                    {bankAccountsLoading && (
+                      <p className="text-[11px] text-gray-400">جاري تحميل الحسابات البنكية...</p>
+                    )}
+                    {!bankAccountsLoading && bankAccounts.length === 0 && (
+                      <p className="text-[11px] text-gray-400">لا توجد حسابات بنكية متاحة حاليًا</p>
+                    )}
                   </div>
                 )}
 

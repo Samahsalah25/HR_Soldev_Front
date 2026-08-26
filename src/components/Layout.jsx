@@ -609,6 +609,11 @@ const ALL_NAV_GROUPS = [
             icon: BookText,
             label: "شروط الدفع",
           },
+           {
+            path: "/taxes",
+            icon: BookText,
+            label: " الضرائب",
+          },
         ],
       },
     ],
@@ -809,7 +814,9 @@ function SidebarContent({
 if (group.label === "المالية" && navKey === "payment_terms") {
   return (canSee("payroll") || canSee("accounting") || canSee("financial-reports"));
 }
-                
+    if (group.label === "المالية" && navKey === "taxes") {
+  return (canSee("payroll") || canSee("accounting") || canSee("taxes"));
+}            
                 return canSee(navKey);
               });
 

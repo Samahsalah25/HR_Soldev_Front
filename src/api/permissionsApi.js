@@ -32,6 +32,7 @@ export const PERMISSION_MODULES = [
 // إعدادات المالية
 { key: "journals", label: "دفاتر اليومية", group: "إعدادات المالية" },
 { key: "payment_terms", label: "شروط الدفع", group: "إعدادات المالية" },
+{ key: "taxes", label: "الضرائب", group: "إعدادات المالية" },
     // التشغيل
     { key: "tasks", label: "المهام", group: "التشغيل" },
     { key: "requests", label: "طلبات الموظفين", group: "التشغيل" },

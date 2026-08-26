@@ -11,7 +11,16 @@ export async function getAccounts() {
   );
   return res.data?.accounts || [];
 }
-
+ 
+/**
+ * تنسيق اسم الحساب للعرض في الـ Dropdowns: "الكود - الاسم بالعربي"
+ */
+export function formatAccountLabel(account) {
+  if (!account) return "";
+  const name = account.name_ar || account.name || account.name_en || "";
+  return account.code ? `${account.code} - ${name}` : name;
+}
+ 
 /**
  * CREATE account
  */

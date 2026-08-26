@@ -15,7 +15,7 @@ import {
   createTax,
   updateTax,
   deleteTax,
-} from "@/api/taxesApi";
+} from "@/api/Taxesapi";
 import { getAccounts, formatAccountLabel } from "@/api/accountingApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";

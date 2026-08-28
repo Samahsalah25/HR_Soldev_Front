@@ -14,6 +14,7 @@ import {
   FileMinus,
   Wallet,
   UserCog,
+  Layers,
 } from "lucide-react";
 
 import ChartOfAccounts from "./accounting/ChartOfAccounts";
@@ -21,6 +22,7 @@ import JournalEntries from "./accounting/JournalEntries";
 import Vouchers from "./accounting/Vouchers";
 import TrialBalance from "./accounting/TrialBalance";
 import FinancialStatements from "./accounting/FinancialStatements";
+import Ledgers from "./accounting/Ledgers";
 
 import Customers from "./accounting/Customers";
 import CustomerPayments from "./accounting/CustomerPayments";
@@ -40,6 +42,7 @@ const TABS = [
   { id: "vouchers", label: "سندات القبض والدفع", icon: Receipt },
   { id: "trial", label: "ميزان المراجعة", icon: BarChart2 },
   { id: "statements", label: "القوائم المالية", icon: TrendingUp },
+  { id: "ledgers", label: "دفتر الحسابات", icon: Layers },
 ];
 
 const CUSTOMER_TABS = [
@@ -272,6 +275,7 @@ export default function AccountingMain() {
         {activeTab === "vouchers" && <Vouchers />}
         {activeTab === "trial" && <TrialBalance />}
         {activeTab === "statements" && <FinancialStatements />}
+        {activeTab === "ledgers" && <Ledgers />}
         {activeTab === "customer" && <Customers />}
         {activeTab === "customer-payments" && <CustomerPayments />}
         {activeTab === "invoices" && <Invoices />}

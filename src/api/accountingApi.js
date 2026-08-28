@@ -248,6 +248,24 @@ export async function getTrialBalance(params = {}) {
   // { success, date_from, date_to, hide_inactive_accounts, is_balanced, grand_totals, trial_balance }
 }
 
+/* ===========================
+   Ledgers (دفاتر الأستاذ)
+=========================== */
+
+// دفتر الأستاذ العام — مجمّع حسب الحساب
+export async function getGeneralLedger(params = {}) {
+  const res = await accountingApi.get("/accounting/ledgers/general", { params });
+  return res.data;
+  // { success, accounts: [{ account_id, account_code, account_name, initial_balance, debit, credit, balance, lines: [...] }] }
+}
+
+// دفتر أستاذ الشركاء — مجمّع حسب الشريك (عميل/مورد)
+export async function getPartnerLedger(params = {}) {
+  const res = await accountingApi.get("/accounting/ledgers/partner", { params });
+  return res.data;
+  // { success, partners: [{ partner_id, partner_name, initial_balance, debit, credit, balance, lines: [...] }] }
+}
+
 
 
 

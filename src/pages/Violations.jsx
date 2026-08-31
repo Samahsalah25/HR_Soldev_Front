@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, Plus, X, CheckCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
 
@@ -10,7 +10,7 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = {
@@ -257,7 +257,6 @@ export default function Violations() {
   const canCreate = canDo("violations", "create");
   const canApprove = canDo("violations", "approve");
 
-  const [violations, setViolations] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -268,13 +267,7 @@ export default function Violations() {
   const load = async () => {
     try {
       setLoading(true);
-
-      const [vs, emps] = await Promise.all([
-        getViolations(),
-        getEmployees(),
-      ]);
-
-      setViolations(vs?.data || vs || []);
+      const emps = await getEmployees();
       setEmployees(emps?.data || emps || []);
     } catch (err) {
       console.error("Error loading data:", err);
@@ -287,6 +280,14 @@ export default function Violations() {
     load();
   }, []);
 
+  const fetchViolationsPage = useCallback((params) => getViolations(params), []);
+  const violationsPagination = useServerPagination(fetchViolationsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    violationsPagination.reload();
+  };
+
   // ================= CONFIRM =================
   const confirm_ = async (id) => {
     const ok = await confirmDialog({
@@ -296,7 +297,7 @@ export default function Violations() {
     });
     if (!ok) return;
     try {
-      const v = violations.find((x) => x.id === id);
+      const v = violationsPagination.pageItems.find((x) => x.id === id);
 
       await updateViolation(id, {
         state: "approved",
@@ -313,7 +314,7 @@ export default function Violations() {
         });
       }
 
-      load();
+      refreshAll();
     } catch (err) {
       console.error("Confirm error:", err);
     }
@@ -333,7 +334,7 @@ export default function Violations() {
         state: "rejected",
       });
 
-      load();
+      refreshAll();
     } catch (err) {
       console.error("Cancel error:", err);
     }
@@ -345,7 +346,8 @@ export default function Violations() {
     PENALTY_TYPES.find((p) => p.value === value)?.label || value;
 
   // ================= FILTER =================
-  const filtered = violations
+  // ملاحظة: الفلترة دلوقتي بتشتغل على الصفحة الحالية بس بعد ما بقى الـ pagination من الباك
+  const filtered = violationsPagination.pageItems
     .filter((v) => !filterDate || v.date?.slice(0, 7) === filterDate)
     .filter(
       (v) =>
@@ -353,8 +355,6 @@ export default function Violations() {
         v.employee_name?.includes(search) ||
         getViolationLabel(v.violation_type_name)?.includes(search)
     );
-
-  const violationsPagination = usePagination(filtered, 20);
 
   // ================= UI =================
   return (
@@ -388,17 +388,17 @@ export default function Violations() {
         {[
           {
             label: "إجمالي المخالفات",
-            value: violations.length,
+            value: violationsPagination.totalItems,
             color: "text-foreground",
           },
           {
             label: "قيد المراجعة",
-            value: violations.filter((v) => v.state === "under_review").length,
+            value: violationsPagination.pageItems.filter((v) => v.state === "under_review").length,
             color: "text-amber-600",
           },
           {
             label: "مؤكدة",
-            value: violations.filter((v) => v.state === "approved").length,
+            value: violationsPagination.pageItems.filter((v) => v.state === "approved").length,
             color: "text-red-600",
           },
         ].map((s) => (
@@ -449,7 +449,7 @@ export default function Violations() {
           </thead>
 
           <tbody>
-            {loading ? (
+            {violationsPagination.loading ? (
               <tr>
                 <td colSpan={6} className="p-6 text-center">
                   جاري التحميل...
@@ -462,7 +462,7 @@ export default function Violations() {
                 </td>
               </tr>
             ) : (
-              violationsPagination.pageItems.map((v) => (
+              filtered.map((v) => (
                 <tr key={v.id} className="border-b hover:bg-muted/20">
                   <td className="p-3">
                     <div className="font-medium">{v.employee_name}</div>
@@ -543,7 +543,7 @@ export default function Violations() {
           employees={employees}
           onSave={() => {
             setShowForm(false);
-            load();
+            refreshAll();
           }}
           onClose={() => setShowForm(false)}
         />

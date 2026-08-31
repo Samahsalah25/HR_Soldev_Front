@@ -3,8 +3,8 @@ import api from "./axios";
 // ======================
 // GET ALL MISSIONS
 // ======================
-export const getMissions = async () => {
-  const res = await api.get("/missions");
+export const getMissions = async (params = {}) => {
+  const res = await api.get("/missions", { params });
   return res.data;
 };
 

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Search, Eye, Edit, Trash2, AlertCircle, X } from "lucide-react";
-import { getEmployeesList, getEmployeeById, deleteEmployee, normalizeEmployee } from "@/api/employeesApi";
+import { getEmployeesListPaged, getEmployeeById, deleteEmployee, normalizeEmployee } from "@/api/employeesApi";
 import { formatCurrency, calcServiceYears, getExpiryStatus } from "../lib/hrUtils";
 import EmployeeForm from "../components/EmployeeForm";
 import EmployeeDetail from "../components/EmployeeDetail";
@@ -9,7 +9,7 @@ import AddEmployeeDropdown from "../components/employees/AddEmployeeDropdown";
 import { useRole } from "../lib/useRole";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -69,8 +69,6 @@ export default function Employees() {
   const canAdd = canDo("employees", "create");
   const canEdit = canDo("employees", "edit");
   const canDelete = canDo("employees", "delete");
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterDept, setFilterDept] = useState("");
   const [filterNat, setFilterNat] = useState("");
@@ -101,23 +99,19 @@ const { toast } = useToast();
     }
   };
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const data = await getEmployeesList();
-      setEmployees(data.map(normalizeEmployee));
-    } catch (err) {
-      console.error("Load employees error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchEmployeesPage = useCallback(async (params) => {
+    const res = await getEmployeesListPaged(params);
+    const list = res?.data || [];
+    return { ...res, data: list.map(normalizeEmployee) };
+  }, []);
+  const employeesPagination = useServerPagination(fetchEmployeesPage, 20);
+  const load = () => employeesPagination.reload();
 
-  useEffect(() => { load(); }, []);
+  // ملاحظة: قائمة الأقسام والفلترة دلوقتي بتشتغل على الصفحة الحالية بس
+  // بعد ما بقى الـ pagination من الباك — مش كل الأقسام هتظهر بالضرورة في الفلتر
+  const departments = [...new Set(employeesPagination.pageItems.map(e => e.department).filter(Boolean))];
 
-  const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
-
-  const filtered = employees.filter(e => {
+  const filtered = employeesPagination.pageItems.filter(e => {
     const q = search.toLowerCase();
     const matchSearch = !search || e.full_name_ar?.toLowerCase().includes(q) ||
       e.full_name_en?.toLowerCase().includes(q) || e.id_number?.includes(q) ||
@@ -127,8 +121,6 @@ const { toast } = useToast();
     const matchStatus = !filterStatus || e.status === filterStatus;
     return matchSearch && matchDept && matchNat && matchStatus;
   });
-
-  const employeesPagination = usePagination(filtered, 20);
 
   // بيفتح المودال بدل ما ينفذ الحذف على طول
   const handleDeleteClick = (emp) => {
@@ -181,7 +173,7 @@ const { toast } = useToast();
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">إدارة الموظفين</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{employees.length} موظف مسجل في النظام</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{employeesPagination.totalItems} موظف مسجل في النظام</p>
         </div>
         <div className="flex items-center gap-2">
           <EmployeeImportExport onImportDone={load} userRole={user?.role} />
@@ -247,7 +239,7 @@ const { toast } = useToast();
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {employeesPagination.loading ? (
                 <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -256,7 +248,7 @@ const { toast } = useToast();
                 </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">لا توجد نتائج</td></tr>
-              ) : employeesPagination.pageItems.map(emp => {
+              ) : filtered.map(emp => {
                 const idStatus = getExpiryStatus(emp.id_expiry);
                 const years = emp.join_date ? calcServiceYears(emp.join_date) : 0;
                 return (

@@ -3,9 +3,9 @@ import api from "./axios";
 // =============================
 // GET ALL APPLICANTS
 // =============================
-export const getApplicants = async () => {
-  const res = await api.get("/applicants");
-  return res.data?.data || [];
+export const getApplicants = async (params = {}) => {
+  const res = await api.get("/applicants", { params });
+  return res.data;
 };
 
 // =============================

@@ -3,8 +3,8 @@ import api from "./axios";
 // ======================
 // GET ALL TASKS
 // ======================
-export const getTasks = async () => {
-  const res = await api.get("/tasks");
+export const getTasks = async (params = {}) => {
+  const res = await api.get("/tasks", { params });
   return res.data;
 };
 

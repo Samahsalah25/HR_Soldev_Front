@@ -100,6 +100,12 @@ export async function getAssets() {
     return toArray(res.data);
 }
 
+// نسخة بـ pagination من الباك (page/limit) — بترجع الـ envelope كامل { success, pagination, data }
+export async function getAssetsPaged(params = {}) {
+    const res = await assetsApi.get("/custodies", { params });
+    return res.data;
+}
+
 export async function getAssetById(id) {
     const res = await assetsApi.get(`/custodies/${id}`);
     return res.data;
@@ -241,4 +247,10 @@ export async function receiveCustodyRequest(id, data) {
 export async function getCustodyReturns() {
     const res = await assetsApi.get("/custody_returns");
     return toArray(res.data);
+}
+
+// نسخة بـ pagination من الباك (page/limit) — بترجع الـ envelope كامل { success, pagination, data }
+export async function getCustodyReturnsPaged(params = {}) {
+    const res = await assetsApi.get("/custody_returns", { params });
+    return res.data;
 }

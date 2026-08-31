@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ArrowLeftRight, Plus, X, Save, CheckCircle, XCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
 
@@ -14,7 +14,7 @@ import {
   getBranches,
 } from "@/api/branchesApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -430,7 +430,6 @@ export default function Transfers() {
   const canCreate = canDo("transfers", "create");
   const canApprove = canDo("transfers", "approve");
 
-  const [transfers, setTransfers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -442,43 +441,12 @@ export default function Transfers() {
   // LOAD
   // =========================
   const load = async () => {
-    const [ts, emps, brs, depts] = await Promise.all([
-      getEmployeeTransfers(),
+    const [emps, brs, depts] = await Promise.all([
       getEmployees(),
       getBranches(),
       getDepartments(),
     ]);
 
-    const rawTransfers = ts?.data || ts || [];
-
-    // =========================
-    // 🔥 NORMALIZE API RESPONSE
-    // =========================
-    const formatted = rawTransfers.map((t) => ({
-      id: t.id,
-      employee_name: t.employee_name,
-
-      from_branch: t.current_branch_name,
-      from_department: t.current_department_name,
-
-      to_branch: t.new_branch_name,
-      to_department: t.new_department_name,
-
-      transfer_date: t.transfer_date,
-      reason: t.reason,
-
-      // تحويل state إلى status للواجهة
-      status:
-        t.state === "approved"
-          ? "معتمد"
-          : t.state === "submitted"
-            ? "قيد الاعتماد"
-            : t.state === "draft"
-              ? "مسودة"
-              : "مرفوض",
-    }));
-
-    setTransfers(formatted);
     setEmployees(emps?.data || emps || []);
     setBranches(brs?.data || brs || []);
     setDepartments(depts?.data || depts || []);
@@ -488,6 +456,42 @@ export default function Transfers() {
   useEffect(() => {
     load();
   }, []);
+
+  // =========================
+  // 🔥 NORMALIZE API RESPONSE
+  // =========================
+  const fetchTransfersPage = useCallback(async (params) => {
+    const res = await getEmployeeTransfers(params);
+    const list = res?.data || res || [];
+    return {
+      ...res,
+      data: list.map((t) => ({
+        id: t.id,
+        employee_name: t.employee_name,
+        from_branch: t.current_branch_name,
+        from_department: t.current_department_name,
+        to_branch: t.new_branch_name,
+        to_department: t.new_department_name,
+        transfer_date: t.transfer_date,
+        reason: t.reason,
+        // تحويل state إلى status للواجهة
+        status:
+          t.state === "approved"
+            ? "معتمد"
+            : t.state === "submitted"
+              ? "قيد الاعتماد"
+              : t.state === "draft"
+                ? "مسودة"
+                : "مرفوض",
+      })),
+    };
+  }, []);
+  const transfersPagination = useServerPagination(fetchTransfersPage, 20);
+
+  const refreshAll = () => {
+    load();
+    transfersPagination.reload();
+  };
 
   // =========================
   // APPROVE
@@ -504,7 +508,7 @@ export default function Transfers() {
         state: "approved",
       });
 
-      load();
+      refreshAll();
     } catch (error) {
       console.error(error);
     }
@@ -526,13 +530,11 @@ export default function Transfers() {
         state: "refused",
       });
 
-      load();
+      refreshAll();
     } catch (error) {
       console.error(error);
     }
   };
-
-  const transfersPagination = usePagination(transfers, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -565,17 +567,17 @@ export default function Transfers() {
         {[
           {
             label: "قيد الاعتماد",
-            value: transfers.filter((t) => t.status === "قيد الاعتماد").length,
+            value: transfersPagination.pageItems.filter((t) => t.status === "قيد الاعتماد").length,
             color: "text-amber-600",
           },
           {
             label: "معتمدة",
-            value: transfers.filter((t) => t.status === "معتمد").length,
+            value: transfersPagination.pageItems.filter((t) => t.status === "معتمد").length,
             color: "text-green-600",
           },
           {
             label: "إجمالي",
-            value: transfers.length,
+            value: transfersPagination.totalItems,
             color: "text-primary",
           },
         ].map((s) => (
@@ -611,13 +613,13 @@ export default function Transfers() {
           </thead>
 
           <tbody>
-            {loading ? (
+            {transfersPagination.loading ? (
               <tr>
                 <td colSpan={7} className="text-center py-8 text-muted-foreground">
                   جاري التحميل...
                 </td>
               </tr>
-            ) : transfers.length === 0 ? (
+            ) : transfersPagination.pageItems.length === 0 ? (
               <tr>
                 <td colSpan={7} className="text-center py-8 text-muted-foreground">
                   لا توجد حركات نقل
@@ -700,7 +702,7 @@ export default function Transfers() {
           departments={departments}
           onSave={() => {
             setShowForm(false);
-            load();
+            refreshAll();
           }}
           onClose={() => setShowForm(false)}
         />

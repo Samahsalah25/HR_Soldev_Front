@@ -1,10 +1,10 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useCallback, Fragment } from "react";
 import { Shield, Search, Loader2 } from "lucide-react";
 import RolesBatchEditor from "../components/permissions/RolesBatchEditor";
 import CrudPermissionsEditor from "../components/permissions/CrudPermissionsEditor";
 import AuditLogViewer from "../components/permissions/AuditLogViewer";
-import { getEmployeesList } from "@/api/employeesApi";
-import { usePagination } from "@/lib/usePagination";
+import { getEmployeesListPaged } from "@/api/employeesApi";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 // أدوار النظام بالظبط كما يرجعها الـ API
@@ -35,29 +35,20 @@ function getRoleColor(roleValue) {
 }
 
 export default function Permissions() {
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [activeView, setActiveView] = useState("users");
 
-  useEffect(() => {
-    getEmployeesList()
-      .then((data) => {
-        const list = Array.isArray(data) ? data : (data?.data ?? []);
-        setEmployees(list);
-      })
-      .catch((e) => console.error("Failed to load employees:", e))
-      .finally(() => setLoading(false));
-  }, []);
+  const fetchEmployeesPage = useCallback((params) => getEmployeesListPaged(params), []);
+  const employeesPagination = useServerPagination(fetchEmployeesPage, 20);
 
-  const filtered = employees.filter((emp) => {
+  // ملاحظة: البحث دلوقتي بيشتغل على الصفحة الحالية بس بعد ما بقى الـ pagination من الباك
+  const filtered = employeesPagination.pageItems.filter((emp) => {
     if (!search) return true;
     const name = emp.name_ar || emp.name_en || emp.name || emp.full_name || "";
     const email = emp.work_email || emp.email || "";
     return name.includes(search) || email.includes(search);
   });
-  const employeesPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -119,7 +110,7 @@ export default function Permissions() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {employeesPagination.loading ? (
                   <tr>
                     <td colSpan={3} className="text-center py-10 text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
@@ -134,7 +125,7 @@ export default function Permissions() {
                     </td>
                   </tr>
                 ) : (
-                  employeesPagination.pageItems.map((emp) => {
+                  filtered.map((emp) => {
                     const empId = emp.id;
                     const empName = emp.name_ar || emp.name_en || emp.name || emp.full_name || "—";
                     const empEmail = emp.work_email || emp.email || "—";

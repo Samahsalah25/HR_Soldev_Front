@@ -3,6 +3,7 @@ import { Plus, CheckCircle, Clock, Search, X, Save, User } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
+import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 import {
   getTasks,
@@ -219,10 +220,17 @@ export default function Tasks() {
   }, []);
   const tasksPagination = useServerPagination(fetchTasksPage, 20);
 
+  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     tasksPagination.reload();
+    setCountsKey((k) => k + 1);
   };
+
+  // عدادات دقيقة على مستوى كل المهام (مش الصفحة الحالية بس)
+  const inProgressCount = useFilteredCount(getTasks, { state: "in_progress" }, [countsKey]);
+  const completeCount = useFilteredCount(getTasks, { state: "complete" }, [countsKey]);
+  const lateCount = useFilteredCount(getTasks, { state: "late" }, [countsKey]);
 
   const deleteTask = async (id) => {
     const ok = await confirmDialog({
@@ -268,10 +276,10 @@ export default function Tasks() {
     .filter(t => !search || t.title?.includes(search) || t.assigned_to?.includes(search));
 
   const counts = {
-    all: tasksPagination.pageItems.length,
-    "قيد العمل": tasksPagination.pageItems.filter(t => t.status === "قيد العمل").length,
-    "مكتملة": tasksPagination.pageItems.filter(t => t.status === "مكتملة").length,
-    "متأخرة": tasksPagination.pageItems.filter(t => t.status === "متأخرة").length,
+    all: tasksPagination.totalItems,
+    "قيد العمل": inProgressCount.count ?? tasksPagination.pageItems.filter(t => t.status === "قيد العمل").length,
+    "مكتملة": completeCount.count ?? tasksPagination.pageItems.filter(t => t.status === "مكتملة").length,
+    "متأخرة": lateCount.count ?? tasksPagination.pageItems.filter(t => t.status === "متأخرة").length,
   };
 
   const isOverdue = (task) => task.due_date && new Date(task.due_date) < new Date() && task.status !== "مكتملة";

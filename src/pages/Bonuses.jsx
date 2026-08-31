@@ -12,6 +12,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
+import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -343,10 +344,16 @@ const [selectedBonus, setSelectedBonus] = useState(null);
   }, []);
   const bonusesPagination = useServerPagination(fetchBonusesPage, 20);
 
+  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     bonusesPagination.reload();
+    setCountsKey((k) => k + 1);
   };
+
+  // عدادات دقيقة على مستوى كل المكافآت (مش الصفحة الحالية بس)
+  const pendingCount = useFilteredCount(getAdditions, { state: "under_approval" }, [countsKey]);
+  const approvedCount = useFilteredCount(getAdditions, { state: "approved" }, [countsKey]);
 
   const approve = async (id) => {
     const ok = await confirmDialog({
@@ -398,12 +405,13 @@ const [selectedBonus, setSelectedBonus] = useState(null);
     );
 
   const totals = {
-    pending: pending.length,
+    pending: pendingCount.count ?? pending.length,
 
-    approved: bonusesPagination.pageItems.filter(
+    approved: approvedCount.count ?? bonusesPagination.pageItems.filter(
       b => b.raw_state === "approved"
     ).length,
 
+    // مجموع مالي — لسه بيتحسب على الصفحة الحالية بس لحد ما الباك يوفّر endpoint إحصائيات
     paid: bonusesPagination.pageItems
       .filter(
         b => b.raw_state === "paid"
@@ -445,7 +453,7 @@ const [selectedBonus, setSelectedBonus] = useState(null);
       <div className="flex gap-1 border-b border-border">
         {[
           { id: "all", label: `كل المكافآت (${bonusesPagination.totalItems})` },
-          { id: "pending", label: `قيد الاعتماد (${pending.length})`, badge: pending.length > 0 },
+          { id: "pending", label: `قيد الاعتماد (${totals.pending})`, badge: totals.pending > 0 },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -461,9 +469,9 @@ const [selectedBonus, setSelectedBonus] = useState(null);
         {filterMonth && <button onClick={() => setFilterMonth("")} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 border border-border rounded-lg">مسح الفلتر</button>}
       </div>
 
-      {activeTab === "pending" && pending.length > 0 && (
+      {activeTab === "pending" && totals.pending > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          يوجد <span className="font-bold">{pending.length}</span> مكافأة بانتظار موافقتك
+          يوجد <span className="font-bold">{totals.pending}</span> مكافأة بانتظار موافقتك
         </div>
       )}
 

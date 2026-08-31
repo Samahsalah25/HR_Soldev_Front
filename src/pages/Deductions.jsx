@@ -9,6 +9,7 @@ import {
 } from "@/api/deductionsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
+import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_COLORS = {
 //   "قيد الاعتماد": "bg-amber-100 text-amber-700",
@@ -217,10 +218,17 @@ export default function Deductions() {
   }, []);
   const deductionsPagination = useServerPagination(fetchDeductionsPage, 20);
 
+  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     deductionsPagination.reload();
+    setCountsKey((k) => k + 1);
   };
+
+  // عدادات دقيقة على مستوى كل الخصومات (مش الصفحة الحالية بس) — بتجيب
+  // العدد من الباك مباشرة (limit=1 + فلتر الحالة) من غير ما تجيب كل البيانات
+  const pendingCount = useFilteredCount(getDeductions, { state: "under_approval" }, [countsKey]);
+  const approvedCount = useFilteredCount(getDeductions, { state: "approved" }, [countsKey]);
 
   const approve = async (id) => {
     const ok = await confirmDialog({
@@ -261,8 +269,8 @@ export default function Deductions() {
     refreshAll();
   };
 
-  // ملاحظة: العدادات دي بقت بتتحسب على الصفحة الحالية بس (مش كل الخصومات)
-  // بعد ما بقى الـ pagination من الباك — الأرقام مش تراكمية على كل البيانات.
+  // ملاحظة: جدول الصفوف وتصفية التاب لسه بيشتغلوا على الصفحة الحالية بس،
+  // بس أرقام الكروت (totals) بقت دقيقة على كل البيانات عن طريق pendingCount/approvedCount
   const pending = deductionsPagination.pageItems.filter(
     d => d.status === "قيد الاعتماد"
   );
@@ -281,10 +289,12 @@ export default function Deductions() {
     );
 
   const totals = {
-    pending: deductionsPagination.pageItems.filter(d => d.status === "قيد الاعتماد").length,
+    pending: pendingCount.count ?? pending.length,
 
-    approved: deductionsPagination.pageItems.filter(d => d.status === "معتمد").length,
+    approved: approvedCount.count ?? deductionsPagination.pageItems.filter(d => d.status === "معتمد").length,
 
+    // ملاحظة: ده مجموع مالي، مش عدد — مفيش طريقة نحسبه دقيق من غير endpoint
+    // إحصائيات من الباك، فلسه بيتحسب على الصفحة الحالية بس.
     applied: deductionsPagination.pageItems
       .filter(d => d.status === "مطبَّق")
       .reduce((s, d) => s + (Number(d.amount) || 0), 0),
@@ -321,7 +331,7 @@ export default function Deductions() {
       <div className="flex gap-1 border-b border-border">
         {[
           { id: "all", label: `كل الخصومات (${deductionsPagination.totalItems})` },
-          { id: "pending", label: `قيد الاعتماد (${pending.length})`, badge: pending.length > 0 },
+          { id: "pending", label: `قيد الاعتماد (${totals.pending})`, badge: totals.pending > 0 },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -342,9 +352,9 @@ export default function Deductions() {
         {filterMonth && <button onClick={() => setFilterMonth("")} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 border border-border rounded-lg">مسح الفلتر</button>}
       </div>
 
-      {activeTab === "pending" && pending.length > 0 && (
+      {activeTab === "pending" && totals.pending > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          يوجد <span className="font-bold">{pending.length}</span> خصم بانتظار موافقتك — راجع وأقِر أو ارفض
+          يوجد <span className="font-bold">{totals.pending}</span> خصم بانتظار موافقتك — راجع وأقِر أو ارفض
         </div>
       )}
 

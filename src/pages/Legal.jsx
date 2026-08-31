@@ -494,7 +494,7 @@
 // }
 
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Scale,
   Plus,
@@ -514,6 +514,7 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 const CASE_STATUS_COLORS = {
   new: "bg-blue-100 text-blue-700",
@@ -657,22 +658,18 @@ export default function Legal() {
 
   const confirmDialog = useConfirm();
 
-  const [cases, setCases] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCaseForm, setShowCaseForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeTab] = useState("cases");
 
   const load = async () => {
     try {
       setLoading(true);
 
-      const [casesResponse, employeesResponse] = await Promise.all([
-        getCases(),
-        getEmployees(),
-      ]);
+      const employeesResponse = await getEmployees();
 
-      setCases(casesResponse.data || casesResponse || []);
       setEmployees(employeesResponse.data || employeesResponse || []);
     } catch (error) {
       console.error("Load Legal Data Error:", error);
@@ -683,6 +680,14 @@ export default function Legal() {
 
   useEffect(() => { load(); }, []);
 
+  const fetchCasesPage = useCallback((params) => getCases(params), []);
+  const casesPagination = useServerPagination(fetchCasesPage, 20);
+
+  const refreshAll = () => {
+    load();
+    casesPagination.reload();
+  };
+
   const handleDeleteCase = async (id) => {
     const ok = await confirmDialog({
       title: "حذف القضية",
@@ -692,11 +697,12 @@ export default function Legal() {
     });
     if (ok) {
       await deleteCase(id);
-      load();
+      refreshAll();
     }
   };
 
-  const filteredCases = cases.filter(
+  // ملاحظة: الفلترة والإحصائيات دلوقتي بتشتغل على الصفحة الحالية بس
+  const filteredCases = casesPagination.pageItems.filter(
     c =>
       !search ||
       c.case_title?.includes(search) ||
@@ -704,9 +710,12 @@ export default function Legal() {
       c.case_number?.includes(search)
   );
 
-  const activeCases = cases.filter(c => !["won", "lost", "settled"].includes(c.state));
-  const totalCaseValue = cases.reduce((s, c) => s + (c.estimated_value || 0), 0);
-  const casesPagination = usePagination(filteredCases, 20);
+  const activeCases = casesPagination.pageItems.filter(c => !["won", "lost", "settled"].includes(c.state));
+  // مجموع مالي — لسه بيتحسب على الصفحة الحالية بس لحد ما الباك يوفّر endpoint إحصائيات
+  const totalCaseValue = casesPagination.pageItems.reduce((s, c) => s + (c.estimated_value || 0), 0);
+  // "عقود" لسه مش متعملها ربط حقيقي بالباك (مفيش endpoint ولا API) — قائمة فاضية دايمًا
+  // عشان الصفحة متكسرش، التاب ده محتاج شغل منفصل تمامًا لو عايزين نفعّله فعليًا
+  const filteredContracts = [];
   const contractsPagination = usePagination(filteredContracts, 20);
 
   return (
@@ -726,7 +735,7 @@ export default function Legal() {
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: "إجمالي القضايا", value: cases.length, color: "text-primary" },
+          { label: "إجمالي القضايا", value: casesPagination.totalItems, color: "text-primary" },
           { label: "قضايا نشطة", value: activeCases.length, color: "text-red-600" },
           { label: "إجمالي قيمة القضايا", value: `${(totalCaseValue / 1000).toFixed(0)}K ر.س`, color: "text-purple-600" },
         ].map(kpi => (
@@ -754,9 +763,9 @@ export default function Legal() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+              {loading || casesPagination.loading ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
                 : filteredCases.length === 0 ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد قضايا</td></tr>
-                  : casesPagination.pageItems.map(c => (
+                  : filteredCases.map(c => (
                     <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{c.case_number}</td>
                       <td className="px-3 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{c.case_type_arabic}</span></td>
@@ -837,7 +846,7 @@ export default function Legal() {
         </div>
       )}
 
-      {showCaseForm && <CaseForm employees={employees} onSave={() => { setShowCaseForm(false); load(); }} onClose={() => setShowCaseForm(false)} />}
+      {showCaseForm && <CaseForm employees={employees} onSave={() => { setShowCaseForm(false); refreshAll(); }} onClose={() => setShowCaseForm(false)} />}
     </div>
   );
 }

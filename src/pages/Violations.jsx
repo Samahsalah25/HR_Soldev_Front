@@ -11,6 +11,7 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
+import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = {
@@ -283,10 +284,16 @@ export default function Violations() {
   const fetchViolationsPage = useCallback((params) => getViolations(params), []);
   const violationsPagination = useServerPagination(fetchViolationsPage, 20);
 
+  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     violationsPagination.reload();
+    setCountsKey((k) => k + 1);
   };
+
+  // عدادات دقيقة على مستوى كل المخالفات (مش الصفحة الحالية بس)
+  const underReviewCount = useFilteredCount(getViolations, { state: "under_review" }, [countsKey]);
+  const approvedCount = useFilteredCount(getViolations, { state: "approved" }, [countsKey]);
 
   // ================= CONFIRM =================
   const confirm_ = async (id) => {
@@ -393,12 +400,12 @@ export default function Violations() {
           },
           {
             label: "قيد المراجعة",
-            value: violationsPagination.pageItems.filter((v) => v.state === "under_review").length,
+            value: underReviewCount.count ?? violationsPagination.pageItems.filter((v) => v.state === "under_review").length,
             color: "text-amber-600",
           },
           {
             label: "مؤكدة",
-            value: violationsPagination.pageItems.filter((v) => v.state === "approved").length,
+            value: approvedCount.count ?? violationsPagination.pageItems.filter((v) => v.state === "approved").length,
             color: "text-red-600",
           },
         ].map((s) => (

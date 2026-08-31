@@ -393,6 +393,7 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
+import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const Field = ({ label, children }) => (
@@ -931,10 +932,21 @@ export default function BranchesDepartments() {
   const fetchDepartmentsPage = useCallback((params) => getDepartments(params), []);
   const departmentsPagination = useServerPagination(fetchDepartmentsPage, 20);
 
+  // نسخة pagination من الفروع للعرض بس — القائمة الكاملة (branches state) لسه
+  // مستخدمة زي ما هي في الإحصائيات وفورم إنشاء قسم (محتاج كل الفروع مش صفحة بس)
+  const fetchBranchesPage = useCallback((params) => getBranches(params), []);
+  const branchesPagination = useServerPagination(fetchBranchesPage, 20);
+
+  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     departmentsPagination.reload();
+    branchesPagination.reload();
+    setCountsKey((k) => k + 1);
   };
+
+  // عداد دقيق على مستوى كل الأقسام (مش الصفحة الحالية بس)
+  const activeDeptsCount = useFilteredCount(getDepartments, { active: true }, [countsKey]);
 
  const handleDeleteBranch = async (id) => {
   const ok = await confirmDialog({
@@ -945,7 +957,7 @@ export default function BranchesDepartments() {
   });
   if (ok) {
     await deleteBranchApi(id);
-    load();
+    refreshAll();
   }
 };
 
@@ -996,7 +1008,7 @@ export default function BranchesDepartments() {
           },
           {
             label: "الأقسام النشطة",
-            value: departmentsPagination.pageItems.filter((d) => d.active).length,
+            value: activeDeptsCount.count ?? departmentsPagination.pageItems.filter((d) => d.active).length,
             icon: Check,
             color: "text-teal-600",
           },
@@ -1062,11 +1074,11 @@ export default function BranchesDepartments() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {loading ? (
+            {branchesPagination.loading ? (
               <p className="text-muted-foreground text-sm">
                 جاري التحميل...
               </p>
-            ) : branches.length === 0 ? (
+            ) : branchesPagination.pageItems.length === 0 ? (
               <div className="sm:col-span-2 text-center py-12 text-muted-foreground">
                 <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
 
@@ -1075,7 +1087,7 @@ export default function BranchesDepartments() {
                 </p>
               </div>
             ) : (
-              branches.map((b) => (
+              branchesPagination.pageItems.map((b) => (
                 <div
                   key={b.id}
                   className="bg-card rounded-xl border border-border p-5 space-y-3"
@@ -1143,6 +1155,13 @@ export default function BranchesDepartments() {
               ))
             )}
           </div>
+          <TablePagination
+            page={branchesPagination.page}
+            totalPages={branchesPagination.totalPages}
+            totalItems={branchesPagination.totalItems}
+            pageSize={branchesPagination.pageSize}
+            onPageChange={branchesPagination.setPage}
+          />
         </div>
       )}
 
@@ -1291,7 +1310,7 @@ export default function BranchesDepartments() {
           branch={editBranch}
           onSave={() => {
             setShowBranchForm(false);
-            load();
+            refreshAll();
           }}
           onClose={() => setShowBranchForm(false)}
         />

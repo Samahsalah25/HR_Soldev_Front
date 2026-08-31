@@ -3,9 +3,9 @@ import api from "./axios";
 // ==========================
 // GET ALL
 // ==========================
-export const getAttendance = async (date) => {
+export const getAttendance = async (date, params = {}) => {
   const res = await api.get("/attendance", {
-    params: { date }
+    params: { date, ...params }
   });
   return res.data;
 };

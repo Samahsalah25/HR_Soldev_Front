@@ -3,8 +3,8 @@ import api from "./axios";
 // =============================
 // GET ALL BRANCHES
 // =============================
-export const getBranches = async () => {
-  const response = await api.get("/branches");
+export const getBranches = async (params = {}) => {
+  const response = await api.get("/branches", { params });
 
   return response.data;
 };

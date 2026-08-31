@@ -3,8 +3,8 @@ import api from "./axios";
 // =============================
 // GET ALL CASES
 // =============================
-export const getCases = async () => {
-  const response = await api.get("/cases");
+export const getCases = async (params = {}) => {
+  const response = await api.get("/cases", { params });
 
   return response.data;
 };

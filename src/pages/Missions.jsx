@@ -12,6 +12,7 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
+import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_STYLES = {
 //   "قيد الانتظار": "bg-amber-100 text-amber-700",
@@ -67,10 +68,16 @@ export default function Missions() {
   const fetchMissionsPage = useCallback((params) => getMissions(params), []);
   const missionsPagination = useServerPagination(fetchMissionsPage, 20);
 
+  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     missionsPagination.reload();
+    setCountsKey((k) => k + 1);
   };
+
+  // عدادات دقيقة على مستوى كل المهمات (مش الصفحة الحالية بس)
+  const pendingCount = useFilteredCount(getMissions, { state: "waiting" }, [countsKey]);
+  const activeCount = useFilteredCount(getMissions, { state: "ongoing" }, [countsKey]);
 
   const handleEmpSelect = (id) => {
     const emp = employees.find(e => e.id === Number(id));
@@ -212,14 +219,15 @@ export default function Missions() {
   const stats = {
     total: missionsPagination.totalItems,
 
-    pending: missionsPagination.pageItems.filter(
+    pending: pendingCount.count ?? missionsPagination.pageItems.filter(
       (m) => m.state === "waiting"
     ).length,
 
-    active: missionsPagination.pageItems.filter(
+    active: activeCount.count ?? missionsPagination.pageItems.filter(
       (m) => m.state === "ongoing"
     ).length,
 
+    // مجموع مالي — لسه بيتحسب على الصفحة الحالية بس لحد ما الباك يوفّر endpoint إحصائيات
     totalBudget: missionsPagination.pageItems
       .filter(
         (m) => m.state !== "cancelled"

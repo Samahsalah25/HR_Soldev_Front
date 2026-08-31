@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, MapPin, CheckCircle, LogIn, LogOut, AlertCircle, Clock, Users } from "lucide-react";
 import { useRole } from "../lib/useRole";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 import {
@@ -43,7 +43,6 @@ export default function Attendance() {
   const { user, canDo } = useRole();
   const canCreate = canDo("attendance", "create");
   const [activeTab, setActiveTab] = useState("daily");
-  const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,57 +58,10 @@ export default function Attendance() {
     try {
       setLoading(true);
 
-      const [recs, emps, brs] = await Promise.all([
-        getAttendance(date),
+      const [emps, brs] = await Promise.all([
         getEmployees(),
         getBranches(),
       ]);
-
-      const attendanceData = recs?.data ?? [];
-
-      const normalized = attendanceData.map((r) => ({
-        id: r.id,
-
-        employee_name:
-          r.employee_name ||
-          r.employee?.full_name_ar ||
-          r.employee?.name ||
-          "—",
-
-        employee_id:
-          r.employee_id ||
-          r.employee?.id,
-
-        department:
-          r.department_name ||
-          r.employee?.department?.name ||
-          "—",
-
-        check_in: r.time_of_arrival
-          ? r.time_of_arrival.slice(11, 16)
-          : "",
-
-        check_out: r.time_of_leave
-          ? r.time_of_leave.slice(11, 16)
-          : "",
-
-        status:
-          r.state_arabic ||
-          STATUS_AR[r.state] ||
-          r.state ||
-          "—",
-
-        raw_status: r.state,
-
-        late_minutes: r.late_minutes || 0,
-
-        overtime_hours: r.extra_hours || 0,
-
-        notes: r.notes || "",
-      }));
-
-      setRecords(normalized);
-      setKpis(recs?.kpis ?? null);
 
       setEmployees(emps?.data ?? []);
 
@@ -120,6 +72,50 @@ export default function Attendance() {
       setLoading(false);
     }
   };
+
+  // بيجيب صفحة حضور يوم معيّن — الفلتر بتاريخ اليوم بيتبعت مع كل صفحة
+  const fetchAttendancePage = useCallback(async (params) => {
+    const res = await getAttendance(date, params);
+    setKpis(res?.kpis ?? null);
+    const attendanceData = res?.data ?? [];
+    return {
+      ...res,
+      data: attendanceData.map((r) => ({
+        id: r.id,
+        employee_name:
+          r.employee_name ||
+          r.employee?.full_name_ar ||
+          r.employee?.name ||
+          "—",
+        employee_id:
+          r.employee_id ||
+          r.employee?.id,
+        department:
+          r.department_name ||
+          r.employee?.department?.name ||
+          "—",
+        check_in: r.time_of_arrival
+          ? r.time_of_arrival.slice(11, 16)
+          : "",
+        check_out: r.time_of_leave
+          ? r.time_of_leave.slice(11, 16)
+          : "",
+        status:
+          r.state_arabic ||
+          STATUS_AR[r.state] ||
+          r.state ||
+          "—",
+        raw_status: r.state,
+        late_minutes: r.late_minutes || 0,
+        overtime_hours: r.extra_hours || 0,
+        notes: r.notes || "",
+      })),
+    };
+  }, [date]);
+  const attendancePagination = useServerPagination(fetchAttendancePage, 20);
+
+  // لما التاريخ يتغيّر، نرجع لأول صفحة (صفحة ٢ من يوم قديم مالهاش معنى ليوم جديد)
+  useEffect(() => { attendancePagination.setPage(1); }, [date]);
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371000;
@@ -157,13 +153,18 @@ export default function Attendance() {
           status: "success",
           message: `تم تسجيل ${type === "in" ? "الحضور" : "الانصراف"} بنجاح ✔️`
         });
-        load();
+        refreshAll();
       },
       () => setCheckInOut({ loading: false, status: "error", message: "تعذّر الحصول على موقعك. تأكد من تفعيل خاصية الموقع" })
     );
   };
 
-  useEffect(() => { load(); }, [date]);
+  useEffect(() => { load(); }, []);
+
+  const refreshAll = () => {
+    load();
+    attendancePagination.reload();
+  };
 
   const handleEmpSelect = (id) => {
     const emp = employees.find((e) => e.id === id);
@@ -212,7 +213,7 @@ export default function Attendance() {
 
       setShowForm(false);
 
-      load();
+      refreshAll();
     } catch (err) {
       console.error("CREATE ERROR:", err);
       toast({
@@ -228,14 +229,13 @@ export default function Attendance() {
   // بنفضّل الأرقام الجاهزة من السيرفر (kpis) لأنها بتحسب على كل الموظفين،
   // بينما records بترجع بس السجلات الموجودة فعليًا لليوم ده (ممكن تكون جزء بسيط)
   const stats = {
-    present: kpis?.total_present ?? records.filter(r => r.status === "حاضر").length,
-    absent: kpis?.total_absent ?? records.filter(r => r.status === "غائب").length,
-    late: kpis?.total_late ?? records.filter(r => r.status === "متأخر").length,
-    leave: kpis?.total_vacation ?? records.filter(r => r.status === "اجازة").length,
+    present: kpis?.total_present ?? attendancePagination.pageItems.filter(r => r.status === "حاضر").length,
+    absent: kpis?.total_absent ?? attendancePagination.pageItems.filter(r => r.status === "غائب").length,
+    late: kpis?.total_late ?? attendancePagination.pageItems.filter(r => r.status === "متأخر").length,
+    leave: kpis?.total_vacation ?? attendancePagination.pageItems.filter(r => r.status === "اجازة").length,
   };
-  const totalOT = kpis?.total_extra_hours ?? records.reduce((s, r) => s + (r.overtime_hours || 0), 0);
-  const totalLate = records.reduce((s, r) => s + (r.late_minutes || 0), 0);
-  const attendancePagination = usePagination(records, 20);
+  const totalOT = kpis?.total_extra_hours ?? attendancePagination.pageItems.reduce((s, r) => s + (r.overtime_hours || 0), 0);
+  const totalLate = attendancePagination.pageItems.reduce((s, r) => s + (r.late_minutes || 0), 0);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -295,7 +295,7 @@ export default function Attendance() {
               <Users className="w-5 h-5 text-primary" />
               <div>
                 <p className="font-semibold text-foreground">سجل حضور يوم {new Date(date).toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
-                <p className="text-xs text-muted-foreground">{records.length} سجل | تأخير إجمالي: {totalLate} دقيقة</p>
+                <p className="text-xs text-muted-foreground">{attendancePagination.totalItems} سجل | تأخير إجمالي: {totalLate} دقيقة</p>
               </div>
             </div>
           </div>
@@ -312,9 +312,9 @@ export default function Attendance() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
+                  {loading || attendancePagination.loading ? (
                     <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-                  ) : records.length === 0 ? (
+                  ) : attendancePagination.pageItems.length === 0 ? (
                     <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">
                       <Clock className="w-10 h-10 mx-auto mb-2 opacity-20" />
                       لا توجد سجلات لهذا اليوم

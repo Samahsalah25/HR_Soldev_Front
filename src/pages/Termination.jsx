@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { UserX, Plus, X, Save, CheckCircle, FileText, DollarSign, Monitor, Package, Plane, Upload, Eye, RotateCcw } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useRole } from "../lib/useRole";
@@ -6,7 +6,7 @@ import { calcEndOfService, calcLeaveEncashment, calcServiceYears, calcTicketEnca
 import { getEmployees } from "@/api/departmentsApi";
 import { createEndOfService, getEndOfService, eosAction } from "@/api/endOfService"
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 const WORKFLOW_STEPS = [
   { key: "Pending Manager", label: "تأكيد المدير", icon: "👔" },
@@ -715,7 +715,6 @@ export default function Termination() {
   const isEmployee = role === "employee" || role === "user";
   const canCreate = isHR;
 
-  const [requests, setRequests] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [myEmployee, setMyEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -727,58 +726,13 @@ export default function Termination() {
     setLoading(true);
 
     try {
-      const [eosRes, empsRes] = await Promise.all([
-        getEndOfService(),
-        getEmployees(),
-      ]);
-
-      const rawReqs = Array.isArray(eosRes) ? eosRes : eosRes?.data ?? eosRes?.requests ?? [];
-
-      // تحويل الـ field names من الـ backend للـ frontend
-      const STATE_MAP = {
-        "draft": "Draft",
-        "manager_approval": "Pending Manager",
-        "pending_manager": "Pending Manager",
-        "hr_review": "Pending HR Review",
-        "pending_hr_review": "Pending HR Review",
-        "finance": "Pending Finance",
-        "pending_finance": "Pending Finance",
-        "financial_settlement": "Pending Finance",
-        "it_assets": "Pending IT/Assets",
-        "pending_it_assets": "Pending IT/Assets",
-        "custody_clearance": "Pending IT/Assets",
-        "it_clearance": "Pending IT/Assets",
-        "assets_clearance": "Pending IT/Assets",
-        "final_approval": "Final Approval",
-        "pending_final_approval": "Final Approval",
-        "completed": "Completed",
-        "done": "Completed",
-        "closed": "Completed",
-        "refused": "Cancelled",
-        "rejected": "Cancelled",
-        "cancelled": "Cancelled",
-      };
-
-      if (rawReqs.length > 0) console.log("🔍 EOS raw record:", rawReqs[0]);
-
-      const reqs = rawReqs.map(r => ({
-        ...r,
-        employee_name: r.employee_name || r.employee || "",
-        termination_type: r.termination_type || r.departure_reason || "",
-        last_working_day: r.last_working_day || r.departure_date || "",
-        status: STATE_MAP[r.status] || STATE_MAP[r.state] || r.status || r.state || "Draft",
-        created_date: r.created_date || r.date_of_request || r.created_at || "",
-        department: r.department || r.department_name || "",
-        reason: r.reason || "",
-        notice_period_days: r.notice_period_days ?? r.notice_period ?? 30,
-      }));
+      const empsRes = await getEmployees();
 
       const emps =
         Array.isArray(empsRes)
           ? empsRes
           : empsRes?.data ?? empsRes?.employees ?? [];
 
-      setRequests(reqs);
       setEmployees(emps);
 
     } catch (e) {
@@ -791,17 +745,67 @@ export default function Termination() {
   useEffect(() => {
     if (user) load();
   }, [user]);
-  const stats = {
-    pending: requests.filter(r => !["Completed", "Cancelled", "Draft"].includes(r.status)).length,
-    completed: requests.filter(r => r.status === "Completed").length,
-    total: requests.length,
+
+  // تحويل الـ field names من الـ backend للـ frontend
+  const STATE_MAP = {
+    "draft": "Draft",
+    "manager_approval": "Pending Manager",
+    "pending_manager": "Pending Manager",
+    "hr_review": "Pending HR Review",
+    "pending_hr_review": "Pending HR Review",
+    "finance": "Pending Finance",
+    "pending_finance": "Pending Finance",
+    "financial_settlement": "Pending Finance",
+    "it_assets": "Pending IT/Assets",
+    "pending_it_assets": "Pending IT/Assets",
+    "custody_clearance": "Pending IT/Assets",
+    "it_clearance": "Pending IT/Assets",
+    "assets_clearance": "Pending IT/Assets",
+    "final_approval": "Final Approval",
+    "pending_final_approval": "Final Approval",
+    "completed": "Completed",
+    "done": "Completed",
+    "closed": "Completed",
+    "refused": "Cancelled",
+    "rejected": "Cancelled",
+    "cancelled": "Cancelled",
   };
 
+  const fetchRequestsPage = useCallback(async (params) => {
+    const eosRes = await getEndOfService(params);
+    const rawReqs = Array.isArray(eosRes) ? eosRes : eosRes?.data ?? eosRes?.requests ?? [];
+    return {
+      ...eosRes,
+      data: rawReqs.map(r => ({
+        ...r,
+        employee_name: r.employee_name || r.employee || "",
+        termination_type: r.termination_type || r.departure_reason || "",
+        last_working_day: r.last_working_day || r.departure_date || "",
+        status: STATE_MAP[r.status] || STATE_MAP[r.state] || r.status || r.state || "Draft",
+        created_date: r.created_date || r.date_of_request || r.created_at || "",
+        department: r.department || r.department_name || "",
+        reason: r.reason || "",
+        notice_period_days: r.notice_period_days ?? r.notice_period ?? 30,
+      })),
+    };
+  }, []);
+  const requestsPagination = useServerPagination(fetchRequestsPage, 20);
 
-  const filtered = requests.filter(r => !filterStatus || r.status === filterStatus);
-  const requestsPagination = usePagination(filtered, 20);
+  const refreshAll = () => {
+    load();
+    requestsPagination.reload();
+  };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
+  // ملاحظة: الإحصائيات والفلترة دلوقتي بتشتغل على الصفحة الحالية بس
+  const stats = {
+    pending: requestsPagination.pageItems.filter(r => !["Completed", "Cancelled", "Draft"].includes(r.status)).length,
+    completed: requestsPagination.pageItems.filter(r => r.status === "Completed").length,
+    total: requestsPagination.totalItems,
+  };
+
+  const filtered = requestsPagination.pageItems.filter(r => !filterStatus || r.status === filterStatus);
+
+  if (loading || requestsPagination.loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
 
   // Employee view
   if (isEmployee) {
@@ -865,11 +869,13 @@ export default function Termination() {
             ))}
           </tr></thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {requestsPagination.loading ? (
+              <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+            ) : filtered.length === 0 ? (
               <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">
                 <UserX className="w-10 h-10 mx-auto mb-2 opacity-20" />لا توجد طلبات
               </td></tr>
-            ) : requestsPagination.pageItems.map(req => (
+            ) : filtered.map(req => (
               <tr key={req.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                 <td className="px-4 py-3">
                   <p className="font-medium text-foreground">{req.employee_name}</p>
@@ -908,8 +914,8 @@ export default function Termination() {
         />
       </div>
 
-      {showForm && <NewTerminationForm employees={employees.filter(e => e.active)} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
-      {selected && <TerminationDetailModal req={selected} employees={employees} user={user} role={role} onClose={() => setSelected(null)} onUpdate={() => { load(); setSelected(null); }} />}
+      {showForm && <NewTerminationForm employees={employees.filter(e => e.active)} onSave={() => { setShowForm(false); refreshAll(); }} onClose={() => setShowForm(false)} />}
+      {selected && <TerminationDetailModal req={selected} employees={employees} user={user} role={role} onClose={() => setSelected(null)} onUpdate={() => { refreshAll(); setSelected(null); }} />}
     </div>
   );
 }

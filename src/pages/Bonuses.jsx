@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Gift, Plus, X, Save, DollarSign } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/api/departmentsApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -230,7 +230,6 @@ export default function Bonuses() {
   const { user, canDo } = useRole();
   const canCreate = canDo("bonuses", "create");
   const canApprove = canDo("bonuses", "approve");
-  const [bonuses, setBonuses] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -244,58 +243,12 @@ const [selectedBonus, setSelectedBonus] = useState(null);
       setLoading(true);
 
       const [
-        additionsRes,
         employeesRes,
         departmentsRes,
       ] = await Promise.all([
-        getAdditions(),
         getEmployees(),
         getDepartments(),
       ]);
-
-      // =========================
-      // BONUSES
-      // =========================
-      const bonusesData =
-        additionsRes?.data || [];
-
-      const normalizedBonuses =
-        bonusesData.map((b) => ({
-          id: b.id,
-
-          employee_id: b.employee_id,
-          employee_name: b.employee_name,
-
-          department_id: b.department_id,
-          department: b.department_name,
-
-          bonus_type:
-            b.addition_type_arabic ||
-            b.addition_type,
-
-          scope:
-            b.add_to === "employee"
-              ? "فردية"
-              : b.add_to === "department"
-                ? "قسم"
-                : "الشركة",
-
-          amount: b.amount,
-
-          reason: b.reason,
-
-          period: b.date,
-
-          status: b.state_arabic,
-
-          raw_state: b.state,
-
-          approved_by: b.approved_by_name,
-
-          approval_date: b.approve_date,
-        }));
-
-      setBonuses(normalizedBonuses);
 
       // =========================
       // EMPLOYEES
@@ -360,6 +313,41 @@ const [selectedBonus, setSelectedBonus] = useState(null);
   };
   useEffect(() => { load(); }, []);
 
+  const fetchBonusesPage = useCallback(async (params) => {
+    const res = await getAdditions(params);
+    const list = res?.data || [];
+    return {
+      ...res,
+      data: list.map((b) => ({
+        id: b.id,
+        employee_id: b.employee_id,
+        employee_name: b.employee_name,
+        department_id: b.department_id,
+        department: b.department_name,
+        bonus_type: b.addition_type_arabic || b.addition_type,
+        scope:
+          b.add_to === "employee"
+            ? "فردية"
+            : b.add_to === "department"
+              ? "قسم"
+              : "الشركة",
+        amount: b.amount,
+        reason: b.reason,
+        period: b.date,
+        status: b.state_arabic,
+        raw_state: b.state,
+        approved_by: b.approved_by_name,
+        approval_date: b.approve_date,
+      })),
+    };
+  }, []);
+  const bonusesPagination = useServerPagination(fetchBonusesPage, 20);
+
+  const refreshAll = () => {
+    load();
+    bonusesPagination.reload();
+  };
+
   const approve = async (id) => {
     const ok = await confirmDialog({
       title: "اعتماد المكافأة",
@@ -370,7 +358,7 @@ const [selectedBonus, setSelectedBonus] = useState(null);
     await updateAddition(id, {
       state: "approved",
     });
-    load();
+    refreshAll();
   };
   const reject = async (id) => {
     const ok = await confirmDialog({
@@ -383,42 +371,40 @@ const [selectedBonus, setSelectedBonus] = useState(null);
     await updateAddition(id, {
       state: "rejected",
     });
-    load();
+    refreshAll();
   };
 
   const pay = async (id) => {
     await updateAddition(id, {
       state: "paid",
     });
-    load();
+    refreshAll();
 };
 
-  
-
-
-  
-  const pending = bonuses.filter(
+  // ملاحظة: العدادات دي بقت بتتحسب على الصفحة الحالية بس (مش كل المكافآت)
+  // بعد ما بقى الـ pagination من الباك — الأرقام مش تراكمية على كل البيانات.
+  const pending = bonusesPagination.pageItems.filter(
     b => b.raw_state === "under_approval"
   );
 
   const displayed =
     (activeTab === "pending"
       ? pending
-      : bonuses
+      : bonusesPagination.pageItems
     ).filter(
       b =>
         !filterMonth ||
         b.period === filterMonth
     );
- 
+
   const totals = {
     pending: pending.length,
 
-    approved: bonuses.filter(
+    approved: bonusesPagination.pageItems.filter(
       b => b.raw_state === "approved"
     ).length,
 
-    paid: bonuses
+    paid: bonusesPagination.pageItems
       .filter(
         b => b.raw_state === "paid"
       )
@@ -427,8 +413,6 @@ const [selectedBonus, setSelectedBonus] = useState(null);
         0
       ),
   };
-
-  const bonusesPagination = usePagination(displayed, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -460,7 +444,7 @@ const [selectedBonus, setSelectedBonus] = useState(null);
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {[
-          { id: "all", label: `كل المكافآت (${bonuses.length})` },
+          { id: "all", label: `كل المكافآت (${bonusesPagination.totalItems})` },
           { id: "pending", label: `قيد الاعتماد (${pending.length})`, badge: pending.length > 0 },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -491,9 +475,9 @@ const [selectedBonus, setSelectedBonus] = useState(null);
             ))}
           </tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+            {bonusesPagination.loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : displayed.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مكافآت</td></tr>
-                : bonusesPagination.pageItems.map(b => (
+                : displayed.map(b => (
                   <tr key={b.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${b.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{b.employee_name || "—"}</p>
@@ -634,7 +618,7 @@ const [selectedBonus, setSelectedBonus] = useState(null);
     </div>
   </div>
 )}
-      {showForm && <BonusForm employees={employees} departments={departments} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
+      {showForm && <BonusForm employees={employees} departments={departments} onSave={() => { setShowForm(false); refreshAll(); }} onClose={() => setShowForm(false)} />}
     </div>
   
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, CheckCircle, XCircle, MapPin } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { formatCurrency } from "../lib/hrUtils";
@@ -11,7 +11,7 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_STYLES = {
 //   "قيد الانتظار": "bg-amber-100 text-amber-700",
@@ -39,7 +39,6 @@ export default function Missions() {
   const { user, canDo } = useRole();
   const canCreate = canDo("missions", "create");
   const canApprove = canDo("missions", "approve");
-  const [missions, setMissions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -54,13 +53,7 @@ export default function Missions() {
   const load = async () => {
     try {
       setLoading(true);
-
-      const [ms, emps] = await Promise.all([
-        getMissions(),
-        getEmployees(),
-      ]);
-
-      setMissions(ms?.data || []);
+      const emps = await getEmployees();
       setEmployees(emps?.data || []);
     } catch (error) {
       console.error("Error loading missions:", error);
@@ -70,6 +63,14 @@ export default function Missions() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const fetchMissionsPage = useCallback((params) => getMissions(params), []);
+  const missionsPagination = useServerPagination(fetchMissionsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    missionsPagination.reload();
+  };
 
   const handleEmpSelect = (id) => {
     const emp = employees.find(e => e.id === Number(id));
@@ -150,7 +151,7 @@ export default function Missions() {
         notes: "",
       });
 
-      load();
+      refreshAll();
     } catch (error) {
       console.error("Error creating mission:", error);
     } finally {
@@ -164,7 +165,7 @@ export default function Missions() {
         state,
       });
 
-      load();
+      refreshAll();
     } catch (error) {
       console.error("Error updating mission:", error);
     }
@@ -207,18 +208,19 @@ export default function Missions() {
     if (ok) await updateStatus(id, "completed");
   };
 
+  // ملاحظة: الإحصائيات دلوقتي بتتحسب على الصفحة الحالية بس (مش كل المهام)
   const stats = {
-    total: missions.length,
+    total: missionsPagination.totalItems,
 
-    pending: missions.filter(
+    pending: missionsPagination.pageItems.filter(
       (m) => m.state === "waiting"
     ).length,
 
-    active: missions.filter(
+    active: missionsPagination.pageItems.filter(
       (m) => m.state === "ongoing"
     ).length,
 
-    totalBudget: missions
+    totalBudget: missionsPagination.pageItems
       .filter(
         (m) => m.state !== "cancelled"
       )
@@ -236,8 +238,6 @@ export default function Missions() {
 
       }, 0),
   };
-
-  const missionsPagination = usePagination(missions, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -299,7 +299,7 @@ export default function Missions() {
             </thead>
 
             <tbody>
-              {loading ? (
+              {missionsPagination.loading ? (
                 <tr>
                   <td
                     colSpan={10}
@@ -308,7 +308,7 @@ export default function Missions() {
                     جاري التحميل...
                   </td>
                 </tr>
-              ) : missions.length === 0 ? (
+              ) : missionsPagination.pageItems.length === 0 ? (
                 <tr>
                   <td
                     colSpan={10}

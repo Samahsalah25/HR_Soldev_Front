@@ -11,8 +11,8 @@ export const getDepartureReasons = async () => {
 // =============================
 // GET ALL END OF SERVICE REQUESTS
 // =============================
-export const getEndOfService = async () => {
-  const res = await api.get("/end_of_service");
+export const getEndOfService = async (params = {}) => {
+  const res = await api.get("/end_of_service", { params });
   return res.data;
 };
 

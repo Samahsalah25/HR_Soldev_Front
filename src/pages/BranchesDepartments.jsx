@@ -363,7 +363,7 @@
 
 
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Building2,
@@ -392,7 +392,7 @@ import {
 
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const Field = ({ label, children }) => (
@@ -893,7 +893,6 @@ function DeptForm({
 export default function BranchesDepartments() {
   const confirmDialog = useConfirm();
   const [branches, setBranches] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -910,15 +909,13 @@ export default function BranchesDepartments() {
     try {
       setLoading(true);
 
-      const [branchesRes, departmentsRes, employeesRes] =
+      const [branchesRes, employeesRes] =
         await Promise.all([
           getBranches(),
-          getDepartments(),
           getEmployees(),
         ]);
 
       setBranches(branchesRes?.data || []);
-      setDepartments(departmentsRes?.data || []);
       setEmployees(employeesRes?.data || []);
     } catch (e) {
       console.error(e);
@@ -930,6 +927,14 @@ export default function BranchesDepartments() {
   useEffect(() => {
     load();
   }, []);
+
+  const fetchDepartmentsPage = useCallback((params) => getDepartments(params), []);
+  const departmentsPagination = useServerPagination(fetchDepartmentsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    departmentsPagination.reload();
+  };
 
  const handleDeleteBranch = async (id) => {
   const ok = await confirmDialog({
@@ -953,11 +958,9 @@ export default function BranchesDepartments() {
     });
     if (ok) {
       await deleteDepartmentApi(id);
-      load();
+      refreshAll();
     }
   };
-
-  const departmentsPagination = usePagination(departments, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -987,13 +990,13 @@ export default function BranchesDepartments() {
           },
           {
             label: "الأقسام",
-            value: departments.length,
+            value: departmentsPagination.totalItems,
             icon: Users,
             color: "text-secondary",
           },
           {
             label: "الأقسام النشطة",
-            value: departments.filter((d) => d.active).length,
+            value: departmentsPagination.pageItems.filter((d) => d.active).length,
             icon: Check,
             color: "text-teal-600",
           },
@@ -1183,7 +1186,7 @@ export default function BranchesDepartments() {
               </thead>
 
               <tbody>
-                {loading ? (
+                {loading || departmentsPagination.loading ? (
                   <tr>
                     <td
                       colSpan={8}
@@ -1192,7 +1195,7 @@ export default function BranchesDepartments() {
                       جاري التحميل...
                     </td>
                   </tr>
-                ) : departments.length === 0 ? (
+                ) : departmentsPagination.pageItems.length === 0 ? (
                   <tr>
                     <td
                       colSpan={8}
@@ -1301,7 +1304,7 @@ export default function BranchesDepartments() {
           employees={employees}
           onSave={() => {
             setShowDeptForm(false);
-            load();
+            refreshAll();
           }}
           onClose={() => setShowDeptForm(false)}
         />

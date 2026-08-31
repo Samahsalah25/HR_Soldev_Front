@@ -5,8 +5,8 @@ import api from "./axios";
 // =============================
 // GET ALL REQUESTS
 // =============================
-export const getAllRequests = async () => {
-  const res = await api.get("/requests");
+export const getAllRequests = async (params = {}) => {
+  const res = await api.get("/requests", { params });
   return res.data;
 };
 
@@ -39,24 +39,24 @@ export const createVacationRequest = async (data) => {
 // =============================
 // GET ALL VACATION REQUESTS
 // =============================
-export const getAllVacationRequests = async () => {
-  const res = await api.get("/requests/vacation");
+export const getAllVacationRequests = async (params = {}) => {
+  const res = await api.get("/requests/vacation", { params });
   return res.data;
 };
 
 // =============================
 // GET ALL VACATION YEARLY BALANCE
 // =============================
-export const getVacationYearlyBalance = async () => {
-  const res = await api.get("/requests/vacation/yearly-balance");
+export const getVacationYearlyBalance = async (params = {}) => {
+  const res = await api.get("/requests/vacation/yearly-balance", { params });
   return res.data;
 };
 
 // =============================
 // GET FLYING TICKET
 // =============================
-export const getFlyingTicket = async () => {
-  const res = await api.get("/requests/vacation/flying-ticket");
+export const getFlyingTicket = async (params = {}) => {
+  const res = await api.get("/requests/vacation/flying-ticket", { params });
   return res.data;
 };
 

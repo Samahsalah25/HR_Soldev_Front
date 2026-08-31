@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { UserPlus, Plus, X, Save, Search, CheckCircle, XCircle, Eye, ChevronRight, Calendar, Star, ExternalLink } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import {
@@ -15,7 +15,7 @@ import { updateMeeting } from "@/api/meetingsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { API_ORIGIN } from "@/api/axios";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 // روابط الـ CV/المستندات ممكن ترجع من الـ API كمسار نسبي (مش رابط كامل) — نضيفله دومين السيرفر
@@ -617,7 +617,6 @@ export default function Recruitment() {
   const { user, canDo } = useRole();
   const canCreate = canDo("recruitment", "create");
   const canApprove = canDo("recruitment", "approve");
-  const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -628,7 +627,6 @@ export default function Recruitment() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [interviewApp, setInterviewApp] = useState(null);
   const [search, setSearch] = useState("");
-  const [applicants, setApplicants] = useState([]);
 
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -649,18 +647,14 @@ export default function Recruitment() {
   const load = async () => {
     setLoading(true);
     try {
-      const [jobsResponse, departmentsResponse, branchesResponse, applicantsData] =
+      const [departmentsResponse, branchesResponse] =
         await Promise.all([
-          getJobs(),
           getDepartments(),
           getBranches(),
-          getApplicants(),
         ]);
 
-      setJobs(jobsResponse.data || []);
       setDepartments(departmentsResponse.data || []);
       setBranches(branchesResponse.data || []);
-      setApplicants(applicantsData);
 
       // users (للمحاورين) — نحمّلهم منفصل عشان لو فشلوا ما يكسروا بقية البيانات
       try {
@@ -679,6 +673,18 @@ export default function Recruitment() {
 
   useEffect(() => { load(); }, []);
 
+  const fetchJobsPage = useCallback((params) => getJobs(params), []);
+  const jobsPagination = useServerPagination(fetchJobsPage, 20);
+
+  const fetchAppsPage = useCallback((params) => getApplicants(params), []);
+  const appsPagination = useServerPagination(fetchAppsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    jobsPagination.reload();
+    appsPagination.reload();
+  };
+
   const approveJob = async (id) => {
     const ok = await confirmDialog({
       title: "اعتماد الوظيفة",
@@ -687,7 +693,7 @@ export default function Recruitment() {
     });
     if (!ok) return;
     await acceptJob(id);
-    load();
+    refreshAll();
   };
 
   const rejectJob = async (id) => {
@@ -699,22 +705,23 @@ export default function Recruitment() {
     });
     if (!ok) return;
     await rejectJobApi(id);
-    load();
+    refreshAll();
   };
   const updateStage = async (appId, stage) => {
     await updateApplicant(appId, { stage });
-    load();
+    refreshAll();
   };
 
+  // ملاحظة: الفلترة والإحصائيات دلوقتي بتشتغل على الصفحة الحالية بس
   const displayedApps = selectedJob
-    ? applicants.filter(a => a.job_id === selectedJob.id)
-    : applicants.filter(a => !search || a.applicant_name?.includes(search) || a.job_title?.includes(search));
+    ? appsPagination.pageItems.filter(a => a.job_id === selectedJob.id)
+    : appsPagination.pageItems.filter(a => !search || a.applicant_name?.includes(search) || a.job_title?.includes(search));
 
-  const activeJobs = jobs.filter(
+  const activeJobs = jobsPagination.pageItems.filter(
     j => j.state === "accepted"
   );
 
-  const pendingJobs = jobs.filter(
+  const pendingJobs = jobsPagination.pageItems.filter(
     j => j.state === "under_review"
   );
   const isMyInterview = (iv) => {
@@ -739,7 +746,7 @@ export default function Recruitment() {
   // My interviews — الـ applicants من الـ backend بييجوا بـ meetings
   // normalizeMeetings بتحول meetings → interviews format في الـ modal
   // هنا نشيك على كلا الـ fields
-  const myInterviewApps = applicants.filter(a => {
+  const myInterviewApps = appsPagination.pageItems.filter(a => {
     const meetings = a.meetings || a.interviews || [];
     return meetings.some(m => {
       // raw meeting من الـ backend
@@ -770,11 +777,8 @@ export default function Recruitment() {
 
     await updateMeeting(meeting.id, { [backendField]: backendValue })
       .catch(e => console.warn("saveMyInterviewResult failed:", e));
-    load();
+    refreshAll();
   };
-
-  const jobsPagination = usePagination(jobs, 20);
-  const appsPagination = usePagination(displayedApps, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -794,8 +798,8 @@ export default function Recruitment() {
         {[
           { label: "وظائف نشطة", value: activeJobs.length, color: "text-green-600" },
           { label: "قيد الاعتماد", value: pendingJobs.length, color: "text-amber-600" },
-          { label: "إجمالي المتقدمين", value: applicants.length, color: "text-primary" },
-          { label: "مقبولون", value: applicants.filter(a => a.stage === "accepted" || a.stage === "مقبول").length, color: "text-secondary" },
+          { label: "إجمالي المتقدمين", value: appsPagination.totalItems, color: "text-primary" },
+          { label: "مقبولون", value: appsPagination.pageItems.filter(a => a.stage === "accepted" || a.stage === "مقبول").length, color: "text-secondary" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -806,8 +810,8 @@ export default function Recruitment() {
 
       <div className="flex gap-1 border-b border-border">
         {[
-          { id: "jobs", label: `الوظائف (${jobs.length})` },
-          { id: "applications", label: `المتقدمون (${applicants.length})` },
+          { id: "jobs", label: `الوظائف (${jobsPagination.totalItems})` },
+          { id: "applications", label: `المتقدمون (${appsPagination.totalItems})` },
           { id: "my-interviews", label: myInterviewApps.length > 0 ? `مقابلاتي (${myInterviewApps.length})` : "مقابلاتي" },
         ].map(t => (
           <button key={t.id} onClick={() => { setActiveTab(t.id); setSelectedJob(null); }}
@@ -852,8 +856,8 @@ export default function Recruitment() {
                 ))}
               </tr></thead>
               <tbody>
-                {loading ? <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
-                  : jobs.length === 0 ? <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">لا توجد وظائف</td></tr>
+                {jobsPagination.loading ? <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                  : jobsPagination.pageItems.length === 0 ? <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">لا توجد وظائف</td></tr>
                     : jobsPagination.pageItems.map(j => {
                       const appCount = applications.filter(a => a.recruitment_id === j.id).length;
                       return (
@@ -926,9 +930,11 @@ export default function Recruitment() {
                 ))}
               </tr></thead>
               <tbody>
-                {displayedApps.length === 0
+                {appsPagination.loading
+                  ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+                  : displayedApps.length === 0
                   ? <tr><td colSpan={10} className="text-center py-8 text-muted-foreground">لا توجد طلبات</td></tr>
-                  : appsPagination.pageItems.map(app => {
+                  : displayedApps.map(app => {
                     const avgScore = app.interviews?.length > 0
                       ? (app.interviews.reduce((s, i) => s + (+i.score || 0), 0) / app.interviews.length).toFixed(1)
                       : null;
@@ -1101,8 +1107,8 @@ export default function Recruitment() {
         </div>
       )}
 
-      {showForm && <JobForm departments={departments} branches={branches} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
-      {interviewApp && <InterviewModal app={interviewApp} users={users} currentUser={currentUser} onSave={() => { setInterviewApp(null); load(); }} onClose={() => setInterviewApp(null)} />}
+      {showForm && <JobForm departments={departments} branches={branches} onSave={() => { setShowForm(false); refreshAll(); }} onClose={() => setShowForm(false)} />}
+      {interviewApp && <InterviewModal app={interviewApp} users={users} currentUser={currentUser} onSave={() => { setInterviewApp(null); refreshAll(); }} onClose={() => setInterviewApp(null)} />}
     </div>
   );
 }

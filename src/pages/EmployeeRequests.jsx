@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CheckCircle, XCircle, Search, FileText, AlertTriangle, DollarSign, Receipt } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import LeaveRequestModal from "../components/requests/LeaveRequestModal";
@@ -14,6 +14,7 @@ import {getCustodyRequests} from "@/api/assetsApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const REQUEST_TYPES = [
@@ -74,10 +75,8 @@ const STATUS_COLORS = {
 
 export default function EmployeeRequests() {
   const confirmDialog = useConfirm();
-  const [requests, setRequests] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [custodies, setCustodies] = useState([]);
-  const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState(null); // { type, requestType }
   const [filterStatus, setFilterStatus] = useState("");
@@ -85,31 +84,37 @@ export default function EmployeeRequests() {
   const [activeTab, setActiveTab] = useState("requests");
 const { toast } = useToast();
  const load = async () => {
- const [reqs, emps, custodyRes, loanRes] = await Promise.all([
-  getAllRequests(),
+ const [emps, custodyRes] = await Promise.all([
   getEmployees(),
   getCustodyRequests(),
-  getSalaryAdvances(),
 ]);
 
-setRequests(reqs?.data || []);
 setEmployees(emps?.data || emps?.employees || emps || []);
-
 setCustodies(custodyRes || custodyRes?.data || []);
-setLoans(loanRes?.data || []);
 
- 
   setLoading(false);
 };
   useEffect(() => { load(); }, []);
 
+  const fetchRequestsPage = useCallback((params) => getAllRequests(params), []);
+  const requestsPagination = useServerPagination(fetchRequestsPage, 20);
+
+  const fetchLoansPage = useCallback((params) => getSalaryAdvances(params), []);
+  const loansPagination = useServerPagination(fetchLoansPage, 20);
+
+  const refreshAll = () => {
+    load();
+    requestsPagination.reload();
+    loansPagination.reload();
+  };
+
   const sendToManager = async (id) => {
     try {
       await apiSendToManager(id);
-      load();
+      refreshAll();
     } catch (err) {
       console.error(err?.response?.data || err);
-      load(); // refresh anyway in case it partially worked
+      refreshAll(); // refresh anyway in case it partially worked
     }
   };
 
@@ -122,8 +127,8 @@ setLoans(loanRes?.data || []);
     if (!ok) return;
     try {
       await apiManagerApprove(id);
-      load();
-    } catch (err) 
+      refreshAll();
+    } catch (err)
     {
       console.error(err?.response?.data || err);
     toast({
@@ -145,9 +150,7 @@ const updateStatus = async (id, status) => {
 
     const res = await requestAction(id, action);
 
-
-
-    load();
+    refreshAll();
   } catch (err) {
     console.error("Update status error:", err);
 
@@ -201,9 +204,11 @@ const updateStatus = async (id, status) => {
 
   const openModal = (modalType, requestType) => setActiveModal({ type: modalType, requestType });
   const closeModal = () => setActiveModal(null);
-  const onRequestSaved = () => { closeModal(); load(); };
+  const onRequestSaved = () => { closeModal(); refreshAll(); };
 
-  const filtered = requests
+  // ملاحظة: البحث والفلترة دلوقتي بيشتغلوا على الصفحة الحالية الجاية من الباك بس
+  // (مش على كل الطلبات)، لإن الـ pagination بقى من الباك مش من الفرونت.
+  const filtered = requestsPagination.pageItems
     .map(r => ({ ...r, _normalizedStatus: normalizeStatus(r.state || r.status || "") }))
     .filter(r => !filterStatus || r._normalizedStatus === filterStatus)
     .filter(r => !search || r.request_type?.includes(search) || r.employee_name?.includes(search))
@@ -218,11 +223,7 @@ const activeCustodies = custodies.filter(
   c => c.state !== "rejected"
 );
 
-const activeLoans = loans;
-
-  const requestsPagination = usePagination(filtered, 20);
   const custodiesPagination = usePagination(activeCustodies, 20);
-  const loansPagination = usePagination(activeLoans, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -249,9 +250,9 @@ const activeLoans = loans;
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {[
-          { id: "requests", label: `الطلبات (${requests.length})` },
+          { id: "requests", label: `الطلبات (${requestsPagination.totalItems})` },
           { id: "custodies", label: `العهد النشطة (${activeCustodies.length})` },
-          { id: "loans", label: `السلف النشطة (${activeLoans.length})` },
+          { id: "loans", label: `السلف النشطة (${loansPagination.totalItems})` },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -288,12 +289,12 @@ const activeLoans = loans;
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {requestsPagination.loading ? (
                   <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-10 text-muted-foreground">لا توجد بيانات</td></tr>
                 ) :
-                  requestsPagination.pageItems.map(req => {
+                  filtered.map(req => {
                     const status = req._normalizedStatus || normalizeStatus(req.state || req.status || "");
 
                     return (
@@ -469,7 +470,9 @@ const activeLoans = loans;
               </tr>
             </thead>
             <tbody>
-              {activeLoans.length === 0 ? (
+              {loansPagination.loading ? (
+                <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+              ) : loansPagination.pageItems.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد سلف نشطة</td></tr>
               ) : loansPagination.pageItems.map(l => (
                 <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/20">

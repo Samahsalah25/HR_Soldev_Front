@@ -3,8 +3,8 @@ import api from "./axios";
 // ======================
 // GET ALL VIOLATIONS
 // ======================
-export const getViolations = async () => {
-  const res = await api.get("/violations");
+export const getViolations = async (params = {}) => {
+  const res = await api.get("/violations", { params });
   return res.data;
 };
 

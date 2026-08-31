@@ -3,8 +3,8 @@
 import api from "./axios";
 
 // GET ALL DEPARTMENTS
-export const getDepartments = async () => {
-  const response = await api.get("/departments");
+export const getDepartments = async (params = {}) => {
+  const response = await api.get("/departments", { params });
 
   return response.data;
 };

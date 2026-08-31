@@ -3,8 +3,8 @@ import api from "./axios";
 // =============================
 // GET ALL SALARY ADVANCES
 // =============================
-export const getSalaryAdvances = async () => {
-  const response = await api.get("/salary_advances");
+export const getSalaryAdvances = async (params = {}) => {
+  const response = await api.get("/salary_advances", { params });
 
   return response.data;
 };

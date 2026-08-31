@@ -14,6 +14,12 @@ export async function getEmployeesList() {
     return [];
 }
 
+// نسخة بـ pagination من الباك (page/limit) — بترجع الـ envelope كامل { success, pagination, data }
+export async function getEmployeesListPaged(params = {}) {
+    const res = await api.get("/employees", { params });
+    return res.data;
+}
+
 /**
  * GET /employees/:id  →  single employee
  */

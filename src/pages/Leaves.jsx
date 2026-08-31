@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Plane, CheckCircle, XCircle } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import {
@@ -13,7 +13,7 @@ import {
 import { getEmployeesList } from "@/api/employeesApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 
@@ -63,7 +63,6 @@ export default function Leaves() {
   const { user, canDo } = useRole();
   const canCreate = canDo("leaves", "create");
   const canApprove = canDo("leaves", "approve");
-  const [leaves, setLeaves] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -79,25 +78,29 @@ export default function Leaves() {
     notes: "",
   });
   const [saving, setSaving] = useState(false);
-  const [balances, setBalances] = useState([]);
-  const [tickets, setTickets] = useState([]);
 
   const load = async () => {
-    const [vacationsRes, balancesRes, ticketsRes, employeesRes] = await Promise.all([
-      getAllVacationRequests(),
-      getVacationYearlyBalance(),
-      getFlyingTicket(),
-      getEmployeesList(),
-    ]);
-
-    setLeaves(vacationsRes?.data || []);
-    setBalances(balancesRes?.data || []);
-    setTickets(ticketsRes?.data || []);
+    const employeesRes = await getEmployeesList();
     setEmployees(Array.isArray(employeesRes) ? employeesRes : []);
-
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  const fetchLeavesPage = useCallback((params) => getAllVacationRequests(params), []);
+  const leavesPagination = useServerPagination(fetchLeavesPage, 20);
+
+  const fetchBalancesPage = useCallback((params) => getVacationYearlyBalance(params), []);
+  const balancesPagination = useServerPagination(fetchBalancesPage, 20);
+
+  const fetchTicketsPage = useCallback((params) => getFlyingTicket(params), []);
+  const ticketsPagination = useServerPagination(fetchTicketsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    leavesPagination.reload();
+    balancesPagination.reload();
+    ticketsPagination.reload();
+  };
 
   const calcDays = (from, to) => {
     if (!from || !to) return 0;
@@ -115,7 +118,7 @@ export default function Leaves() {
   const formDays = calcDays(form.from, form.to);
   const isFormYearly = form.vacation_type === "yearly";
   const formEmpBalance = form.employee_id
-    ? balances.find(b => String(b.employee_id) === String(form.employee_id))
+    ? balancesPagination.pageItems.find(b => String(b.employee_id) === String(form.employee_id))
     : null;
   const formYearlyBalance = formEmpBalance?.balance ?? formEmpBalance?.remaining ?? null;
   const formOverBalance = isFormYearly && formYearlyBalance !== null && formDays > formYearlyBalance;
@@ -158,7 +161,7 @@ export default function Leaves() {
         contains_flying_ticket: false,
         notes: "",
       });
-      load();
+      refreshAll();
     } catch (err) {
       const rawError = err?.response?.data;
       let msg = "حصل خطأ أثناء إرسال الطلب";
@@ -182,9 +185,9 @@ export default function Leaves() {
 
   const updateStatus = async (id, action) => {
     try {
-      
+
       await vacationAction(id, action);
-      load();
+      refreshAll();
     } catch (err) {
       const msg = err?.response?.data?.error || "حصل خطأ أثناء تنفيذ الإجراء";
       toast({
@@ -197,12 +200,12 @@ export default function Leaves() {
 
   const sendToManager = async (id) => {
     try {
-       
+
       await apiSendToManager(id);
-      load();
+      refreshAll();
     } catch (err) {
       console.error(err?.response?.data || err);
-      load();
+      refreshAll();
     }
   };
 
@@ -215,7 +218,7 @@ export default function Leaves() {
     if (!ok) return;
     try {
       await apiManagerApprove(id);
-      load();
+      refreshAll();
     } catch (err) {
       console.error(err?.response?.data || err);
       toast({
@@ -245,21 +248,19 @@ export default function Leaves() {
     if (ok) await updateStatus(id, "refuse");
   };
 
-  const filtered = leaves.filter(
+  // ملاحظة: العدادات دي بقت بتتحسب على الصفحة الحالية بس (مش كل الطلبات)
+  // بعد ما بقى الـ pagination من الباك — الأرقام مش تراكمية على كل البيانات.
+  const filtered = leavesPagination.pageItems.filter(
     l => !filterStatus || l.state === filterStatus
   );
 
-  const pending = leaves.filter(
+  const pending = leavesPagination.pageItems.filter(
     l => l.state === "confirm"
   );
-  const rejected = leaves.filter(l => l.state === "refuse");
-  const approved = leaves.filter(
+  const rejected = leavesPagination.pageItems.filter(l => l.state === "refuse");
+  const approved = leavesPagination.pageItems.filter(
     l => l.state === "validate"
   );
-
-  const leavesPagination = usePagination(filtered, 20);
-  const balancesPagination = usePagination(balances, 20);
-  const ticketsPagination = usePagination(tickets, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -279,7 +280,7 @@ export default function Leaves() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "إجمالي الطلبات", value: leaves.length, color: "text-primary" },
+          { label: "إجمالي الطلبات", value: leavesPagination.totalItems, color: "text-primary" },
           { label: "بانتظار الموافقة", value: pending.length, color: "text-amber-600" },
           { label: "معتمدة", value: approved.length, color: "text-green-600" },
           { label: "مرفوضة", value: rejected.length, color: "text-red-600" },
@@ -324,11 +325,11 @@ export default function Leaves() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {leavesPagination.loading ? (
                   <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">لا توجد طلبات</td></tr>
-                ) : leavesPagination.pageItems.map(leave => (
+                ) : filtered.map(leave => (
                   <tr key={leave.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{leave.employee?.name_ar}</p>

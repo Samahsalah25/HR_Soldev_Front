@@ -5,8 +5,8 @@ import api from "./axios";
 // ==========================
 // GET ALL ADDITIONS
 // ==========================
-export const getAdditions = async () => {
-  const res = await api.get("/additions");
+export const getAdditions = async (params = {}) => {
+  const res = await api.get("/additions", { params });
   return res.data;
 };
 

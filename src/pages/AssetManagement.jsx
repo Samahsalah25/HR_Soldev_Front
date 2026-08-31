@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Package, History, CheckCircle, XCircle, Wrench, RotateCcw } from "lucide-react";
 
 import {
-  getAssets, getEmployees, getCustodyRequests, getCustodyReturns,
+  getAssets, getAssetsPaged, getEmployees, getCustodyRequests, getCustodyReturns, getCustodyReturnsPaged,
   acceptCustodyRequest, rejectCustodyRequest,
   acceptCustodyReturn, rejectCustodyReturn,
   stateLabel, categoryTypeLabel, conditionLabel,
@@ -17,6 +17,7 @@ import CustodyDeliverModal from "../components/assets/CustodyDeliverModal";
 import CustodyReceiveModal from "../components/assets/CustodyReceiveModal";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 // State badge colours — in_use treated same as assigned
@@ -84,6 +85,18 @@ const load = async () => {
 
   useEffect(() => { load(); }, []);
 
+  const fetchAssetsPage = useCallback((params) => getAssetsPaged(params), []);
+  const assetsPagination = useServerPagination(fetchAssetsPage, 20);
+
+  const fetchReturnsPage = useCallback((params) => getCustodyReturnsPaged(params), []);
+  const returnsPagination = useServerPagination(fetchReturnsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    assetsPagination.reload();
+    returnsPagination.reload();
+  };
+
   // ── Request actions ─────────────────────────────────────────────────────────
   const handleAccept = async (req) => {
     const ok = await confirmDialog({
@@ -99,7 +112,7 @@ const load = async () => {
       } else {
         await acceptCustodyRequest(req.id);
       }
-      load();
+      refreshAll();
     } catch (err) {
       console.error("Accept error:", err);
     }
@@ -119,21 +132,17 @@ const load = async () => {
       } else {
         await rejectCustodyRequest(req.id);
       }
-      load();
+      refreshAll();
     } catch (err) {
       console.error("Reject error:", err);
     }
   };
 
   // ── Derived data ─────────────────────────────────────────────────────────────
-  const visibleAssets = isAdminOrHR
-    ? assets
-    : assets.filter(a =>
-      String(a.employee_id) === String(currentEmployee?.id) ||
-      a.employee_name === currentEmployee?.name
-    );
-
-  const filteredAssets = visibleAssets.filter(a => {
+  // ملاحظة: الباك بيفلتر تلقائي حسب صاحب التوكن، فمفيش داعي لفلترة يدوية حسب
+  // الموظف هنا زي الأول — البحث/الفلترة دلوقتي بيشتغلوا على الصفحة الحالية
+  // الجاية من الباك بس (الأصول والمرتجعات بقوا pagination من الباك مش من الفرونت).
+  const pageAssets = assetsPagination.pageItems.filter(a => {
     const q = search.toLowerCase();
     const matchSearch =
       !search ||
@@ -154,6 +163,7 @@ const load = async () => {
   });
 
   // Tab الطلبات: كل الطلبات (custody_requests + custody_returns مدمجين)
+  // لسه client-side لإنه مفيش endpoint واحد بيرجعهم مدمجين مع بعض
   const allRequestsAndReturns = [
     ...requests.map(r => ({ ...r, _source: "requests" })),
     ...returns.map(r => ({ ...r, _source: "returns" })),
@@ -162,15 +172,7 @@ const load = async () => {
     ? allRequestsAndReturns
     : allRequestsAndReturns.filter(r => String(r.employee_id) === String(currentEmployee?.id));
 
-  const returnRequests = isAdminOrHR
-    ? returns
-    : returns.filter(r =>
-      String(r.employee_id) === String(currentEmployee?.id)
-    );
-
-  const assetsPagination = usePagination(filteredAssets, 20);
   const requestsPagination = usePagination(myRequests, 20);
-  const returnsPagination = usePagination(returnRequests, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto" dir="rtl">
@@ -284,11 +286,11 @@ const load = async () => {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {assetsPagination.loading ? (
                   <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
-                ) : filteredAssets.length === 0 ? (
+                ) : pageAssets.length === 0 ? (
                   <tr><td colSpan={7} className="text-center py-10 text-muted-foreground">لا توجد أصول</td></tr>
-                ) : assetsPagination.pageItems.map(asset => (
+                ) : pageAssets.map(asset => (
                   <tr key={asset.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3 font-medium text-foreground">{asset.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{categoryTypeLabel(asset.category_type)}</td>
@@ -461,7 +463,9 @@ const load = async () => {
               </tr>
             </thead>
             <tbody>
-              {returnRequests.length === 0 ? (
+              {returnsPagination.loading ? (
+                <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">جاري التحميل...</td></tr>
+              ) : returnsPagination.pageItems.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">لا توجد إعادات</td></tr>
               ) : returnsPagination.pageItems.map(ret => {
                 const statusKey = ret.state || ret.status || "";
@@ -516,7 +520,7 @@ const load = async () => {
         <AssetForm
           asset={editAsset}
           onClose={() => setShowForm(false)}
-          onSave={() => { setShowForm(false); load(); }}
+          onSave={() => { setShowForm(false); refreshAll(); }}
         />
       )}
       {showRequestModal && (
@@ -524,7 +528,7 @@ const load = async () => {
           assets={assets}
           employees={employees}
           onClose={() => setShowRequestModal(false)}
-          onSave={() => { setShowRequestModal(false); load(); }}
+          onSave={() => { setShowRequestModal(false); refreshAll(); }}
         />
       )}
       {deliverModal && (
@@ -532,7 +536,7 @@ const load = async () => {
           request={deliverModal}
           employees={employees}
           onClose={() => setDeliverModal(null)}
-          onSave={() => { setDeliverModal(null); load(); }}
+          onSave={() => { setDeliverModal(null); refreshAll(); }}
         />
       )}
       {receiveModal && (
@@ -540,7 +544,7 @@ const load = async () => {
           request={receiveModal}
           employees={employees}
           onClose={() => setReceiveModal(null)}
-          onSave={() => { setReceiveModal(null); load(); }}
+          onSave={() => { setReceiveModal(null); refreshAll(); }}
         />
       )}
       {historyModal && (

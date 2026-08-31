@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, CheckCircle, Clock, Search, X, Save, User } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 import {
   getTasks,
@@ -156,7 +156,6 @@ export default function Tasks() {
   const canCreate = canDo("tasks", "create");
   const canEdit = canDo("tasks", "edit");
   const canDelete = canDo("tasks", "delete");
-  const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -168,37 +167,7 @@ export default function Tasks() {
     try {
       setLoading(true);
 
-      const [tasksRes, employeesRes] =
-        await Promise.all([
-          getTasks(),
-          getEmployees(),
-        ]);
-
-      // TASKS
-      const normalized =
-        tasksRes?.data?.map((t) => ({
-          id: t.id,
-          title: t.title,
-          description: t.description,
-          assigned_to: t.employee_name,
-          assigned_to_id: t.employee_id,
-
-          priority:
-            PRIORITY_MAP_REVERSE[
-            t.priority
-            ] || "متوسطة",
-
-          status:
-            STATUS_MAP_REVERSE[
-            t.state
-            ] || "قيد العمل",
-
-          due_date: t.deadline
-            ? t.deadline.split(" ")[0]
-            : "",
-
-          active: t.active,
-        })) || [];
+      const employeesRes = await getEmployees();
 
       // EMPLOYEES
       const normalizedEmployees =
@@ -218,8 +187,6 @@ export default function Tasks() {
           })
         ) || [];
 
-      setTasks(normalized);
-
       setEmployees(
         normalizedEmployees
       );
@@ -232,6 +199,31 @@ export default function Tasks() {
 
   useEffect(() => { load(); }, []);
 
+  const fetchTasksPage = useCallback(async (params) => {
+    const res = await getTasks(params);
+    const list = res?.data || [];
+    return {
+      ...res,
+      data: list.map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        assigned_to: t.employee_name,
+        assigned_to_id: t.employee_id,
+        priority: PRIORITY_MAP_REVERSE[t.priority] || "متوسطة",
+        status: STATUS_MAP_REVERSE[t.state] || "قيد العمل",
+        due_date: t.deadline ? t.deadline.split(" ")[0] : "",
+        active: t.active,
+      })),
+    };
+  }, []);
+  const tasksPagination = useServerPagination(fetchTasksPage, 20);
+
+  const refreshAll = () => {
+    load();
+    tasksPagination.reload();
+  };
+
   const deleteTask = async (id) => {
     const ok = await confirmDialog({
       title: "حذف المهمة",
@@ -239,7 +231,7 @@ export default function Tasks() {
       confirmText: "حذف",
       variant: "destructive",
     });
-    if (ok) { await deleteTaskApi(id); load(); }
+    if (ok) { await deleteTaskApi(id); refreshAll(); }
   };
 
   const toggleComplete = async (task) => {
@@ -267,22 +259,22 @@ export default function Tasks() {
         task.description,
     });
 
-    load();
+    refreshAll();
   };
 
-  const filtered = tasks
+  // ملاحظة: العدادات والفلترة دلوقتي بتشتغل على الصفحة الحالية بس
+  const filtered = tasksPagination.pageItems
     .filter(t => !filterStatus || t.status === filterStatus)
     .filter(t => !search || t.title?.includes(search) || t.assigned_to?.includes(search));
 
   const counts = {
-    all: tasks.length,
-    "قيد العمل": tasks.filter(t => t.status === "قيد العمل").length,
-    "مكتملة": tasks.filter(t => t.status === "مكتملة").length,
-    "متأخرة": tasks.filter(t => t.status === "متأخرة").length,
+    all: tasksPagination.pageItems.length,
+    "قيد العمل": tasksPagination.pageItems.filter(t => t.status === "قيد العمل").length,
+    "مكتملة": tasksPagination.pageItems.filter(t => t.status === "مكتملة").length,
+    "متأخرة": tasksPagination.pageItems.filter(t => t.status === "متأخرة").length,
   };
 
   const isOverdue = (task) => task.due_date && new Date(task.due_date) < new Date() && task.status !== "مكتملة";
-  const tasksPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-5xl mx-auto" dir="rtl">
@@ -327,13 +319,13 @@ export default function Tasks() {
 
       {/* Task List */}
       <div className="space-y-2">
-        {loading ? <p className="text-center py-10 text-muted-foreground">جاري التحميل...</p>
+        {tasksPagination.loading ? <p className="text-center py-10 text-muted-foreground">جاري التحميل...</p>
           : filtered.length === 0 ? (
             <div className="text-center py-16 bg-card rounded-xl border border-border">
               <CheckCircle className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-30" />
               <p className="text-sm text-muted-foreground">لا توجد مهام</p>
             </div>
-          ) : tasksPagination.pageItems.map(task => (
+          ) : filtered.map(task => (
             <div key={task.id} className={`bg-card rounded-xl border p-4 flex items-start gap-3 ${isOverdue(task) ? "border-red-200 bg-red-50/30" : "border-border"}`}>
               <button onClick={() => toggleComplete(task)} className="mt-0.5 flex-shrink-0">
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${task.status === "مكتملة" ? "bg-green-500 border-green-500" : "border-muted-foreground"}`}>
@@ -375,7 +367,7 @@ export default function Tasks() {
         onPageChange={tasksPagination.setPage}
       />
 
-      {showForm && <TaskForm task={editTask} employees={employees} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
+      {showForm && <TaskForm task={editTask} employees={employees} onSave={() => { setShowForm(false); refreshAll(); }} onClose={() => setShowForm(false)} />}
     </div>
   );
 }

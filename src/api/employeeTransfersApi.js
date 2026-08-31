@@ -3,8 +3,8 @@ import api from "./axios";
 // ======================
 // GET ALL EMPLOYEE TRANSFERS
 // ======================
-export const getEmployeeTransfers = async () => {
-  const res = await api.get("/employee_transfers");
+export const getEmployeeTransfers = async (params = {}) => {
+  const res = await api.get("/employee_transfers", { params });
   return res.data;
 };
 

@@ -1,7 +1,7 @@
 
 
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   FolderOpen,
   Plus,
@@ -19,7 +19,7 @@ import {
 } from "../api/companyRecordsApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -445,34 +445,14 @@ const { toast } = useToast();
 
 export default function CompanyRecords() {
   const confirmDialog = useConfirm();
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
 const { toast } = useToast();
-const load = async () => {
-  try {
-    setLoading(true);
 
-    const data = await getCompanyRecords();
-
-    setRecords(data?.data || data || []);
-  } catch (err) {
-    console.error(err);
-    toast({
-      title: "خطأ",
-      description: "فشل تحميل السجلات",
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
-  useEffect(() => {
-    load();
-  }, []);
+  const fetchRecordsPage = useCallback((params) => getCompanyRecords(params), []);
+  const recordsPagination = useServerPagination(fetchRecordsPage, 20);
+  const load = () => recordsPagination.reload();
 
   const deleteRecord = async (id) => {
     const ok = await confirmDialog({
@@ -512,7 +492,8 @@ const downloadRecord = async (id, filename) => {
 
   const today = new Date();
 
-  const expiringSoon = records.filter((r) => {
+  // ملاحظة: الإحصائيات والفلترة دلوقتي بتشتغل على الصفحة الحالية بس
+  const expiringSoon = recordsPagination.pageItems.filter((r) => {
     if (!r.expiry_date) return false;
 
     const days = Math.ceil(
@@ -522,20 +503,19 @@ const downloadRecord = async (id, filename) => {
     return days <= 60 && days >= 0;
   });
 
-  const expired = records.filter(
+  const expired = recordsPagination.pageItems.filter(
     (r) =>
       r.expiry_date &&
       new Date(r.expiry_date) < today
   );
 
-  const filtered = records.filter(
+  const filtered = recordsPagination.pageItems.filter(
     (r) =>
       (!search ||
         r.name?.includes(search) ||
         r.number?.includes(search)) &&
       (!filterType || r.category === filterType)
   );
-  const recordsPagination = usePagination(filtered, 20);
 
   return (
     <div
@@ -567,7 +547,7 @@ const downloadRecord = async (id, filename) => {
         {[
           {
             label: "إجمالي الوثائق",
-            value: records.length,
+            value: recordsPagination.totalItems,
             color: "text-primary",
           },
           {
@@ -695,7 +675,7 @@ const downloadRecord = async (id, filename) => {
           </thead>
 
           <tbody>
-            {loading ? (
+            {recordsPagination.loading ? (
               <tr>
                 <td
                   colSpan={9}
@@ -714,7 +694,7 @@ const downloadRecord = async (id, filename) => {
                 </td>
               </tr>
             ) : (
-              recordsPagination.pageItems.map((r) => {
+              filtered.map((r) => {
                 const days = r.expiry_date
                   ? Math.ceil(
                       (new Date(r.expiry_date) -

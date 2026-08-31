@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TrendingDown, Plus, X, Save, Search } from "lucide-react";
 import { useRole } from "../lib/useRole";
 import { getEmployees } from "@/api/departmentsApi";
@@ -8,7 +8,7 @@ import {
   updateDeduction,
 } from "@/api/deductionsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_COLORS = {
 //   "قيد الاعتماد": "bg-amber-100 text-amber-700",
@@ -161,7 +161,6 @@ export default function Deductions() {
   const { user, canDo } = useRole();
   const canCreate = canDo("deductions", "create");
   const canApprove = canDo("deductions", "approve");
-  const [deductions, setDeductions] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -174,30 +173,7 @@ export default function Deductions() {
     try {
       setLoading(true);
 
-      const [ds, emps] = await Promise.all([
-        getDeductions(),
-        getEmployees(),
-      ]);
-
-      // normalize deductions
-      const deductionsData = ds?.data ?? ds ?? [];
-      const normalizedDeductions = deductionsData.map((d) => ({
-        id: d.id,
-        employee_name: d.employee_name,
-        department: d.department,
-        deduction_type: d.deduction_type,
-        month: d.month_of_deduction,
-        amount: d.amount,
-        reason: d.reason,
-
-        // مهم جداً
-        raw_state: d.state,
-
-        // عرض عربي فقط
-        status: STATE_LABELS[d.state] || d.state,
-      }));
-
-      setDeductions(normalizedDeductions);
+      const emps = await getEmployees();
 
       // normalize employees
       const employeesData = emps?.data ?? emps ?? [];
@@ -219,6 +195,33 @@ export default function Deductions() {
   };
   useEffect(() => { load(); }, []);
 
+  const fetchDeductionsPage = useCallback(async (params) => {
+    const res = await getDeductions(params);
+    const list = res?.data ?? res ?? [];
+    return {
+      ...res,
+      data: list.map((d) => ({
+        id: d.id,
+        employee_name: d.employee_name,
+        department: d.department,
+        deduction_type: d.deduction_type,
+        month: d.month_of_deduction,
+        amount: d.amount,
+        reason: d.reason,
+        // مهم جداً
+        raw_state: d.state,
+        // عرض عربي فقط
+        status: STATE_LABELS[d.state] || d.state,
+      })),
+    };
+  }, []);
+  const deductionsPagination = useServerPagination(fetchDeductionsPage, 20);
+
+  const refreshAll = () => {
+    load();
+    deductionsPagination.reload();
+  };
+
   const approve = async (id) => {
     const ok = await confirmDialog({
       title: "اعتماد الخصم",
@@ -229,7 +232,7 @@ export default function Deductions() {
     await updateDeduction(id, {
       state: "approved",
     });
-    load();
+    refreshAll();
   };
   const reject = async (id) => {
     const ok = await confirmDialog({
@@ -242,7 +245,7 @@ export default function Deductions() {
     await updateDeduction(id, {
       state: "rejected",
     });
-    load();
+    refreshAll();
   };
   const apply = async (id) => {
     const ok = await confirmDialog({
@@ -255,14 +258,16 @@ export default function Deductions() {
     await updateDeduction(id, {
       state: "paid",
     });
-    load();
+    refreshAll();
   };
 
-  const pending = deductions.filter(
+  // ملاحظة: العدادات دي بقت بتتحسب على الصفحة الحالية بس (مش كل الخصومات)
+  // بعد ما بقى الـ pagination من الباك — الأرقام مش تراكمية على كل البيانات.
+  const pending = deductionsPagination.pageItems.filter(
     d => d.status === "قيد الاعتماد"
   );
 
-  const filtered = deductions
+  const filtered = deductionsPagination.pageItems
     .filter(d =>
       activeTab === "pending"
         ? d.status === "قيد الاعتماد"
@@ -276,16 +281,14 @@ export default function Deductions() {
     );
 
   const totals = {
-    pending: deductions.filter(d => d.status === "قيد الاعتماد").length,
+    pending: deductionsPagination.pageItems.filter(d => d.status === "قيد الاعتماد").length,
 
-    approved: deductions.filter(d => d.status === "معتمد").length,
+    approved: deductionsPagination.pageItems.filter(d => d.status === "معتمد").length,
 
-    applied: deductions
+    applied: deductionsPagination.pageItems
       .filter(d => d.status === "مطبَّق")
       .reduce((s, d) => s + (Number(d.amount) || 0), 0),
   };
-
-  const deductionsPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -317,7 +320,7 @@ export default function Deductions() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {[
-          { id: "all", label: `كل الخصومات (${deductions.length})` },
+          { id: "all", label: `كل الخصومات (${deductionsPagination.totalItems})` },
           { id: "pending", label: `قيد الاعتماد (${pending.length})`, badge: pending.length > 0 },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -353,9 +356,9 @@ export default function Deductions() {
             ))}
           </tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
+            {deductionsPagination.loading ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">جاري التحميل...</td></tr>
               : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد خصومات</td></tr>
-                : deductionsPagination.pageItems.map(d => (
+                : filtered.map(d => (
                   <tr key={d.id} className={`border-b border-border last:border-0 hover:bg-muted/20 ${d.status === "قيد الاعتماد" ? "bg-amber-50/30" : ""}`}>
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground">{d.employee_name}</p>
@@ -390,7 +393,7 @@ export default function Deductions() {
         />
       </div>
 
-      {showForm && <DeductionForm employees={employees} violations={violations} onSave={() => { setShowForm(false); load(); }} onClose={() => setShowForm(false)} />}
+      {showForm && <DeductionForm employees={employees} violations={violations} onSave={() => { setShowForm(false); refreshAll(); }} onClose={() => setShowForm(false)} />}
     </div>
   );
 }

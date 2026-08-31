@@ -5,8 +5,8 @@ import api from "./axios";
 // ==========================
 // GET ALL DEDUCTIONS
 // ==========================
-export const getDeductions = async () => {
-  const res = await api.get("/deductions");
+export const getDeductions = async (params = {}) => {
+  const res = await api.get("/deductions", { params });
   return res.data;
 };
 

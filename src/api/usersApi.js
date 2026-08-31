@@ -3,8 +3,8 @@ import api from "./axios";
 // GET ALL USERS
 // GET /auth/users
 // Response: { success: true, data: [{ id, name, email, role }, ...] }
-export const getUsers = async () => {
-    const response = await api.get("/auth/users");
+export const getUsers = async (params = {}) => {
+    const response = await api.get("/auth/users", { params });
     return response.data;
 };
 

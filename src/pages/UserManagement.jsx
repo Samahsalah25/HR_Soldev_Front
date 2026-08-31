@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { getUsers, inviteEmployee, changeUserRole } from "@/api/usersApi";
 import { UserPlus, Shield, Search, Edit2, Check, X, Mail } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { usePagination } from "@/lib/usePagination";
+import { useServerPagination } from "@/lib/useServerPagination";
 import TablePagination from "@/components/ui/TablePagination";
 
 const ROLES = [
@@ -26,8 +26,6 @@ function getRoleBadge(role) {
 
 export default function UserManagement() {
   const confirmDialog = useConfirm();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   // Invite form
@@ -40,21 +38,9 @@ export default function UserManagement() {
   const [editingId, setEditingId] = useState(null);
   const [editingRole, setEditingRole] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await getUsers();
-      // Response: { success: true, data: [{ id, name, email, role }, ...] }
-      setUsers(Array.isArray(res) ? res : (res?.data ?? []));
-    } catch (err) {
-      console.error("Failed to load users:", err);
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  const fetchUsersPage = useCallback((params) => getUsers(params), []);
+  const usersPagination = useServerPagination(fetchUsersPage, 20);
+  const load = () => usersPagination.reload();
 
   const handleInvite = async (e) => {
     e.preventDefault();
@@ -89,17 +75,17 @@ export default function UserManagement() {
       variant: "destructive",
     });
     if (!ok) return;
-    await base44.entities.User.update(userId, { role: editingRole });
+    await changeUserRole(userId, editingRole);
     setEditingId(null);
     load();
   };
 
-  const filtered = users.filter(u =>
+  // ملاحظة: البحث دلوقتي بيشتغل على الصفحة الحالية بس بعد ما بقى الـ pagination من الباك
+  const filtered = usersPagination.pageItems.filter(u =>
     !search ||
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
   );
-  const usersPagination = usePagination(filtered, 20);
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto" dir="rtl">
@@ -166,7 +152,7 @@ export default function UserManagement() {
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
           <h2 className="font-semibold text-foreground flex items-center gap-2">
             <Shield className="w-4 h-4 text-primary" />
-            المستخدمون المسجلون ({users.length})
+            المستخدمون المسجلون ({usersPagination.totalItems})
           </h2>
           <div className="relative">
             <Search className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground" />
@@ -189,7 +175,7 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {usersPagination.loading ? (
                 <tr><td colSpan={4} className="text-center py-10 text-muted-foreground">
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -198,7 +184,7 @@ export default function UserManagement() {
                 </td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-10 text-muted-foreground">لا توجد نتائج</td></tr>
-              ) : usersPagination.pageItems.map(u => (
+              ) : filtered.map(u => (
                 <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">

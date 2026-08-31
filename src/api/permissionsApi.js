@@ -95,7 +95,7 @@ export const updateEmployeePermissions = async (employeeId, hasOverrides, permis
 // =============================
 // GET PERMISSION LOGS
 // =============================
-export const getPermissionLogs = async () => {
-    const res = await api.get("/permissions/logs");
+export const getPermissionLogs = async (params = {}) => {
+    const res = await api.get("/permissions/logs", { params });
     return res.data;
 };

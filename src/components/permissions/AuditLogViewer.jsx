@@ -147,32 +147,18 @@
 //   );
 // }
 
-import { useState, useEffect } from "react";
+import { useCallback } from "react";
 import { Clock, User, Shield, RefreshCw } from "lucide-react";
 import { getPermissionLogs } from "@/api/permissionsApi";
+import { useServerPagination } from "@/lib/useServerPagination";
+import TablePagination from "@/components/ui/TablePagination";
 
 export default function AuditLogViewer() {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getPermissionLogs();
-      setLogs(Array.isArray(data) ? data : data?.data ?? []);
-    } catch (e) {
-      console.error(e);
-      setError("تعذّر تحميل سجل التدقيق");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const fetchLogsPage = useCallback((params) => getPermissionLogs(params), []);
+  const logsPagination = useServerPagination(fetchLogsPage, 20);
+  const logs = logsPagination.pageItems;
+  const loading = logsPagination.loading;
+  const load = logsPagination.reload;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
@@ -221,15 +207,8 @@ export default function AuditLogViewer() {
         </div>
       )}
 
-      {/* Error */}
-      {error && (
-        <div className="text-center py-16 text-red-500 text-sm">
-          {error}
-        </div>
-      )}
-
       {/* Empty */}
-      {!loading && !error && logs.length === 0 && (
+      {!loading && logs.length === 0 && (
         <div className="text-center py-16 text-muted-foreground text-sm">
           <Shield className="w-10 h-10 mx-auto mb-3 opacity-30" />
           لا توجد سجلات تدقيق حتى الآن
@@ -302,6 +281,14 @@ export default function AuditLogViewer() {
           </div>
         ))}
       </div>
+
+      <TablePagination
+        page={logsPagination.page}
+        totalPages={logsPagination.totalPages}
+        totalItems={logsPagination.totalItems}
+        pageSize={logsPagination.pageSize}
+        onPageChange={logsPagination.setPage}
+      />
     </div>
   );
 }

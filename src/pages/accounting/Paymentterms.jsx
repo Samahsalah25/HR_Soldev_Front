@@ -55,6 +55,10 @@ const EMPTY_TERM = {
   early_pay_discount_computation: "mixed",
   display_on_invoice: true,
   lines: [{ _key: 1, value: "percent", value_amount: 100, delay_type: "days_after", nb_days: 0, days_next_month: 10 }],
+  // قايمة id بتوع الأسطر اللي اتمسحت من الفورم وكانت أصلاً موجودة في
+  // الباك اند (عندها id حقيقي). بتتبعت في الآخر بصيغة { id, _delete: true }
+  // زي ما موضّح في الـ Postman collection.
+  _deleted_line_ids: [],
 };
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -89,24 +93,45 @@ function computePreview(lines, exampleAmount = 1000) {
 
 /**
  * بناء الـ Payload اللي بيتبعت للباك اند من شكل الفورم المحلي
+ *
+ * ملاحظة مهمة (نفس منطق الإصلاح اللي عملناه في Taxes.jsx):
+ * - أي سطر جاي أصلاً من الباك اند (عنده id حقيقي) لازم يتبعت بالـ id
+ *   بتاعه عشان الباك اند يعمله update بدل create سطر جديد ليه.
+ * - أي سطر كان موجود واتمسح من الفورم، لازم يتبعت بصيغة
+ *   { id, _delete: true } (زي ما موضّح في الـ Postman collection)
+ *   عشان يتمسح فعليًا من أودو، مش يفضل يتيم هناك.
+ * - الأسطر الجديدة اللي المستخدم أضافها وبعدين مسحها (مالهاش id) بتتشال
+ *   من غير ما تتبعت خالص، لأنها أصلاً معملهاش create.
  */
 function buildPayload(form) {
+  const activeLines = form.lines.map((l) => {
+    const line = {
+      value: l.value,
+      value_amount: Number(l.value_amount) || 0,
+      delay_type: l.delay_type,
+    };
+
+    // لو السطر ده جاي من الباك اند أصلاً (عنده id رقمي حقيقي) ابعتيه
+    // عشان يبقى update مش create سطر جديد بنفس البيانات
+    if (l.id) {
+      line.id = l.id;
+    }
+
+    if (l.delay_type === "days_end_of_month_on_the") {
+      line.days_next_month = Number(l.days_next_month) || 1;
+    } else {
+      line.nb_days = Number(l.nb_days) || 0;
+    }
+    return line;
+  });
+
+  // الأسطر اللي اتمسحت من الفورم وكانت أصلاً موجودة (ليها id حقيقي)
+  const deletedLines = (form._deleted_line_ids || []).map((id) => ({ id, _delete: true }));
+
   const payload = {
     name: form.name.trim(),
     note: form.note?.trim() || "",
-    lines: form.lines.map((l) => {
-      const line = {
-        value: l.value,
-        value_amount: Number(l.value_amount) || 0,
-        delay_type: l.delay_type,
-      };
-      if (l.delay_type === "days_end_of_month_on_the") {
-        line.days_next_month = Number(l.days_next_month) || 1;
-      } else {
-        line.nb_days = Number(l.nb_days) || 0;
-      }
-      return line;
-    }),
+    lines: [...activeLines, ...deletedLines],
     early_discount: !!form.early_discount,
     display_on_invoice: !!form.display_on_invoice,
   };
@@ -135,14 +160,20 @@ function PaymentTermForm({ term, onBack, onSaved }) {
           ...term,
           lines: (term.lines?.length ? term.lines : EMPTY_TERM.lines).map((l) => ({
             _key: l.id ?? Date.now() + Math.random(),
+            // *** الإصلاح الأهم ***: لازم نحافظ على الـ id هنا كحقل فعلي
+            // في السطر، مش بس نستخدمه كـ _key للـ React. من غيرها،
+            // buildPayload مستحيل يبعت id لأي سطر حتى لو كان جاي أصلاً
+            // من الباك اند، وأودو هيعامل كل الأسطر كأنها جديدة.
+            id: l.id,
             value: l.value || "percent",
             value_amount: l.value_amount ?? 0,
             delay_type: l.delay_type || "days_after",
             nb_days: l.nb_days ?? 0,
             days_next_month: l.days_next_month ?? 10,
           })),
+          _deleted_line_ids: [],
         }
-      : { ...EMPTY_TERM }
+      : { ...EMPTY_TERM, lines: EMPTY_TERM.lines.map((l) => ({ ...l })), _deleted_line_ids: [] }
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -153,8 +184,25 @@ function PaymentTermForm({ term, onBack, onSaved }) {
     setForm((f) => ({ ...f, lines: f.lines.map((l, i) => (i === idx ? { ...l, [field]: value } : l)) }));
 
   const addLine = () => setForm((f) => ({ ...f, lines: [...f.lines, EMPTY_LINE()] }));
+
+  // *** الإصلاح ***: لو السطر اللي بيتمسح عنده id حقيقي (جاي من الباك
+  // اند)، بنسجله في _deleted_line_ids عشان يتبعت لاحقًا كـ
+  // { id, _delete: true } في buildPayload، بدل ما يختفي بس من الـ state
+  // المحلي ويفضل موجود في أودو من غير علم حد.
   const removeLine = (idx) =>
-    setForm((f) => (f.lines.length > 1 ? { ...f, lines: f.lines.filter((_, i) => i !== idx) } : f));
+    setForm((f) => {
+      if (f.lines.length <= 1) return f;
+      const removed = f.lines[idx];
+      const remaining = f.lines.filter((_, i) => i !== idx);
+      if (removed.id) {
+        return {
+          ...f,
+          lines: remaining,
+          _deleted_line_ids: [...(f._deleted_line_ids || []), removed.id],
+        };
+      }
+      return { ...f, lines: remaining };
+    });
 
   const totalPercent = form.lines
     .filter((l) => l.value === "percent")
@@ -179,6 +227,17 @@ function PaymentTermForm({ term, onBack, onSaved }) {
   const handleSave = async () => {
     setError(null);
     if (!form.name.trim()) return;
+
+    // تحقق بسيط قبل الحفظ: مجموع نسب الأسطر من نوع "percent" لازم
+    // يساوي 100% بالظبط (نفس المنطق اللي أودو بيفرضه على شروط الدفع).
+    const percentSum = form.lines
+      .filter((l) => l.value === "percent")
+      .reduce((s, l) => s + (Number(l.value_amount) || 0), 0);
+    if (form.lines.some((l) => l.value === "percent") && Math.abs(percentSum - 100) > 0.001) {
+      setError(`إجمالي نسب بنود الاستحقاق لازم يساوي 100%، حاليًا المجموع = ${percentSum}%.`);
+      return;
+    }
+
     try {
       setSaving(true);
       const payload = buildPayload(form);
@@ -379,7 +438,11 @@ function PaymentTermForm({ term, onBack, onSaved }) {
                         </div>
                       </td>
                       <td className="px-2 py-2">
-                        <button onClick={() => removeLine(i)} className="p-1 hover:bg-red-50 text-red-400 rounded">
+                        <button
+                          onClick={() => removeLine(i)}
+                          disabled={form.lines.length <= 1}
+                          className="p-1 hover:bg-red-50 text-red-400 rounded disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                        >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>

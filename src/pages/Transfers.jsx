@@ -15,7 +15,6 @@ import {
 } from "@/api/branchesApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -438,6 +437,8 @@ export default function Transfers() {
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
 
+  const [transfersKpis, setTransfersKpis] = useState(null);
+
   // =========================
   // LOAD
   // =========================
@@ -463,6 +464,7 @@ export default function Transfers() {
   // =========================
   const fetchTransfersPage = useCallback(async (params) => {
     const res = await getEmployeeTransfers(params);
+    setTransfersKpis(res?.kpis ?? null);
     const list = res?.data || res || [];
     return {
       ...res,
@@ -489,16 +491,10 @@ export default function Transfers() {
   }, []);
   const transfersPagination = useServerPagination(fetchTransfersPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     transfersPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل الحركات (مش الصفحة الحالية بس)
-  const pendingCount = useFilteredCount(getEmployeeTransfers, { state: "submitted" }, [countsKey]);
-  const approvedCount = useFilteredCount(getEmployeeTransfers, { state: "approved" }, [countsKey]);
 
   // =========================
   // APPROVE
@@ -574,17 +570,17 @@ export default function Transfers() {
         {[
           {
             label: "قيد الاعتماد",
-            value: pendingCount.count ?? transfersPagination.pageItems.filter((t) => t.status === "قيد الاعتماد").length,
+            value: transfersKpis?.under_review ?? transfersPagination.pageItems.filter((t) => t.status === "قيد الاعتماد").length,
             color: "text-amber-600",
           },
           {
             label: "معتمدة",
-            value: approvedCount.count ?? transfersPagination.pageItems.filter((t) => t.status === "معتمد").length,
+            value: transfersKpis?.approved ?? transfersPagination.pageItems.filter((t) => t.status === "معتمد").length,
             color: "text-green-600",
           },
           {
             label: "إجمالي",
-            value: transfersPagination.totalItems,
+            value: transfersKpis?.total ?? transfersPagination.totalItems,
             color: "text-primary",
           },
         ].map((s) => (

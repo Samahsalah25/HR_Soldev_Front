@@ -393,7 +393,6 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const Field = ({ label, children }) => (
@@ -929,24 +928,30 @@ export default function BranchesDepartments() {
     load();
   }, []);
 
-  const fetchDepartmentsPage = useCallback((params) => getDepartments(params), []);
+  // kpis جايين جاهزين من الباك جوه نفس رد القائمة — دقيقين على كل البيانات
+  const [deptKpis, setDeptKpis] = useState(null);
+  const fetchDepartmentsPage = useCallback(async (params) => {
+    const res = await getDepartments(params);
+    setDeptKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const departmentsPagination = useServerPagination(fetchDepartmentsPage, 20);
 
+  const [branchesKpis, setBranchesKpis] = useState(null);
   // نسخة pagination من الفروع للعرض بس — القائمة الكاملة (branches state) لسه
   // مستخدمة زي ما هي في الإحصائيات وفورم إنشاء قسم (محتاج كل الفروع مش صفحة بس)
-  const fetchBranchesPage = useCallback((params) => getBranches(params), []);
+  const fetchBranchesPage = useCallback(async (params) => {
+    const res = await getBranches(params);
+    setBranchesKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const branchesPagination = useServerPagination(fetchBranchesPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     departmentsPagination.reload();
     branchesPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عداد دقيق على مستوى كل الأقسام (مش الصفحة الحالية بس)
-  const activeDeptsCount = useFilteredCount(getDepartments, { active: true }, [countsKey]);
 
  const handleDeleteBranch = async (id) => {
   const ok = await confirmDialog({
@@ -990,25 +995,25 @@ export default function BranchesDepartments() {
         {[
           {
             label: "الفروع",
-            value: branches.length,
+            value: branchesKpis?.total_branches ?? branches.length,
             icon: Building2,
             color: "text-primary",
           },
           {
             label: "الفروع النشطة",
-            value: branches.filter((b) => b.active).length,
+            value: branchesKpis?.total_active_branches ?? branches.filter((b) => b.active).length,
             icon: Check,
             color: "text-green-600",
           },
           {
             label: "الأقسام",
-            value: departmentsPagination.totalItems,
+            value: deptKpis?.total_departments ?? departmentsPagination.totalItems,
             icon: Users,
             color: "text-secondary",
           },
           {
             label: "الأقسام النشطة",
-            value: activeDeptsCount.count ?? departmentsPagination.pageItems.filter((d) => d.active).length,
+            value: deptKpis?.total_active_departments ?? departmentsPagination.pageItems.filter((d) => d.active).length,
             icon: Check,
             color: "text-teal-600",
           },

@@ -11,7 +11,6 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_LABELS = {
@@ -281,19 +280,19 @@ export default function Violations() {
     load();
   }, []);
 
-  const fetchViolationsPage = useCallback((params) => getViolations(params), []);
+  // kpis جايين جاهزين من الباك جوه نفس رد القائمة — دقيقين على كل البيانات
+  const [violationsKpis, setViolationsKpis] = useState(null);
+  const fetchViolationsPage = useCallback(async (params) => {
+    const res = await getViolations(params);
+    setViolationsKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const violationsPagination = useServerPagination(fetchViolationsPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     violationsPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل المخالفات (مش الصفحة الحالية بس)
-  const underReviewCount = useFilteredCount(getViolations, { state: "under_review" }, [countsKey]);
-  const approvedCount = useFilteredCount(getViolations, { state: "approved" }, [countsKey]);
 
   // ================= CONFIRM =================
   const confirm_ = async (id) => {
@@ -395,17 +394,17 @@ export default function Violations() {
         {[
           {
             label: "إجمالي المخالفات",
-            value: violationsPagination.totalItems,
+            value: violationsKpis?.total_violations ?? violationsPagination.totalItems,
             color: "text-foreground",
           },
           {
             label: "قيد المراجعة",
-            value: underReviewCount.count ?? violationsPagination.pageItems.filter((v) => v.state === "under_review").length,
+            value: violationsKpis?.pending_approval ?? violationsPagination.pageItems.filter((v) => v.state === "under_review").length,
             color: "text-amber-600",
           },
           {
             label: "مؤكدة",
-            value: approvedCount.count ?? violationsPagination.pageItems.filter((v) => v.state === "approved").length,
+            value: violationsKpis?.approved ?? violationsPagination.pageItems.filter((v) => v.state === "approved").length,
             color: "text-red-600",
           },
         ].map((s) => (

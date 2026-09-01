@@ -680,7 +680,12 @@ export default function Legal() {
 
   useEffect(() => { load(); }, []);
 
-  const fetchCasesPage = useCallback((params) => getCases(params), []);
+  const [casesKpis, setCasesKpis] = useState(null);
+  const fetchCasesPage = useCallback(async (params) => {
+    const res = await getCases(params);
+    setCasesKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const casesPagination = useServerPagination(fetchCasesPage, 20);
 
   const refreshAll = () => {
@@ -735,9 +740,9 @@ export default function Legal() {
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
-          { label: "إجمالي القضايا", value: casesPagination.totalItems, color: "text-primary" },
-          { label: "قضايا نشطة", value: activeCases.length, color: "text-red-600" },
-          { label: "إجمالي قيمة القضايا", value: `${(totalCaseValue / 1000).toFixed(0)}K ر.س`, color: "text-purple-600" },
+          { label: "إجمالي القضايا", value: casesKpis?.total_cases ?? casesPagination.totalItems, color: "text-primary" },
+          { label: "قضايا نشطة", value: casesKpis?.active_cases ?? activeCases.length, color: "text-red-600" },
+          { label: "إجمالي قيمة القضايا", value: `${((casesKpis?.total_estimate_value ?? totalCaseValue) / 1000).toFixed(0)}K ر.س`, color: "text-purple-600" },
         ].map(kpi => (
           <div key={kpi.label} className="bg-card rounded-xl border border-border p-4">
             <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>

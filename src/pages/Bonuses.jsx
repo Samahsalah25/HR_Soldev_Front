@@ -12,7 +12,6 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 const STATUS_COLORS = {
@@ -314,8 +313,10 @@ const [selectedBonus, setSelectedBonus] = useState(null);
   };
   useEffect(() => { load(); }, []);
 
+  const [bonusesKpis, setBonusesKpis] = useState(null);
   const fetchBonusesPage = useCallback(async (params) => {
     const res = await getAdditions(params);
+    setBonusesKpis(res?.kpis ?? null);
     const list = res?.data || [];
     return {
       ...res,
@@ -344,16 +345,10 @@ const [selectedBonus, setSelectedBonus] = useState(null);
   }, []);
   const bonusesPagination = useServerPagination(fetchBonusesPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     bonusesPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل المكافآت (مش الصفحة الحالية بس)
-  const pendingCount = useFilteredCount(getAdditions, { state: "under_approval" }, [countsKey]);
-  const approvedCount = useFilteredCount(getAdditions, { state: "approved" }, [countsKey]);
 
   const approve = async (id) => {
     const ok = await confirmDialog({
@@ -405,14 +400,13 @@ const [selectedBonus, setSelectedBonus] = useState(null);
     );
 
   const totals = {
-    pending: pendingCount.count ?? pending.length,
+    pending: bonusesKpis?.pending_approval ?? pending.length,
 
-    approved: approvedCount.count ?? bonusesPagination.pageItems.filter(
+    approved: bonusesKpis?.approved ?? bonusesPagination.pageItems.filter(
       b => b.raw_state === "approved"
     ).length,
 
-    // مجموع مالي — لسه بيتحسب على الصفحة الحالية بس لحد ما الباك يوفّر endpoint إحصائيات
-    paid: bonusesPagination.pageItems
+    paid: bonusesKpis?.paid ?? bonusesPagination.pageItems
       .filter(
         b => b.raw_state === "paid"
       )

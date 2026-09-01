@@ -9,7 +9,6 @@ import {
 } from "@/api/deductionsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_COLORS = {
 //   "قيد الاعتماد": "bg-amber-100 text-amber-700",
@@ -196,8 +195,10 @@ export default function Deductions() {
   };
   useEffect(() => { load(); }, []);
 
+  const [deductionsKpis, setDeductionsKpis] = useState(null);
   const fetchDeductionsPage = useCallback(async (params) => {
     const res = await getDeductions(params);
+    setDeductionsKpis(res?.kpis ?? null);
     const list = res?.data ?? res ?? [];
     return {
       ...res,
@@ -218,17 +219,10 @@ export default function Deductions() {
   }, []);
   const deductionsPagination = useServerPagination(fetchDeductionsPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     deductionsPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل الخصومات (مش الصفحة الحالية بس) — بتجيب
-  // العدد من الباك مباشرة (limit=1 + فلتر الحالة) من غير ما تجيب كل البيانات
-  const pendingCount = useFilteredCount(getDeductions, { state: "under_approval" }, [countsKey]);
-  const approvedCount = useFilteredCount(getDeductions, { state: "approved" }, [countsKey]);
 
   const approve = async (id) => {
     const ok = await confirmDialog({
@@ -289,13 +283,11 @@ export default function Deductions() {
     );
 
   const totals = {
-    pending: pendingCount.count ?? pending.length,
+    pending: deductionsKpis?.pending_approval ?? pending.length,
 
-    approved: approvedCount.count ?? deductionsPagination.pageItems.filter(d => d.status === "معتمد").length,
+    approved: deductionsKpis?.approved ?? deductionsPagination.pageItems.filter(d => d.status === "معتمد").length,
 
-    // ملاحظة: ده مجموع مالي، مش عدد — مفيش طريقة نحسبه دقيق من غير endpoint
-    // إحصائيات من الباك، فلسه بيتحسب على الصفحة الحالية بس.
-    applied: deductionsPagination.pageItems
+    applied: deductionsKpis?.paid ?? deductionsPagination.pageItems
       .filter(d => d.status === "مطبَّق")
       .reduce((s, d) => s + (Number(d.amount) || 0), 0),
   };

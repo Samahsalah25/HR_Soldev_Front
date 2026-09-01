@@ -16,7 +16,6 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { API_ORIGIN } from "@/api/axios";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 // روابط الـ CV/المستندات ممكن ترجع من الـ API كمسار نسبي (مش رابط كامل) — نضيفله دومين السيرفر
@@ -674,24 +673,23 @@ export default function Recruitment() {
 
   useEffect(() => { load(); }, []);
 
-  const fetchJobsPage = useCallback((params) => getJobs(params), []);
+  // kpis جوه رد /jobs بيغطي الوظائف والمتقدمين مع بعض
+  const [jobsKpis, setJobsKpis] = useState(null);
+  const fetchJobsPage = useCallback(async (params) => {
+    const res = await getJobs(params);
+    setJobsKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const jobsPagination = useServerPagination(fetchJobsPage, 20);
 
   const fetchAppsPage = useCallback((params) => getApplicants(params), []);
   const appsPagination = useServerPagination(fetchAppsPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     jobsPagination.reload();
     appsPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل الوظائف/المتقدمين (مش الصفحة الحالية بس)
-  const activeJobsCount = useFilteredCount(getJobs, { state: "accepted" }, [countsKey]);
-  const pendingJobsCount = useFilteredCount(getJobs, { state: "under_review" }, [countsKey]);
-  const acceptedAppsCount = useFilteredCount(getApplicants, { stage: "accepted" }, [countsKey]);
 
   const approveJob = async (id) => {
     const ok = await confirmDialog({
@@ -804,10 +802,10 @@ export default function Recruitment() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "وظائف نشطة", value: activeJobsCount.count ?? activeJobs.length, color: "text-green-600" },
-          { label: "قيد الاعتماد", value: pendingJobsCount.count ?? pendingJobs.length, color: "text-amber-600" },
-          { label: "إجمالي المتقدمين", value: appsPagination.totalItems, color: "text-primary" },
-          { label: "مقبولون", value: acceptedAppsCount.count ?? appsPagination.pageItems.filter(a => a.stage === "accepted" || a.stage === "مقبول").length, color: "text-secondary" },
+          { label: "وظائف نشطة", value: jobsKpis?.total_active_jobs ?? activeJobs.length, color: "text-green-600" },
+          { label: "قيد الاعتماد", value: jobsKpis?.under_review ?? pendingJobs.length, color: "text-amber-600" },
+          { label: "إجمالي المتقدمين", value: jobsKpis?.total_applicants ?? appsPagination.totalItems, color: "text-primary" },
+          { label: "مقبولون", value: jobsKpis?.total_approved_applicants ?? appsPagination.pageItems.filter(a => a.stage === "accepted" || a.stage === "مقبول").length, color: "text-secondary" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>

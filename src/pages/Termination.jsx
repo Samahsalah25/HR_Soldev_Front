@@ -771,8 +771,10 @@ export default function Termination() {
     "cancelled": "Cancelled",
   };
 
+  const [eosKpis, setEosKpis] = useState(null);
   const fetchRequestsPage = useCallback(async (params) => {
     const eosRes = await getEndOfService(params);
+    setEosKpis(eosRes?.kpis ?? null);
     const rawReqs = Array.isArray(eosRes) ? eosRes : eosRes?.data ?? eosRes?.requests ?? [];
     return {
       ...eosRes,
@@ -796,11 +798,12 @@ export default function Termination() {
     requestsPagination.reload();
   };
 
-  // ملاحظة: الإحصائيات والفلترة دلوقتي بتشتغل على الصفحة الحالية بس
+  // ملاحظة: "قيد التنفيذ" بيغطي كذا مرحلة مع بعض، والباك بيرجع مرحلة "pending_manager" بس
+  // من غير الباقي (HR/Finance/IT/الموافقة النهائية) — فلسه محسوبة محليًا عشان تفضل شاملة
   const stats = {
     pending: requestsPagination.pageItems.filter(r => !["Completed", "Cancelled", "Draft"].includes(r.status)).length,
-    completed: requestsPagination.pageItems.filter(r => r.status === "Completed").length,
-    total: requestsPagination.totalItems,
+    completed: eosKpis?.completed ?? requestsPagination.pageItems.filter(r => r.status === "Completed").length,
+    total: eosKpis?.total_eos_requests ?? requestsPagination.totalItems,
   };
 
   const filtered = requestsPagination.pageItems.filter(r => !filterStatus || r.status === filterStatus);

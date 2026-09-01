@@ -14,7 +14,6 @@ import { getEmployeesList } from "@/api/employeesApi";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 
 
@@ -87,7 +86,12 @@ export default function Leaves() {
   };
   useEffect(() => { load(); }, []);
 
-  const fetchLeavesPage = useCallback((params) => getAllVacationRequests(params), []);
+  const [leavesKpis, setLeavesKpis] = useState(null);
+  const fetchLeavesPage = useCallback(async (params) => {
+    const res = await getAllVacationRequests(params);
+    setLeavesKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const leavesPagination = useServerPagination(fetchLeavesPage, 20);
 
   const fetchBalancesPage = useCallback((params) => getVacationYearlyBalance(params), []);
@@ -96,19 +100,12 @@ export default function Leaves() {
   const fetchTicketsPage = useCallback((params) => getFlyingTicket(params), []);
   const ticketsPagination = useServerPagination(fetchTicketsPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     leavesPagination.reload();
     balancesPagination.reload();
     ticketsPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل طلبات الإجازة (مش الصفحة الحالية بس)
-  const pendingCount = useFilteredCount(getAllVacationRequests, { state: "confirm" }, [countsKey]);
-  const approvedCount = useFilteredCount(getAllVacationRequests, { state: "validate" }, [countsKey]);
-  const rejectedCount = useFilteredCount(getAllVacationRequests, { state: "refuse" }, [countsKey]);
 
   const calcDays = (from, to) => {
     if (!from || !to) return 0;
@@ -288,10 +285,10 @@ export default function Leaves() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "إجمالي الطلبات", value: leavesPagination.totalItems, color: "text-primary" },
-          { label: "بانتظار الموافقة", value: pendingCount.count ?? pending.length, color: "text-amber-600" },
-          { label: "معتمدة", value: approvedCount.count ?? approved.length, color: "text-green-600" },
-          { label: "مرفوضة", value: rejectedCount.count ?? rejected.length, color: "text-red-600" },
+          { label: "إجمالي الطلبات", value: leavesKpis?.total_requests ?? leavesPagination.totalItems, color: "text-primary" },
+          { label: "بانتظار الموافقة", value: leavesKpis?.waiting_for_approval ?? pending.length, color: "text-amber-600" },
+          { label: "معتمدة", value: leavesKpis?.approved ?? approved.length, color: "text-green-600" },
+          { label: "مرفوضة", value: leavesKpis?.rejected ?? rejected.length, color: "text-red-600" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>

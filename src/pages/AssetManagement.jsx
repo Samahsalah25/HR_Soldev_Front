@@ -85,7 +85,12 @@ const load = async () => {
 
   useEffect(() => { load(); }, []);
 
-  const fetchAssetsPage = useCallback((params) => getAssetsPaged(params), []);
+  const [assetsKpis, setAssetsKpis] = useState(null);
+  const fetchAssetsPage = useCallback(async (params) => {
+    const res = await getAssetsPaged(params);
+    setAssetsKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const assetsPagination = useServerPagination(fetchAssetsPage, 20);
 
   const fetchReturnsPage = useCallback((params) => getCustodyReturnsPaged(params), []);
@@ -203,9 +208,9 @@ const load = async () => {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "إجمالي الأصول", value: assets.length, color: "text-foreground" },
-          { label: "متاحة", value: assets.filter(a => a.state === "available").length, color: "text-green-600" },
-          { label: "مخصصة", value: assets.filter(a => a.state === "assigned" || a.state === "in_use").length, color: "text-blue-600" },
+          { label: "إجمالي الأصول", value: assetsKpis?.total_custodies ?? assets.length, color: "text-foreground" },
+          { label: "متاحة", value: assetsKpis?.available ?? assets.filter(a => a.state === "available").length, color: "text-green-600" },
+          { label: "مخصصة", value: assetsKpis?.in_use ?? assets.filter(a => a.state === "assigned" || a.state === "in_use").length, color: "text-blue-600" },
           { label: "طلبات معلقة", value: pendingRequests.length, color: "text-amber-600" },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-4 text-center">

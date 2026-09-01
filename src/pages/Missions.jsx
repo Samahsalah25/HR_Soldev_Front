@@ -12,7 +12,6 @@ import {
 import { getEmployees } from "@/api/departmentsApi";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useServerPagination } from "@/lib/useServerPagination";
-import { useFilteredCount } from "@/lib/useFilteredCount";
 import TablePagination from "@/components/ui/TablePagination";
 // const STATUS_STYLES = {
 //   "قيد الانتظار": "bg-amber-100 text-amber-700",
@@ -65,19 +64,19 @@ export default function Missions() {
 
   useEffect(() => { load(); }, []);
 
-  const fetchMissionsPage = useCallback((params) => getMissions(params), []);
+  // kpis جايين جاهزين من الباك جوه نفس رد القائمة — دقيقين على كل البيانات (حتى الميزانية)
+  const [missionsKpis, setMissionsKpis] = useState(null);
+  const fetchMissionsPage = useCallback(async (params) => {
+    const res = await getMissions(params);
+    setMissionsKpis(res?.kpis ?? null);
+    return res;
+  }, []);
   const missionsPagination = useServerPagination(fetchMissionsPage, 20);
 
-  const [countsKey, setCountsKey] = useState(0);
   const refreshAll = () => {
     load();
     missionsPagination.reload();
-    setCountsKey((k) => k + 1);
   };
-
-  // عدادات دقيقة على مستوى كل المهمات (مش الصفحة الحالية بس)
-  const pendingCount = useFilteredCount(getMissions, { state: "waiting" }, [countsKey]);
-  const activeCount = useFilteredCount(getMissions, { state: "ongoing" }, [countsKey]);
 
   const handleEmpSelect = (id) => {
     const emp = employees.find(e => e.id === Number(id));
@@ -215,20 +214,19 @@ export default function Missions() {
     if (ok) await updateStatus(id, "completed");
   };
 
-  // ملاحظة: الإحصائيات دلوقتي بتتحسب على الصفحة الحالية بس (مش كل المهام)
+  // الأرقام دي كلها (حتى الميزانية) بتيجي جاهزة من الباك (kpis) دلوقتي — دقيقة على كل المهام
   const stats = {
-    total: missionsPagination.totalItems,
+    total: missionsKpis?.total_missions ?? missionsPagination.totalItems,
 
-    pending: pendingCount.count ?? missionsPagination.pageItems.filter(
+    pending: missionsKpis?.waiting_for_approval ?? missionsPagination.pageItems.filter(
       (m) => m.state === "waiting"
     ).length,
 
-    active: activeCount.count ?? missionsPagination.pageItems.filter(
+    active: missionsKpis?.ongoing ?? missionsPagination.pageItems.filter(
       (m) => m.state === "ongoing"
     ).length,
 
-    // مجموع مالي — لسه بيتحسب على الصفحة الحالية بس لحد ما الباك يوفّر endpoint إحصائيات
-    totalBudget: missionsPagination.pageItems
+    totalBudget: missionsKpis?.total_budget ?? missionsPagination.pageItems
       .filter(
         (m) => m.state !== "cancelled"
       )

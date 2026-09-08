@@ -469,7 +469,8 @@ import {
   UserX,
   Wallet,
 } from "lucide-react";
-
+import { getUnreadNotificationsCount } from "@/api/notificationsApi";
+import { useEffect } from "react";
 import NotificationPanel from "./NotificationPanel";
 import { useLanguage } from "../lib/useLanguage";
 import { useRole } from "../lib/useRole";
@@ -1151,7 +1152,21 @@ export default function Layout() {
 
   const navigate =
     useNavigate();
+const [unreadCount, setUnreadCount] = useState(0);
 
+useEffect(() => {
+  const loadCount = async () => {
+    try {
+      const res = await getUnreadNotificationsCount();
+      setUnreadCount(res?.unread_count ?? 0);
+    } catch (err) {
+      console.error("تعذّر تحميل عداد الإشعارات:", err);
+    }
+  };
+  loadCount();
+  const interval = setInterval(loadCount, 30000);
+  return () => clearInterval(interval);
+}, []);
   // =========================================================
   // TOGGLE GROUP
   // =========================================================
@@ -1320,30 +1335,20 @@ export default function Layout() {
           </button>
 
           {/* Notifications */}
-
-          <div className="relative">
-
-            <button
-              onClick={() =>
-                setNotifOpen(
-                  (o) => !o
-                )
-              }
-              className="relative flex items-center justify-center w-9 h-9 rounded-lg hover:bg-muted transition-colors"
-            >
-              <Bell className="w-5 h-5 text-muted-foreground" />
-
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            </button>
-
-            <NotificationPanel
-              isOpen={notifOpen}
-              onClose={() =>
-                setNotifOpen(false)
-              }
-            />
-
-          </div>
+<div className="relative">
+  <button onClick={() => setNotifOpen((o) => !o)} className="relative flex items-center justify-center w-9 h-9 rounded-lg hover:bg-muted transition-colors">
+    <Bell className="w-5 h-5 text-muted-foreground" />
+    {unreadCount > 0 && (
+      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+    )}
+  </button>
+  <NotificationPanel
+    isOpen={notifOpen}
+    onClose={() => setNotifOpen(false)}
+    unreadCount={unreadCount}
+    setUnreadCount={setUnreadCount}
+  />
+</div>
 
           {/* Pending requests */}
 

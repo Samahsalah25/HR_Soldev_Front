@@ -61,7 +61,9 @@ const PERMISSION_KEY_TO_NAV = {
     assets: "assets",
     expenses: "expenses",
     projects: "projects",
+    project_statement: "project-statement",
     purchases: "purchases",
+    sales: "sales",
     meetings: "meetings",
     salaries: "payroll",
     accounting: "accounting",
@@ -104,8 +106,10 @@ const BACKEND_UNSUPPORTED_KEYS = new Set([
     "storage_crm",
     "expenses",
     "projects",
+    "project_statement",
     "leavesettings",
     "purchases",
+    "sales",
 ]);
 
 // localStorage key مشترك مع RolesBatchEditor
@@ -140,17 +144,17 @@ const ROLE_ACCESS = {
             "missions", "termination", "violations", "deductions", "bonuses",
             "transfers", "tasks", "requests", "meetings", "payroll", "legal",
             "policies", "branches", "company-records", "reports", "ess",
-            "assets", "loan-management"],
+            "assets", "loan-management", "project-statement"],
     },
     general_manager: {
         nav: ["home", "dashboard", "employees", "recruitment", "leaves", "attendance",
             "missions", "termination", "violations", "deductions", "bonuses",
             "transfers", "tasks", "requests", "meetings", "payroll", "legal",
             "policies", "branches", "company-records", "reports", "ess",
-            "assets", "loan-management"],
+            "assets", "loan-management", "project-statement"],
     },
     ceo: { nav: ["all"] },
-    accountant: { nav: ["home", "accounting", "financial-reports", "assets", "loan-management"] },
+    accountant: { nav: ["home", "accounting", "financial-reports", "assets", "loan-management", "project-statement", "sales"] },
     admin: { nav: ["all"] },
     user: { nav: ["home", "ess", "assets"] },
 };

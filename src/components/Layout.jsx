@@ -41,6 +41,8 @@ import {
   Wallet,
   FolderKanban,
   ShoppingCart,
+  ShoppingBag,
+  BarChart3,
 } from "lucide-react";
 import { getUnreadNotificationsCount } from "@/api/notificationsApi";
 import { useEffect } from "react";
@@ -157,6 +159,11 @@ const ALL_NAV_GROUPS = [
         label: "نظام الحسابات",
       },
       {
+        path: "/sales",
+        icon: ShoppingBag,
+        label: "المبيعات",
+      },
+      {
         path: "/purchases",
         icon: ShoppingCart,
         label: "المشتريات",
@@ -229,6 +236,11 @@ const ALL_NAV_GROUPS = [
         path: "/projects",
         icon: FolderKanban,
         label: "المشاريع",
+      },
+      {
+        path: "/project-statement",
+        icon: BarChart3,
+        label: "كشف حساب المشروع",
       },
     ],
   },

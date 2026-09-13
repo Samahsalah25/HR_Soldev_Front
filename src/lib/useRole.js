@@ -38,11 +38,11 @@ export const ROLE_ACCESS = {
     canSeePayroll: false, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: false, isDeptManager: true,
   },
   hr: {
-    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings"],
+    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings", "project-statement"],
     canSeePayroll: true, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: true, isHR: true,
   },
   general_manager: {
-    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings"],
+    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings", "project-statement"],
     canSeePayroll: true, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: true, isGM: true,
   },
   ceo: {
@@ -50,7 +50,7 @@ export const ROLE_ACCESS = {
     canSeePayroll: true, canSeeAccounting: true, canSeeSettings: true, canSeeAllEmployees: true, isCEO: true,
   },
   accountant: {
-    nav: ["accounting", "financial-reports", "assets", "loan-management", "expenses", "projects", "purchases"],
+    nav: ["accounting", "financial-reports", "assets", "loan-management", "expenses", "projects", "purchases", "sales", "project-statement"],
     canSeePayroll: false, canSeeAccounting: true, canSeeSettings: false, canSeeAllEmployees: false, isAccountant: true,
   },
   admin: {

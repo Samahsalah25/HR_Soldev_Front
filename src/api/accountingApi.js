@@ -63,6 +63,15 @@ export async function getAccountsKPIs() {
   return res.data?.kpis || {};
 }
 
+/**
+ * GET وحدات القياس (Units of Measure) — لاستخدامها في دروب داون "وحدة القياس"
+ * في فورم المنتج، زي ما بيظهر بالظبط في أودوو
+ */
+export async function getUoms() {
+  const res = await accountingApi.get("/uom");
+  return res.data?.data || [];
+}
+
 
 
 

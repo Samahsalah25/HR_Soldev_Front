@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Package, Plus, X, Save } from "lucide-react";
-import { getProducts, createProduct, updateProduct, getTaxes, getAccounts } from "@/api/accountingApi";
+import { getProducts, createProduct, updateProduct, getTaxes, getAccounts, getUoms } from "@/api/accountingApi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useToast } from "@/components/ui/use-toast";
 import { usePagination } from "@/lib/usePagination";
@@ -17,7 +17,7 @@ function TaxChip({ value }) {
   );
 }
 
-function ProductForm({ product, taxes, accounts, onSave, onDiscard }) {
+function ProductForm({ product, taxes, accounts, uoms, onSave, onDiscard }) {
   const { toast } = useToast();
   const isEdit = Boolean(product?.id);
 
@@ -35,6 +35,7 @@ function ProductForm({ product, taxes, accounts, onSave, onDiscard }) {
     supplier_tax_id: product?.supplier_taxes_id?.[0] ?? "",
     property_account_income_id: product?.property_account_income_id || "",
     property_account_expense_id: product?.property_account_expense_id || "",
+    uom_id: product?.uom_id || "",
   });
   const [tab, setTab] = useState("general");
   const [saving, setSaving] = useState(false);
@@ -67,6 +68,7 @@ function ProductForm({ product, taxes, accounts, onSave, onDiscard }) {
         supplier_taxes_id: form.supplier_tax_id ? [Number(form.supplier_tax_id)] : [],
         property_account_income_id: form.property_account_income_id ? Number(form.property_account_income_id) : undefined,
         property_account_expense_id: form.property_account_expense_id ? Number(form.property_account_expense_id) : undefined,
+        uom_id: form.uom_id ? Number(form.uom_id) : undefined,
       };
 
       if (isEdit) {
@@ -193,12 +195,20 @@ function ProductForm({ product, taxes, accounts, onSave, onDiscard }) {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-foreground">سعر البيع</label>
-                <input
-                  type="number"
-                  value={form.list_price}
-                  onChange={(e) => set("list_price", +e.target.value)}
-                  className="w-32 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none mt-1"
-                />
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    value={form.list_price}
+                    onChange={(e) => set("list_price", +e.target.value)}
+                    className="w-32 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+                  />
+                  <span className="text-sm text-muted-foreground">لكل</span>
+                  <select value={form.uom_id} onChange={(e) => set("uom_id", e.target.value)}
+                    className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none">
+                    <option value="">وحدة القياس...</option>
+                    {uoms.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">ضريبة المبيعات</label>
@@ -264,6 +274,7 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [taxes, setTaxes] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [uoms, setUoms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "form"
   const [editing, setEditing] = useState(null);
@@ -274,11 +285,12 @@ export default function Products() {
       // الصفحة دي مشتركة بين تبويب "العملاء" و"الموردين" (نفس الكومبوننت في
       // AccountingMain.jsx)، فبنجيب منتجات المبيعات والمشتريات مع بعض
       // ونستبعد التكرار (منتج ممكن يكون sale_ok و purchase_ok مع بعض)
-      const [saleProds, purchaseProds, taxesRes, accs] = await Promise.all([
+      const [saleProds, purchaseProds, taxesRes, accs, uomsRes] = await Promise.all([
         getProducts("sale"),
         getProducts("purchase").catch(() => []),
         getTaxes().catch(() => []),
         getAccounts().catch(() => []),
+        getUoms().catch(() => []),
       ]);
       const byId = new Map();
       [...saleProds, ...purchaseProds].forEach((p) => byId.set(p.id, p));
@@ -292,6 +304,7 @@ export default function Products() {
           is_active: item.active ?? item.is_active,
         }))
       );
+      setUoms(uomsRes || []);
     } catch (err) {
       console.error("خطأ أثناء تحميل المنتجات:", err);
       toast({
@@ -318,6 +331,7 @@ export default function Products() {
         product={editing}
         taxes={taxes}
         accounts={accounts}
+        uoms={uoms}
         onSave={() => { closeForm(); load(); }}
         onDiscard={closeForm}
       />

@@ -60,6 +60,7 @@ const PERMISSION_KEY_TO_NAV = {
     requests: "requests",
     assets: "assets",
     expenses: "expenses",
+    projects: "projects",
     meetings: "meetings",
     salaries: "payroll",
     accounting: "accounting",
@@ -78,6 +79,9 @@ const PERMISSION_KEY_TO_NAV = {
     storage_bookings: "storage-bookings",
     storage_contracts: "storage-contracts",
     storage_crm: "storage-crm",
+    // ⚠️ الاسم لازم يكون "LeaveSettings" بالظبط (نفس حالة الأحرف) عشان يطابق
+    // مسار الراوت <Route path="/LeaveSettings" .../> اللي بيولّد navKey بنفس الشكل ده
+    LeaveSettings: "LeaveSettings",
 };
 
 const NAV_TO_PERMISSION_KEY = Object.fromEntries(
@@ -98,6 +102,8 @@ const BACKEND_UNSUPPORTED_KEYS = new Set([
     "storage_contracts",
     "storage_crm",
     "expenses",
+    "projects",
+    "leavesettings",
 ]);
 
 // localStorage key مشترك مع RolesBatchEditor

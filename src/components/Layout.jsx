@@ -39,6 +39,7 @@ import {
   CreditCard,
   UserX,
   Wallet,
+  FolderKanban,
 } from "lucide-react";
 import { getUnreadNotificationsCount } from "@/api/notificationsApi";
 import { useEffect } from "react";
@@ -217,6 +218,11 @@ const ALL_NAV_GROUPS = [
         path: "/meetings",
         icon: Video,
         label: "الاجتماعات",
+      },
+      {
+        path: "/projects",
+        icon: FolderKanban,
+        label: "المشاريع",
       },
     ],
   },

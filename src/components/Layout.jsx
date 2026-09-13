@@ -40,6 +40,7 @@ import {
   UserX,
   Wallet,
   FolderKanban,
+  ShoppingCart,
 } from "lucide-react";
 import { getUnreadNotificationsCount } from "@/api/notificationsApi";
 import { useEffect } from "react";
@@ -154,6 +155,11 @@ const ALL_NAV_GROUPS = [
         path: "/accounting",
         icon: Calculator,
         label: "نظام الحسابات",
+      },
+      {
+        path: "/purchases",
+        icon: ShoppingCart,
+        label: "المشتريات",
       },
       {
         path: "/financial-reports",

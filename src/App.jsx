@@ -314,7 +314,7 @@ import LeaveSettings from './pages/Leavessettings.jsx';
 import Projects from './pages/Projects.jsx';
 import Purchases from './pages/Purchases.jsx';
 import Sales from './pages/Sales.jsx';
-import ProjectStatement from './pages/ProjectStatement.jsx';
+import ProjectStatement from './pages/Projectstatement.jsx';
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 

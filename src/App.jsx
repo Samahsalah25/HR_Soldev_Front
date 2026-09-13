@@ -314,6 +314,7 @@ import LeaveSettings from './pages/Leavessettings.jsx';
 import Projects from './pages/Projects.jsx';
 import Purchases from './pages/Purchases.jsx';
 import Sales from './pages/Sales.jsx';
+import ProjectStatement from './pages/ProjectStatement.jsx';
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 
@@ -442,7 +443,8 @@ const AuthenticatedApp = () => {
           <Route path="/end-of-service" element={<EndOfService />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/purchases" element={<Purchases />} />
-<Route path="/sales" element={<Sales />} />
+          <Route path="/sales" element={<Sales />} />
+          <Route path="/project-statement" element={<ProjectStatement />} />
           <Route path="/missions" element={<Missions />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />

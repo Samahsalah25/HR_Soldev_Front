@@ -9,8 +9,8 @@ import {
   TrendingDown,
   Wallet,
 } from "lucide-react";
-import { getProjects } from "@/api/PurchasesApi";
-import { getAnalyticLines } from "@/api/AnalyticApi";
+import { getProjects } from "../api/projectsApi";
+import { getAnalyticLines } from "../api/Analyticapi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 
 /* ────────────────────────────────────────────────────────────────────────

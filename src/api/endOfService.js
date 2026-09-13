@@ -3,8 +3,13 @@ import api from "./axios";
 // =============================
 // GET DEPARTURE REASONS
 // =============================
+// ⚠️ لاحظت إن الـ path القديم كان "/departure_reasons" من غير prefix،
+// لكن حسب التوثيق اللي بعتهولي الـ endpoint الفعلي هو:
+// /end_of_service/departure_reasons — عدلته هنا عشان يطابق الباك اند.
+// لو الـ axios instance بتاعك أصلاً فيه baseURL بيحط /end_of_service
+// من نفسه، رجّعها زي ما كانت.
 export const getDepartureReasons = async () => {
-  const res = await api.get("/departure_reasons");
+  const res = await api.get("/end_of_service/departure_reasons");
   return res.data;
 };
 

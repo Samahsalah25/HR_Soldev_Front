@@ -51,6 +51,10 @@ export const PERMISSION_MODULES = [
     { key: "company_records", label: "سجلات الشركة", group: "الإدارة" },
     { key: "policies", label: "سياسات الشركة", group: "الإدارة" },
     { key: "legal_affairs", label: "الشؤون القانونية", group: "الإدارة" },
+    // ⚠️ الاسم لازم يكون "LeaveSettings" بالظبط (نفس حالة الأحرف)
+    // عشان مطابق لمسار الراوت <Route path='/LeaveSettings' .../>
+    // اللي بيولّد navKey بنفس الشكل ده في Layout.jsx (canSee("LeaveSettings"))
+    { key: "LeaveSettings", label: "إعدادات الإجازات", group: "الإدارة" },
     { key: "reports", label: "التقارير", group: "الإدارة" },
     { key: "permissions", label: "الصلاحيات", group: "الإدارة" },
     { key: "user_management", label: "إدارة المستخدمين", group: "الإدارة" },

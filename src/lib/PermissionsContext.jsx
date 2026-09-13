@@ -61,6 +61,7 @@ const PERMISSION_KEY_TO_NAV = {
     assets: "assets",
     expenses: "expenses",
     projects: "projects",
+    purchases: "purchases",
     meetings: "meetings",
     salaries: "payroll",
     accounting: "accounting",
@@ -104,6 +105,7 @@ const BACKEND_UNSUPPORTED_KEYS = new Set([
     "expenses",
     "projects",
     "leavesettings",
+    "purchases",
 ]);
 
 // localStorage key مشترك مع RolesBatchEditor

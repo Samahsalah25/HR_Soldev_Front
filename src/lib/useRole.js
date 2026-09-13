@@ -50,7 +50,7 @@ export const ROLE_ACCESS = {
     canSeePayroll: true, canSeeAccounting: true, canSeeSettings: true, canSeeAllEmployees: true, isCEO: true,
   },
   accountant: {
-    nav: ["accounting", "financial-reports", "assets", "loan-management", "expenses", "projects"],
+    nav: ["accounting", "financial-reports", "assets", "loan-management", "expenses", "projects", "purchases"],
     canSeePayroll: false, canSeeAccounting: true, canSeeSettings: false, canSeeAllEmployees: false, isAccountant: true,
   },
   admin: {

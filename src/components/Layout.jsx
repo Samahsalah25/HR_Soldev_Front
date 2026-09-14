@@ -43,6 +43,7 @@ import {
   ShoppingCart,
   ShoppingBag,
   BarChart3,
+  Coins,
 } from "lucide-react";
 import { getUnreadNotificationsCount } from "@/api/notificationsApi";
 import { useEffect } from "react";
@@ -209,6 +210,11 @@ const ALL_NAV_GROUPS = [
             path: "/taxes",
             icon: BookText,
             label: " الضرائب",
+          },
+           {
+            path: "/currencies",
+            icon: Coins,
+            label: "العملات",
           },
         ],
       },
@@ -418,7 +424,10 @@ if (group.label === "المالية" && navKey === "payment_terms") {
 }
     if (group.label === "المالية" && navKey === "taxes") {
   return (canSee("payroll") || canSee("accounting") || canSee("taxes"));
-}            
+}
+    if (group.label === "المالية" && navKey === "currencies") {
+  return (canSee("payroll") || canSee("accounting") || canSee("financial-reports"));
+}
                 return canSee(navKey);
               });
 

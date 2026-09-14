@@ -159,6 +159,16 @@ const ALL_NAV_GROUPS = [
         label: "نظام الحسابات",
       },
       {
+        path: "/project-statement",
+        icon: BarChart3,
+        label: "كشف حساب المشروع",
+      },
+      {
+        path: "/projects",
+        icon: FolderKanban,
+        label: "المشاريع",
+      },
+      {
         path: "/sales",
         icon: ShoppingBag,
         label: "المبيعات",
@@ -231,16 +241,6 @@ const ALL_NAV_GROUPS = [
         path: "/meetings",
         icon: Video,
         label: "الاجتماعات",
-      },
-      {
-        path: "/projects",
-        icon: FolderKanban,
-        label: "المشاريع",
-      },
-      {
-        path: "/project-statement",
-        icon: BarChart3,
-        label: "كشف حساب المشروع",
       },
     ],
   },

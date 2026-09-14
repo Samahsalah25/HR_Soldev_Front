@@ -61,7 +61,8 @@ export default function ProjectStatement() {
     (async () => {
       try {
         setLoadingProjects(true);
-        setProjects((await getProjects()) || []);
+        const res = await getProjects();
+        setProjects(Array.isArray(res) ? res : res?.data ?? []);
       } catch (err) {
         console.error("خطأ أثناء تحميل المشاريع:", err);
         setError(extractApiErrorMessage(err, "تعذر تحميل المشاريع"));

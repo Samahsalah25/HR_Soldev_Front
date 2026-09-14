@@ -310,6 +310,7 @@ import CustomerPayments from './pages/accounting/CustomerPayments.jsx';
 import Journals from './pages/accounting/Journals.jsx';
 import PaymentTerms from './pages/accounting/Paymentterms.jsx';
 import Taxes from './pages/accounting/Taxes.jsx';
+import Currencies from './pages/accounting/Currencies.jsx';
 import LeaveSettings from './pages/Leavessettings.jsx';
 import Projects from './pages/Projects.jsx';
 import Purchases from './pages/Purchases.jsx';
@@ -438,6 +439,7 @@ const AuthenticatedApp = () => {
          <Route path="/payment_terms" element={<PaymentTerms/>} />
          <Route path='/LeaveSettings' element={<LeaveSettings/>} />
           <Route path="/taxes" element={<Taxes/>} />
+          <Route path="/currencies" element={<Currencies/>} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/end-of-service" element={<EndOfService />} />

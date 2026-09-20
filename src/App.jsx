@@ -316,6 +316,7 @@ import Projects from './pages/Projects.jsx';
 import Purchases from './pages/Purchases.jsx';
 import Sales from './pages/Sales.jsx';
 import ProjectStatement from './pages/Projectstatement.jsx';
+import Nitaqat from './pages/Nitaqatpage.jsx';
 function TerminatedEmployeeScreen() {
   const navigate = useNavigate();
 
@@ -440,6 +441,7 @@ const AuthenticatedApp = () => {
          <Route path='/LeaveSettings' element={<LeaveSettings/>} />
           <Route path="/taxes" element={<Taxes/>} />
           <Route path="/currencies" element={<Currencies/>} />
+          <Route path="/nitaqat" element={<Nitaqat />} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/end-of-service" element={<EndOfService />} />

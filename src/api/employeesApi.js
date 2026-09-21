@@ -43,6 +43,7 @@ export async function getEmployeeById(id) {
  *   transport_allowance, food_allowance, communication_allowance, other_allowance
  *   bank_name, iban_number, insurance_number
  *   ticket_entitlement (yearly|biannual|none), ticket_class, ticket_destination, ticket_price
+ *   nitaqat_weight (رقم عشري), gosi_system (old|new)
  *   documents: [{ document (base64), filename, notes }]
  */
 export async function createEmployee(data) {
@@ -95,6 +96,7 @@ export function normalizeEmployee(e) {
         nationality: e.nationality_name || e.nationality || "",
         is_saudi: e.employee_category === "saudi",
         employee_category: e.employee_category || "saudi",
+        nitaqat_weight: e.nitaqat_weight ?? 1,
         // ids
         id_number: e.identification_id || "",
         id_expiry: e.residency_end || "",
@@ -141,6 +143,7 @@ export function normalizeEmployee(e) {
         bank_name: e.bank_name || "",
         iban: e.iban_number || "",
         gosi_number: e.insurance_number || "",
+        gosi_system: e.gosi_system || "new",
         // tickets
         ticket_entitlement: e.ticket_entitlement === "yearly" ? "سنوياً" : e.ticket_entitlement === "biannual" ? "كل سنتين" : e.ticket_entitlement === "none" ? "غير مستحق" : e.ticket_entitlement || "غير مستحق",
         ticket_class: e.ticket_class === "economic" ? "اقتصادية" : e.ticket_class === "business" ? "أعمال" : e.ticket_class || "اقتصادية",
@@ -171,6 +174,7 @@ export function toApiPayload(form) {
         name_en: form.full_name_en || form.name_en || "",
         nationality: form.nationality || "",
         employee_category: form.is_saudi ? "saudi" : "resident",
+        nitaqat_weight: form.nitaqat_weight === "" ? null : Number(form.nitaqat_weight ?? 1),
         identification_id: form.id_number || "",
         residency_end: form.id_expiry || null,
         passport_id: form.passport_number || "",
@@ -208,6 +212,7 @@ export function toApiPayload(form) {
         bank_name: form.bank_name || "",
         iban_number: form.iban || "",
         insurance_number: form.gosi_number || "",
+        gosi_system: form.gosi_system || "new",
         ticket_entitlement: form.ticket_entitlement === "سنوياً" ? "yearly" : form.ticket_entitlement === "كل سنتين" ? "biannual" : form.ticket_entitlement === "غير مستحق" ? "none" : form.ticket_entitlement || "none",
         ticket_class: form.ticket_class === "اقتصادية" ? "economic" : form.ticket_class === "أعمال" ? "business" : form.ticket_class || "economic",
         ticket_destination: form.ticket_destination || "",

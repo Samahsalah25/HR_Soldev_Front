@@ -130,7 +130,8 @@ const [errors, setErrors] = useState({});
     join_date: "", contract_type: "غير محدد المدة", contract_end_date: "",
     basic_salary: 0, housing_allowance: 0, transport_allowance: 0,
     food_allowance: 0, communication_allowance: 0, other_allowances: 0,
-    bank_name: "", iban: "", gosi_number: "",
+    bank_name: "", iban: "", gosi_number: "", gosi_system: "new",
+    nitaqat_weight: 1,
     ticket_entitlement: "سنوياً", ticket_class: "اقتصادية", ticket_destination: "", ticket_value: 0,
     status: "نشط", notes: "",
     user_role: "employee",
@@ -538,7 +539,18 @@ const handleSubmit = async () => {
     </Field>
 
 
-    <Field 
+    <Field label="وزن نطاقات (Nitaqat Weight)">
+      <Input
+        type="number"
+        step="0.01"
+        min={0}
+        value={form.nitaqat_weight}
+        onChange={e => set("nitaqat_weight", e.target.value === "" ? "" : +e.target.value)}
+      />
+    </Field>
+
+
+    <Field
       label="رقم الهوية / الإقامة *"
       error={errors.id_number}
     >
@@ -1051,6 +1063,17 @@ const handleSubmit = async () => {
         }
         dir="ltr"
       />
+    </Field>
+
+
+    <Field label="نظام التأمينات الاجتماعية (GOSI)">
+      <Select
+        value={form.gosi_system}
+        onChange={e => set("gosi_system", e.target.value)}
+      >
+        <option value="old">النظام القديم</option>
+        <option value="new">النظام الجديد</option>
+      </Select>
     </Field>
 
   </div>

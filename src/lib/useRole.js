@@ -38,11 +38,11 @@ export const ROLE_ACCESS = {
     canSeePayroll: false, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: false, isDeptManager: true,
   },
   hr: {
-    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings", "project-statement"],
+    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings", "project-statement", "nitaqat"],
     canSeePayroll: true, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: true, isHR: true,
   },
   general_manager: {
-    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings", "project-statement"],
+    nav: ["dashboard", "employees", "recruitment", "leaves", "attendance", "missions", "termination", "violations", "deductions", "bonuses", "transfers", "tasks", "requests", "meetings", "payroll", "legal", "policies", "branches", "company-records", "reports", "ess", "assets", "loan-management", "expenses", "projects", "LeaveSettings", "project-statement", "nitaqat"],
     canSeePayroll: true, canSeeAccounting: false, canSeeSettings: false, canSeeAllEmployees: true, isGM: true,
   },
   ceo: {

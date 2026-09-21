@@ -44,6 +44,7 @@ import {
   ShoppingBag,
   BarChart3,
   Coins,
+  Gauge,
 } from "lucide-react";
 import { getUnreadNotificationsCount } from "@/api/notificationsApi";
 import { useEffect } from "react";
@@ -333,6 +334,11 @@ const ALL_NAV_GROUPS = [
         path: "/user-management",
         icon: UserCircle,
         label: "إدارة المستخدمين",
+      },
+      {
+        path: "/nitaqat",
+        icon: Gauge,
+        label: "النطاقات",
       },
     ],
   },

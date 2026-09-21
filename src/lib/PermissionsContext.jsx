@@ -64,6 +64,7 @@ const PERMISSION_KEY_TO_NAV = {
     project_statement: "project-statement",
     purchases: "purchases",
     sales: "sales",
+    nitaqat: "nitaqat",
     meetings: "meetings",
     salaries: "payroll",
     accounting: "accounting",
@@ -110,6 +111,7 @@ const BACKEND_UNSUPPORTED_KEYS = new Set([
     "leavesettings",
     "purchases",
     "sales",
+    "nitaqat",
 ]);
 
 // localStorage key مشترك مع RolesBatchEditor
@@ -144,14 +146,14 @@ const ROLE_ACCESS = {
             "missions", "termination", "violations", "deductions", "bonuses",
             "transfers", "tasks", "requests", "meetings", "payroll", "legal",
             "policies", "branches", "company-records", "reports", "ess",
-            "assets", "loan-management", "project-statement"],
+            "assets", "loan-management", "project-statement", "nitaqat"],
     },
     general_manager: {
         nav: ["home", "dashboard", "employees", "recruitment", "leaves", "attendance",
             "missions", "termination", "violations", "deductions", "bonuses",
             "transfers", "tasks", "requests", "meetings", "payroll", "legal",
             "policies", "branches", "company-records", "reports", "ess",
-            "assets", "loan-management", "project-statement"],
+            "assets", "loan-management", "project-statement", "nitaqat"],
     },
     ceo: { nav: ["all"] },
     accountant: { nav: ["home", "accounting", "financial-reports", "assets", "loan-management", "project-statement", "sales"] },

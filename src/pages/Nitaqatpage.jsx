@@ -23,7 +23,7 @@ import {
   updateNitaqatBand,
   deleteNitaqatBand,
   getCompanies,
-} from "@/api/NitaqatApi";
+} from "../api/Nitaqatapi";
 import { extractApiErrorMessage } from "@/lib/apiErrors";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";

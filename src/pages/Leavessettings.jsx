@@ -98,6 +98,10 @@ const EMPTY_TYPE = {
   timesheet_generate: false,
   employee_requests: "no",
   affects_gosi: false,
+  // 🆕 التخصيص التلقائي عند إنشاء الموظف — auto_allocation_days بيظهر
+  // ويتبعت بس لو auto_allocate_on_create = true
+  auto_allocate_on_create: false,
+  auto_allocation_days: 0,
   responsible_ids: [],
   rules: [],
   // قايمة id بتوع القواعد (rules) اللي اتمسحت من الفورم وكانت أصلاً
@@ -147,6 +151,10 @@ function buildPayload(form) {
     timesheet_generate: !!form.timesheet_generate,
     employee_requests: form.employee_requests,
     affects_gosi: !!form.affects_gosi,
+    // 🆕 لو الـ checkbox مقفول نبعت 0 عشان الحقل يفضل موجود في الـ payload
+    // (الباك اند مستنيه دايمًا)، بس القيمة بتتصفر لو مش مفعّل
+    auto_allocate_on_create: !!form.auto_allocate_on_create,
+    auto_allocation_days: form.auto_allocate_on_create ? Number(form.auto_allocation_days) || 0 : 0,
     responsible_ids: form.responsible_ids,
     rules: [...activeRules, ...deletedRules],
   };
@@ -201,6 +209,9 @@ function LeaveTypeForm({ leaveType, onBack, onSaved }) {
           // بدل "" (string)، فبنجبرها تبقى نص دايمًا عشان .trim() ماتكسرش
           legal_reference: leaveType.legal_reference && typeof leaveType.legal_reference === "string" ? leaveType.legal_reference : "",
           responsible_ids: leaveType.responsible_ids || [],
+          // 🆕 تأمين القيم الافتراضية لو الباك اند رجّع null بدل false/رقم
+          auto_allocate_on_create: !!leaveType.auto_allocate_on_create,
+          auto_allocation_days: leaveType.auto_allocation_days ?? 0,
           rules: (leaveType.rules || []).map((r) => ({ ...r, _key: r.id ?? Date.now() + Math.random() })),
           _deleted_rule_ids: [],
         }
@@ -430,6 +441,54 @@ function LeaveTypeForm({ leaveType, onBack, onSaved }) {
               value={form.include_public_holidays_in_duration ? "yes" : "no"}
               onChange={(v) => set("include_public_holidays_in_duration", v === "yes")}
             />
+
+            {/* 🆕 التخصيص التلقائي عند إنشاء الموظف */}
+            <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50/50">
+              <p className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                التخصيص التلقائي
+              </p>
+
+              <label className="flex items-center justify-between text-sm text-gray-700 cursor-pointer max-w-md">
+                <span className="flex items-center gap-1">
+                  تخصيص تلقائي عند إنشاء الموظف
+                  <span
+                    className="text-blue-400 cursor-help text-xs"
+                    title="لو مفعّل، هيتم تخصيص رصيد للموظف تلقائيًا بمجرد إنشائه"
+                  >
+                    ❓
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={form.auto_allocate_on_create}
+                  onChange={(e) => set("auto_allocate_on_create", e.target.checked)}
+                  className="w-4 h-4 accent-orange-500"
+                />
+              </label>
+
+              {form.auto_allocate_on_create && (
+                <div className="max-w-md">
+                  <label className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                    عدد أيام التخصيص التلقائي
+                    <span
+                      className="text-blue-400 cursor-help"
+                      title="عدد الأيام اللي هتتخصص تلقائيًا للموظف عند إنشائه"
+                    >
+                      ❓
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.auto_allocation_days}
+                    onChange={(e) => set("auto_allocation_days", e.target.value)}
+                    placeholder="5.00"
+                    className="w-full sm:w-1/2 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
+                  />
+                </div>
+              )}
+            </div>
 
             <div className="max-w-md">
               <label className="text-xs text-gray-400 mb-1 block">* جهة اعتماد طلب التخصيص</label>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, Save } from "lucide-react";
-import { createCustodyRequest } from "@/api/assetsApi";
+import { createCustodyRequest, RETURN_CONDITION_OPTIONS } from "@/api/assetsApi";
 
 export default function AssetRequestModal({ assets, employees, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -8,6 +8,8 @@ export default function AssetRequestModal({ assets, employees, onClose, onSave }
     equipment_id: "",
     request_type: "custody_request",
     reason: "",
+    return_condition: "good",
+    damage_cost: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +43,8 @@ export default function AssetRequestModal({ assets, employees, onClose, onSave }
         equipment_id: Number(form.equipment_id),
         request_type: form.request_type,
         reason: form.reason,
+        return_condition: isReturn ? form.return_condition : undefined,
+        damage_cost: isReturn && form.return_condition !== "good" ? form.damage_cost : undefined,
       });
       onSave();
     } catch (err) {
@@ -140,6 +144,39 @@ export default function AssetRequestModal({ assets, employees, onClose, onSave }
               className="w-full mt-1.5 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none resize-none"
             />
           </div>
+
+          {/* حالة الإعادة وتكلفة التلف — بتظهر بس لما يكون الطلب "إعادة أصل" */}
+          {isReturn && (
+            <>
+              <div>
+                <label className="text-sm font-medium">حالة الأصل عند الإعادة</label>
+                <select
+                  value={form.return_condition}
+                  onChange={e => set("return_condition", e.target.value)}
+                  className="w-full mt-1.5 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+                >
+                  {RETURN_CONDITION_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {form.return_condition !== "good" && (
+                <div>
+                  <label className="text-sm font-medium">تكلفة التلف/الفقد (ريال)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.damage_cost}
+                    onChange={e => set("damage_cost", e.target.value)}
+                    placeholder="مثال: 1500"
+                    className="w-full mt-1.5 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none"
+                  />
+                </div>
+              )}
+            </>
+          )}
 
           {/* Buttons */}
           <div className="flex gap-3 justify-end pt-2">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Package, History, CheckCircle, XCircle, Wrench, RotateCcw } from "lucide-react";
+import { Plus, Search, Package, History, CheckCircle, XCircle, Wrench, RotateCcw, Wallet } from "lucide-react";
 
 import {
   getAssets, getAssetsPaged, getEmployees, getCustodyRequests, getCustodyReturns, getCustodyReturnsPaged,
@@ -15,6 +15,7 @@ import AssetRequestModal from "../components/assets/AssetRequestModal";
 import AssetHistoryModal from "../components/assets/AssetHistoryModal";
 import CustodyDeliverModal from "../components/assets/CustodyDeliverModal";
 import CustodyReceiveModal from "../components/assets/CustodyReceiveModal";
+import CustodyChargeModal from "../components/assets/CustodyChargeModal";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { usePagination } from "@/lib/usePagination";
 import { useServerPagination } from "@/lib/useServerPagination";
@@ -56,6 +57,7 @@ const { user, isLoadingAuth } = useAuth();
   const [historyModal, setHistoryModal] = useState(null);
   const [deliverModal, setDeliverModal] = useState(null);
   const [receiveModal, setReceiveModal] = useState(null);
+  const [chargeModal, setChargeModal] = useState(null);
 
   // ── Load ────────────────────────────────────────────────────────────────────
 const load = async () => {
@@ -406,6 +408,15 @@ const load = async () => {
                             <RotateCcw className="w-3 h-3" /> تسجيل استلام
                           </button>
                         )}
+                        {/* طلب إعادة أصل تالف/مفقود → زرار تحصيل من الموظف */}
+                        {isAdminOrHR && req._source === "returns" && isPending && (
+                          <button
+                            onClick={() => setChargeModal(req)}
+                            className="flex items-center gap-1 text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition-colors whitespace-nowrap"
+                          >
+                            <Wallet className="w-3 h-3" /> تحصيل من الموظف
+                          </button>
+                        )}
                         {/* طلب أصل عادي → قبول / رفض */}
                         {isAdminOrHR && req._source !== "returns" && isPending && (
                           <>
@@ -491,14 +502,24 @@ const load = async () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {isAdminOrHR && isPendingReturn && (
-                        <button
-                          onClick={() => setReceiveModal(ret)}
-                          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg font-medium hover:bg-orange-200 transition-colors whitespace-nowrap"
-                        >
-                          <RotateCcw className="w-3 h-3" /> تسجيل استلام
-                        </button>
-                      )}
+                      <div className="flex gap-1 items-center">
+                        {isAdminOrHR && isPendingReturn && (
+                          <button
+                            onClick={() => setReceiveModal(ret)}
+                            className="flex items-center gap-1 text-xs px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg font-medium hover:bg-orange-200 transition-colors whitespace-nowrap"
+                          >
+                            <RotateCcw className="w-3 h-3" /> تسجيل استلام
+                          </button>
+                        )}
+                        {isAdminOrHR && isPendingReturn && (
+                          <button
+                            onClick={() => setChargeModal(ret)}
+                            className="flex items-center gap-1 text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition-colors whitespace-nowrap"
+                          >
+                            <Wallet className="w-3 h-3" /> تحصيل من الموظف
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -545,6 +566,13 @@ const load = async () => {
           employees={employees}
           onClose={() => setReceiveModal(null)}
           onSave={() => { setReceiveModal(null); refreshAll(); }}
+        />
+      )}
+      {chargeModal && (
+        <CustodyChargeModal
+          request={chargeModal}
+          onClose={() => setChargeModal(null)}
+          onSave={() => { setChargeModal(null); refreshAll(); }}
         />
       )}
       {historyModal && (

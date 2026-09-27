@@ -11,13 +11,13 @@ export const CATEGORY_TYPE_OPTIONS = [
     { value: "Other", label: "أخرى" },
 ];
 
+// ⚠️ مؤكَّد عبر Postman (Create custody): القيم الفعلية هي
+// "available" / "in_use" / "maintenance" — مفيش "assigned" خالص.
 export const STATE_OPTIONS = [
     { value: "available", label: "متاح" },
-    { value: "assigned", label: "مخصص" },
+    { value: "in_use", label: "قيد الاستخدام" },
     { value: "maintenance", label: "صيانة" },
 ];
-
-const STATE_ALIAS = { in_use: "assigned" };
 
 export const CONDITION_OPTIONS = [
     { value: "new", label: "جديد" },
@@ -31,8 +31,7 @@ export const REQUEST_TYPE_OPTIONS = [
 ];
 
 export function stateLabel(state) {
-    const normalized = STATE_ALIAS[state] || state;
-    return STATE_OPTIONS.find(o => o.value === normalized)?.label ?? state ?? "—";
+    return STATE_OPTIONS.find(o => o.value === state)?.label ?? state ?? "—";
 }
 
 export function categoryTypeLabel(cat) {
@@ -166,15 +165,43 @@ export async function getCustodyRequests() {
 
 /**
  * POST /custody_requests
- * Body: { employee_id, equipment_id, request_type: "custody_request"|"custody_return", reason }
+ * Body: { employee_id, equipment_id, request_type: "custody_request"|"custody_return", reason,
+ *         return_condition?: "good"|"damaged"|"lost", damage_cost? }
+ * return_condition/damage_cost بيتبعتوا بس لما request_type = "custody_return" (مؤكَّد عبر Postman)
  */
-export async function createCustodyRequest({ employee_id, equipment_id, request_type, reason }) {
-    const res = await assetsApi.post("/custody_requests", {
-        employee_id,
-        equipment_id,
-        request_type,
-        reason,
-    });
+export async function createCustodyRequest({ employee_id, equipment_id, request_type, reason, return_condition, damage_cost }) {
+    const payload = { employee_id, equipment_id, request_type, reason };
+    if (request_type === "custody_return") {
+        payload.return_condition = return_condition;
+        if (damage_cost !== undefined && damage_cost !== "") {
+            payload.damage_cost = Number(damage_cost) || 0;
+        }
+    }
+    const res = await assetsApi.post("/custody_requests", payload);
+    return res.data;
+}
+
+export const RETURN_CONDITION_OPTIONS = [
+    { value: "good", label: "سليم" },
+    { value: "damaged", label: "تالف" },
+    { value: "lost", label: "مفقود" },
+];
+
+export const CHARGE_PAYMENT_METHOD_OPTIONS = [
+    { value: "deduction", label: "خصم من الراتب (مرة واحدة)" },
+    { value: "advance", label: "سلفة بالتقسيط" },
+    { value: "upfront", label: "دفع مقدم (كاش / تحويل)" },
+];
+
+/**
+ * POST /custody_requests/:id/charge
+ * تحصيل من الموظف عن أصل تالف/مفقود — 3 طرق دفع (مؤكَّد عبر Postman):
+ *  - deduction: { payment_method, amount? }                          (amount اختياري، افتراضيًا = damage_cost)
+ *  - advance:   { payment_method, amount, advance_type_id, installments_count }
+ *  - upfront:   { payment_method, amount, journal_id }
+ */
+export async function chargeCustodyRequest(id, payload) {
+    const res = await assetsApi.post(`/custody_requests/${id}/charge`, payload);
     return res.data;
 }
 

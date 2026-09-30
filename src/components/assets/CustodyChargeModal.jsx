@@ -3,6 +3,7 @@ import { X, Wallet } from "lucide-react";
 import { chargeCustodyRequest, CHARGE_PAYMENT_METHOD_OPTIONS } from "@/api/assetsApi";
 import { getSalaryAdvanceTypes } from "@/api/salaryAdvanceTypesApi";
 import { getJournals } from "@/api/Journalsapi";
+import { extractApiErrorMessage } from "@/lib/apiErrors";
 
 export default function CustodyChargeModal({ request, onClose, onSave }) {
   const [advanceTypes, setAdvanceTypes] = useState([]);
@@ -57,7 +58,7 @@ export default function CustodyChargeModal({ request, onClose, onSave }) {
       onSave();
     } catch (err) {
       console.error("Charge custody error:", err);
-      setError(err?.response?.data?.message ?? "حدث خطأ أثناء تسجيل التحصيل");
+      setError(extractApiErrorMessage(err, "حدث خطأ أثناء تسجيل التحصيل"));
     } finally {
       setSaving(false);
     }

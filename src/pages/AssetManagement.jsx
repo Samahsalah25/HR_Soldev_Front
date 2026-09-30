@@ -408,14 +408,19 @@ const load = async () => {
                             <RotateCcw className="w-3 h-3" /> تسجيل استلام
                           </button>
                         )}
-                        {/* طلب إعادة أصل تالف/مفقود → زرار تحصيل من الموظف */}
-                        {isAdminOrHR && req._source === "returns" && isPending && (
+                        {/* طلب إعادة أصل تالف/مفقود → زرار تحصيل من الموظف (لو لسه ماتحصلش) */}
+                        {isAdminOrHR && req._source === "returns" && isPending && !req.is_charged && (
                           <button
                             onClick={() => setChargeModal(req)}
                             className="flex items-center gap-1 text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition-colors whitespace-nowrap"
                           >
                             <Wallet className="w-3 h-3" /> تحصيل من الموظف
                           </button>
+                        )}
+                        {isAdminOrHR && req._source === "returns" && req.is_charged && (
+                          <span className="text-xs px-3 py-1.5 bg-muted text-muted-foreground rounded-lg font-medium whitespace-nowrap">
+                            تم التحصيل ✓
+                          </span>
                         )}
                         {/* طلب أصل عادي → قبول / رفض */}
                         {isAdminOrHR && req._source !== "returns" && isPending && (
@@ -511,13 +516,18 @@ const load = async () => {
                             <RotateCcw className="w-3 h-3" /> تسجيل استلام
                           </button>
                         )}
-                        {isAdminOrHR && isPendingReturn && (
+                        {isAdminOrHR && isPendingReturn && !ret.is_charged && (
                           <button
                             onClick={() => setChargeModal(ret)}
                             className="flex items-center gap-1 text-xs px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition-colors whitespace-nowrap"
                           >
                             <Wallet className="w-3 h-3" /> تحصيل من الموظف
                           </button>
+                        )}
+                        {isAdminOrHR && ret.is_charged && (
+                          <span className="text-xs px-3 py-1.5 bg-muted text-muted-foreground rounded-lg font-medium whitespace-nowrap">
+                            تم التحصيل ✓
+                          </span>
                         )}
                       </div>
                     </td>
